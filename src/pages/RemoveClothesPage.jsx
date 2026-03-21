@@ -3,7 +3,7 @@ import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle } from 'luc
 import { detectObjects, generateGarmentImage } from '../services/geminiService'
 import { getPrompt } from '../services/masterPrompts'
 import { getApiKeys } from '../services/apiKeyService'
-import { saveToLibrary, createLibraryRecord, downloadImage } from '../services/libraryService'
+import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems } from '../services/libraryService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -90,15 +90,50 @@ ${productName ? `- Collection name: "${productName}"` : ''}
 Generate the master composite image now.`
 }
 
+// ─── Smart Naming Helpers ─────────────────────────────────────────────────────
+
+const CATEGORY_PREFIX = {
+  top: 'ÁO', bottom: 'QUẦN', dress: 'ĐẦM', outerwear: 'KHOÁC',
+  shoes: 'GIÀY', bag: 'TÚI', accessory: 'PKIỆN', model: 'MẪU',
+  background: 'NỀN', other: 'BST',
+}
+
+function generateSmartName(item, existingItems = []) {
+  const prefix = CATEGORY_PREFIX[item?.category] || 'SP'
+  // Lấy tên rút gọn từ nameVi (bỏ các từ chung)
+  let baseName = (item?.nameVi || 'Không tên')
+    .replace(/^(Áo|Quần|Đầm|Giày|Túi|Mũ|Băng|Vợt|Tất)\s*/i, '')
+    .trim()
+  if (baseName.length > 30) baseName = baseName.slice(0, 30).trim()
+
+  const fullBase = `${prefix}-${baseName}`
+
+  // Đếm số item trùng prefix + base
+  const sameBase = existingItems.filter(i =>
+    i.name && i.name.startsWith(fullBase)
+  )
+  const num = String(sameBase.length + 1).padStart(3, '0')
+  return `${fullBase}-${num}`
+}
+
+function checkDuplicate(name, existingItems) {
+  return existingItems.some(i => i.name === name)
+}
+
 // ─── Save Modal Component ─────────────────────────────────────────────────────
 
-function SaveModal({ item, imageSrc, onClose, onSave }) {
-  const [name, setName] = useState(item?.nameVi || '')
+function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
+  const existingItems = getLibraryItems()
+
+  const autoName = generateSmartName(item, existingItems)
+  const [name, setName] = useState(autoName)
   const [type, setType] = useState(item?.category === 'model' ? 'model' : 'product')
+
+  const isDuplicate = checkDuplicate(name, existingItems)
 
   const handleSave = () => {
     const record = createLibraryRecord({
-      name: name || item?.nameVi || 'Không tên',
+      name: name || autoName,
       type,
       category: item?.category || 'other',
       imageSrc,
@@ -108,33 +143,101 @@ function SaveModal({ item, imageSrc, onClose, onSave }) {
     onClose()
   }
 
+  // Gợi ý các tên thay thế
+  const suggestions = [
+    autoName,
+    productName ? `${CATEGORY_PREFIX[item?.category] || 'SP'}-${productName}-${item?.nameVi || ''}`.slice(0, 50) : null,
+    item?.description ? `${CATEGORY_PREFIX[item?.category] || 'SP'}-${item.description.slice(0, 35)}` : null,
+  ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i) // unique
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
           Lưu vào Kho Tài Nguyên
         </h3>
-        <div style={{ display: 'flex', gap: 14, marginBottom: 16 }}>
+
+        {/* Preview + type */}
+        <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
           {imageSrc && (
             <img src={imageSrc} alt={name}
-              style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 'var(--r-sm)', background: '#f5f5f5' }}
-            />
+              style={{ width: 72, height: 72, objectFit: 'contain', borderRadius: 'var(--r-sm)', background: '#f5f5f5' }} />
           )}
-          <div style={{ flex: 1 }}>
-            <label className="select-label">Tên sản phẩm/mẫu</label>
-            <input type="text" value={name} onChange={e => setName(e.target.value)}
-              placeholder="VD: Đầm trắng" className="input-field" />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <span style={{
+                display: 'inline-block', padding: '2px 10px', borderRadius: 'var(--r-full)',
+                fontSize: 11, fontWeight: 700, letterSpacing: 0.3,
+                background: 'var(--brand-08)', color: 'var(--brand)',
+              }}>
+                {CATEGORY_PREFIX[item?.category] || 'SP'}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
+                {item?.nameVi}
+              </span>
+            </div>
+            {item?.description && (
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                {item.description.slice(0, 60)}…
+              </div>
+            )}
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+
+        {/* Mã / Tên định danh */}
+        <label className="select-label" style={{ marginBottom: 4, display: 'block' }}>
+          Mã định danh sản phẩm
+        </label>
+        <input type="text" value={name} onChange={e => setName(e.target.value)}
+          className="input-field"
+          style={{
+            marginBottom: 4, fontFamily: 'monospace', fontSize: 13.5, fontWeight: 600,
+            borderColor: isDuplicate ? '#ef4444' : undefined,
+          }} />
+
+        {/* Duplicate warning */}
+        {isDuplicate && (
+          <div style={{ fontSize: 11.5, color: '#ef4444', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 4 }}>
+            ⚠️ Tên này đã tồn tại trong kho — hãy chọn tên khác hoặc dùng gợi ý bên dưới.
+          </div>
+        )}
+
+        {/* Suggestions */}
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6, letterSpacing: 0.3 }}>
+            GỢI Ý TÊN
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {suggestions.map((s, i) => (
+              <button key={i} onClick={() => setName(s)}
+                style={{
+                  padding: '4px 10px', fontSize: 11.5, fontFamily: 'monospace',
+                  border: `1.5px solid ${name === s ? 'var(--brand)' : 'var(--border)'}`,
+                  borderRadius: 'var(--r-full)', cursor: 'pointer',
+                  background: name === s ? 'var(--brand-08)' : 'var(--white)',
+                  color: name === s ? 'var(--brand)' : 'var(--text-secondary)',
+                  fontWeight: 500,
+                }}>
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Type toggle */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
           <button className={`toggle-pill ${type === 'product' ? 'active' : ''}`}
             onClick={() => setType('product')}>Sản phẩm</button>
           <button className={`toggle-pill ${type === 'model' ? 'active' : ''}`}
             onClick={() => setType('model')}>Người mẫu</button>
         </div>
+
+        {/* Actions */}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button className="btn btn-ghost" onClick={onClose}>Hủy</button>
-          <button className="btn btn-primary" onClick={handleSave}>Lưu ngay</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={!name.trim()}>
+            Lưu ngay
+          </button>
         </div>
       </div>
     </div>
@@ -527,6 +630,7 @@ export default function RemoveClothesPage() {
       {/* Save Modal */}
       {saveModalItem && (
         <SaveModal item={saveModalItem.item} imageSrc={saveModalItem.imageSrc}
+          productName={productName}
           onClose={() => setSaveModalItem(null)}
           onSave={(record) => console.log('Saved:', record)} />
       )}
