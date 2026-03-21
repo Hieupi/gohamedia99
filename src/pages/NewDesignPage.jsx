@@ -1,41 +1,43 @@
 import { useState, useRef } from 'react'
 import {
   Upload, Sparkles, RotateCcw, Download, Save, Trash2, ChevronDown, X,
-  Send, Plus, Image as ImageIcon, Settings2, Loader
+  Send, Plus, Image as ImageIcon, Settings2, Loader, FolderOpen, Check
 } from 'lucide-react'
 import { generateGarmentImage } from '../services/geminiService'
 import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems } from '../services/libraryService'
 
-// ─── Option Data ──────────────────────────────────────────────────────────────
+// ─── Option Data (Auto = AI tự chọn tối ưu) ──────────────────────────────────
 
-const QUALITY_OPTS = ['1K (SD)', '2K (HD)', '4K (Ultra)']
-const ASPECT_OPTS = ['1:1 Vuông', '9:16 Dọc (Story)', '16:9 Ngang', '3:4 Chân dung', '4:3 Landscape']
+const AUTO = '🤖 Auto (AI tự chọn)'
+
+const QUALITY_OPTS = [AUTO, '1K (SD)', '2K (HD)', '4K (Ultra)']
+const ASPECT_OPTS = [AUTO, '1:1 Vuông', '9:16 Dọc (Story)', '16:9 Ngang', '3:4 Chân dung', '4:3 Landscape']
 
 const MODEL_TYPES = [
-  'Á Đông thanh lịch', 'Hàn Quốc ulzzang', 'Châu Âu cổ điển', 'Latina phóng khoáng',
-  'Châu Phi hiện đại', 'Trung Đông sang trọng', 'Ngẫu nhiên',
+  AUTO, 'Á Đông thanh lịch', 'Hàn Quốc ulzzang', 'Châu Âu cổ điển', 'Latina phóng khoáng',
+  'Châu Phi hiện đại', 'Trung Đông sang trọng',
 ]
 const BACKGROUNDS = [
-  'Studio trắng chuyên nghiệp', 'Studio xám phẳng', 'Ngoài trời thành phố', 'Bãi biển nhiệt đới',
+  AUTO, 'Studio trắng chuyên nghiệp', 'Studio xám phẳng', 'Ngoài trời thành phố', 'Bãi biển nhiệt đới',
   'Quán cafe vintage', 'Showroom cao cấp', 'Phố cổ châu Âu', 'Vườn hoa lãng mạn',
-  'Nội thất sang trọng', 'Phông nền gradient', 'Sân thượng rooftop', 'Ngẫu nhiên',
+  'Nội thất sang trọng', 'Phông nền gradient', 'Sân thượng rooftop',
 ]
 const POSES = [
-  'Đứng thẳng tự tin', 'Tay chống hông', 'Đi bộ catwalk', 'Ngồi ghế thanh lịch',
+  AUTO, 'Đứng thẳng tự tin', 'Tay chống hông', 'Đi bộ catwalk', 'Ngồi ghế thanh lịch',
   'Tựa tường cool', 'Xoay nhẹ 3/4', 'Tay vuốt tóc', 'Nhảy tung tăng',
-  'Ngồi bệt casual', 'Đứng nghiêng nhẹ', 'Ngẫu nhiên',
+  'Ngồi bệt casual', 'Đứng nghiêng nhẹ',
 ]
 const STYLES = [
-  'Thời trang cao cấp', 'Street style', 'Tối giản Minimalist', 'Vintage retro',
+  AUTO, 'Thời trang cao cấp', 'Street style', 'Tối giản Minimalist', 'Vintage retro',
   'Sporty năng động', 'Bohemian tự do', 'Công sở thanh lịch', 'Đồ ngủ/homewear',
-  'Dạ hội/tiệc tối', 'Y2K trendy', 'Ngẫu nhiên',
+  'Dạ hội/tiệc tối', 'Y2K trendy',
 ]
 const SKIN_FILTERS = [
-  'Tự nhiên', 'Da trắng sáng', 'Da trắng hồng', 'Da nâu khỏe', 'Da rám nắng',
-  'Da sứ Hàn Quốc', 'Da olive Địa Trung Hải',
+  AUTO, 'Da trắng hồng', 'Da trắng sáng', 'Da sứ Hàn Quốc', 'Da nâu khỏe',
+  'Da rám nắng', 'Da olive Địa Trung Hải',
 ]
 const TONE_FILTERS = [
-  'Tự nhiên', 'Warm vintage', 'Cool tone xanh', 'Pastel nhẹ nhàng', 'Moody tối',
+  AUTO, 'Warm vintage', 'Cool tone xanh', 'Pastel nhẹ nhàng', 'Moody tối',
   'Golden hour', 'Film analog', 'High contrast', 'Soft dreamy', 'Cinematic',
 ]
 
@@ -46,20 +48,40 @@ const QUICK_EDITS = [
   '🔆 Tăng sáng tổng thể', '🌈 Màu sắc sống động', '📐 Cân đối bố cục',
 ]
 
-// ─── Helper: Build prompt ─────────────────────────────────────────────────────
+// ─── Vietnamese DNA Auto Defaults ─────────────────────────────────────────────
+// Khi Auto: AI tự động tối ưu cho DNA mẫu Việt Nam + Gen Z sweet makeup
+
+const VN_DNA_PROMPT = `
+IMPORTANT AUTO DEFAULTS (apply when no specific preference is given):
+- Model DNA: Vietnamese / East Asian young woman (18-28), naturally beautiful
+- Skin: Porcelain white-pink (trắng hồng), smooth, dewy glow
+- Makeup: Sweet Gen Z style - gradient lip tint, soft blush, sparkly eye shadow, natural eyebrows
+- Hair: Trendy Gen Z Vietnamese hairstyle (layered, curtain bangs, or sleek)
+- Pose: Confident yet approachable, flattering for the garment
+- Background: Choose the most suitable background that complements the clothing style
+- Lighting: Soft, flattering studio lighting with gentle fill
+- Color grading: Fresh, youthful, slightly warm with pastel undertones
+- Overall vibe: High-end Vietnamese fashion lookbook, Instagram-worthy, aspirational
+`
 
 function buildDesignPrompt(opts) {
   const parts = ['Generate a professional fashion product photograph.']
-  if (opts.modelType && opts.modelType !== 'Ngẫu nhiên') parts.push(`Model type: ${opts.modelType}.`)
-  if (opts.background && opts.background !== 'Ngẫu nhiên') parts.push(`Background/setting: ${opts.background}.`)
-  if (opts.pose && opts.pose !== 'Ngẫu nhiên') parts.push(`Pose: ${opts.pose}.`)
-  if (opts.style && opts.style !== 'Ngẫu nhiên') parts.push(`Fashion style: ${opts.style}.`)
-  if (opts.skinFilter && opts.skinFilter !== 'Tự nhiên') parts.push(`Skin tone: ${opts.skinFilter}.`)
-  if (opts.toneFilter && opts.toneFilter !== 'Tự nhiên') parts.push(`Color grading/filter: ${opts.toneFilter}.`)
-  if (opts.quality) parts.push(`Output quality: ${opts.quality} resolution.`)
-  if (opts.aspect) parts.push(`Aspect ratio: ${opts.aspect}.`)
+  const isAuto = (v) => !v || v === AUTO
+
+  if (isAuto(opts.modelType)) {
+    parts.push(VN_DNA_PROMPT) // inject full VN DNA defaults
+  } else {
+    parts.push(`Model type: ${opts.modelType}.`)
+  }
+  if (!isAuto(opts.background)) parts.push(`Background/setting: ${opts.background}.`)
+  if (!isAuto(opts.pose)) parts.push(`Pose: ${opts.pose}.`)
+  if (!isAuto(opts.style)) parts.push(`Fashion style: ${opts.style}.`)
+  if (!isAuto(opts.skinFilter)) parts.push(`Skin tone: ${opts.skinFilter}.`)
+  if (!isAuto(opts.toneFilter)) parts.push(`Color grading/filter: ${opts.toneFilter}.`)
+  if (!isAuto(opts.quality)) parts.push(`Output quality: ${opts.quality} resolution.`)
+  if (!isAuto(opts.aspect)) parts.push(`Aspect ratio: ${opts.aspect}.`)
   // User prompt luôn ưu tiên cuối cùng
-  if (opts.prompt) parts.push(`IMPORTANT additional requirements (PRIORITIZE THIS): ${opts.prompt}`)
+  if (opts.prompt) parts.push(`\nCRITICAL — USER'S CUSTOM REQUEST (ALWAYS PRIORITIZE THIS OVER EVERYTHING): ${opts.prompt}`)
   return parts.join('\n')
 }
 
@@ -105,9 +127,47 @@ function PillSelect({ options, value, onChange }) {
   )
 }
 
+// ─── Library Picker Modal ─────────────────────────────────────────────────────
+
+function LibraryPickerModal({ onSelect, onClose, title }) {
+  const items = getLibraryItems()
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>
+          <FolderOpen size={16} style={{ verticalAlign: -2 }} /> {title || 'Chọn từ Kho Thư Viện'}
+        </h3>
+        {items.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+            Kho thư viện trống. Hãy tải ảnh lên hoặc tách đồ trước.
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10, maxHeight: 400, overflowY: 'auto', padding: '4px 0' }}>
+            {items.map(item => (
+              <div key={item.id} onClick={() => onSelect(item)}
+                style={{ cursor: 'pointer', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '2px solid var(--border)', transition: 'border-color 0.15s' }}
+                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
+                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                <img src={item.imageSrc} alt={item.name}
+                  style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }} />
+                <div style={{ padding: '4px 6px', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {item.name}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+          <button className="btn btn-ghost" onClick={onClose}>Đóng</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Image Slot ───────────────────────────────────────────────────────────────
 
-function ImageSlot({ src, onRemove, onAdd, label }) {
+function ImageSlot({ src, onRemove, onPickLibrary }) {
   if (src) {
     return (
       <div className="img-slot filled">
@@ -117,8 +177,9 @@ function ImageSlot({ src, onRemove, onAdd, label }) {
     )
   }
   return (
-    <div className="img-slot empty" onClick={onAdd}>
-      <Plus size={20} style={{ color: 'var(--text-muted)' }} />
+    <div className="img-slot empty" onClick={onPickLibrary} title="Chọn từ Kho Thư Viện">
+      <Plus size={18} style={{ color: 'var(--brand)' }} />
+      <span style={{ fontSize: 8, color: 'var(--text-muted)', marginTop: 2 }}>Kho</span>
     </div>
   )
 }
@@ -233,30 +294,31 @@ export default function NewDesignPage() {
   const refAddRef = useRef()
 
   // Images
-  const [refImages, setRefImages] = useState([])          // ảnh mẫu tham khảo (max 5)
-  const [productImages, setProductImages] = useState([])   // sản phẩm (max 8)
+  const [refImages, setRefImages] = useState([])
+  const [productImages, setProductImages] = useState([])
 
-  // Settings
-  const [quality, setQuality] = useState('2K (HD)')
-  const [aspect, setAspect] = useState('9:16 Dọc (Story)')
-  const [modelType, setModelType] = useState('')
-  const [background, setBackground] = useState('')
-  const [pose, setPose] = useState('')
-  const [style, setStyle] = useState('')
-  const [skinFilter, setSkinFilter] = useState('Tự nhiên')
-  const [toneFilter, setToneFilter] = useState('Tự nhiên')
+  // Settings — tất cả mặc định Auto (VN DNA Gen Z)
+  const [quality, setQuality] = useState(AUTO)
+  const [aspect, setAspect] = useState(AUTO)
+  const [modelType, setModelType] = useState(AUTO)
+  const [background, setBackground] = useState(AUTO)
+  const [pose, setPose] = useState(AUTO)
+  const [style, setStyle] = useState(AUTO)
+  const [skinFilter, setSkinFilter] = useState(AUTO)
+  const [toneFilter, setToneFilter] = useState(AUTO)
   const [prompt, setPrompt] = useState('')
   const [projectName, setProjectName] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
 
-  // Results (4 slots)
+  // Results
   const [results, setResults] = useState([null, null, null, null])
   const [loadingIdx, setLoadingIdx] = useState(new Set())
   const [errors, setErrors] = useState({})
   const [generating, setGenerating] = useState(false)
 
-  // Save modal
+  // Modals
   const [saveModal, setSaveModal] = useState(null)
+  const [libraryPicker, setLibraryPicker] = useState(null) // 'ref' | 'product' | null
 
   // ─── File handlers ────────────────────────────────────────────────────────
 
@@ -270,7 +332,17 @@ export default function NewDesignPage() {
     setProductImages(prev => [...prev, ...newImgs.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
   }
 
-  // ─── Generate 4 images ───────────────────────────────────────────────────
+  // Chọn ảnh từ Kho Thư Viện
+  const handleLibraryPick = (item) => {
+    const entry = { url: item.imageSrc, file: null, fromLibrary: true }
+    if (libraryPicker === 'ref' && refImages.length < 5) {
+      setRefImages(prev => [...prev, entry])
+    } else if (libraryPicker === 'product' && productImages.length < 8) {
+      setProductImages(prev => [...prev, entry])
+    }
+    setLibraryPicker(null)
+  }
+
 
   const handleGenerate = async () => {
     if (productImages.length === 0) return
@@ -358,7 +430,7 @@ export default function NewDesignPage() {
                   onRemove={() => setRefImages(prev => prev.filter((_, j) => j !== i))} />
               ))}
               {refImages.length < 5 && (
-                <ImageSlot onAdd={() => refFileRef.current?.click()} />
+                <ImageSlot onPickLibrary={() => setLibraryPicker('ref')} />
               )}
             </div>
           </div>
@@ -381,7 +453,7 @@ export default function NewDesignPage() {
                   onRemove={() => setProductImages(prev => prev.filter((_, j) => j !== i))} />
               ))}
               {productImages.length < 8 && (
-                <ImageSlot onAdd={() => productFileRef.current?.click()} />
+                <ImageSlot onPickLibrary={() => setLibraryPicker('product')} />
               )}
             </div>
           </div>
@@ -505,6 +577,15 @@ export default function NewDesignPage() {
       {saveModal && (
         <SaveDesignModal imageSrc={saveModal} projectName={projectName}
           onClose={() => setSaveModal(null)} />
+      )}
+
+      {/* Library Picker Modal */}
+      {libraryPicker && (
+        <LibraryPickerModal
+          title={libraryPicker === 'ref' ? 'Chọn ảnh mẫu từ Kho' : 'Chọn sản phẩm từ Kho'}
+          onClose={() => setLibraryPicker(null)}
+          onSelect={handleLibraryPick}
+        />
       )}
     </div>
   )
