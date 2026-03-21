@@ -1,173 +1,211 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import {
-  Search, SlidersHorizontal, Grid, List, Plus, Download, Trash2, Heart, Eye
+  Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff
 } from 'lucide-react'
+import {
+  getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
+  downloadImage, migrateOldLibrary
+} from '../services/libraryService'
 
-const CATEGORIES = ['Tất cả', 'Áo', 'Quần', 'Đầm', 'Phụ kiện', 'Bộ set']
+const CATEGORIES = ['Tất cả', 'Trang phục', 'Người mẫu', 'Phụ kiện', 'Bộ sưu tập']
 
-const ITEMS = Array.from({ length: 18 }, (_, i) => ({
-  id: i + 1,
-  src: `https://picsum.photos/seed/lib${i}/300/450`,
-  name: ['Áo đầm trắng', 'Áo thun basic', 'Đầm hoa nhí', 'Áo khoác denim',
-    'Váy midi', 'Set đồ công sở', 'Áo sơ mi trắng', 'Quần jeans xanh',
-    'Đầm dạ hội', 'Áo hoodie'][i % 10],
-  category: CATEGORIES[1 + (i % 4)],
-  date: `${10 + i}/3/2025`,
-  liked: i % 3 === 0,
-}))
+function mapCategory(cat) {
+  const m = {
+    top: 'Trang phục', bottom: 'Trang phục', dress: 'Trang phục',
+    outerwear: 'Trang phục', shoes: 'Phụ kiện', bag: 'Phụ kiện',
+    accessory: 'Phụ kiện', model: 'Người mẫu', background: 'Khác', other: 'Bộ sưu tập',
+  }
+  return m[cat] || 'Trang phục'
+}
+
+// ─── Preview Modal ────────────────────────────────────────────────────────────
+
+function PreviewModal({ item, onClose }) {
+  if (!item) return null
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="preview-modal" onClick={e => e.stopPropagation()}>
+        <button className="preview-close" onClick={onClose}><X size={18} /></button>
+        <img src={item.imageSrc} alt={item.name} className="preview-img" />
+        <div className="preview-info">
+          <h3>{item.name}</h3>
+          <span className="preview-badge">{item.type === 'model' ? 'Người mẫu' : 'Sản phẩm'}</span>
+          <span className="preview-date">{new Date(item.createdAt).toLocaleDateString('vi-VN')}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
-  const [view, setView] = useState('grid') // 'grid' | 'list'
+  const [items, setItems] = useState([])
+  const [view, setView] = useState('grid')
   const [selectedCat, setSelectedCat] = useState('Tất cả')
   const [searchQ, setSearchQ] = useState('')
-  const [liked, setLiked] = useState(() => new Set(ITEMS.filter(x => x.liked).map(x => x.id)))
+  const [preview, setPreview] = useState(null)
 
-  const filtered = ITEMS.filter(item => {
-    if (selectedCat !== 'Tất cả' && item.category !== selectedCat) return false
+  // Load items on mount + migrate old data
+  useEffect(() => {
+    migrateOldLibrary()
+    setItems(getLibraryItems())
+  }, [])
+
+  const refresh = useCallback(() => setItems(getLibraryItems()), [])
+
+  const handleDelete = (id) => {
+    if (!confirm('Xóa ảnh này khỏi thư viện?')) return
+    deleteFromLibrary(id)
+    refresh()
+  }
+
+  const handleToggleLike = (id) => {
+    toggleLikeInLibrary(id)
+    refresh()
+  }
+
+  const handleDownload = (item) => {
+    downloadImage(item.imageSrc, item.name)
+  }
+
+  // Filter
+  const filtered = items.filter(item => {
+    if (selectedCat !== 'Tất cả' && mapCategory(item.category) !== selectedCat) return false
     if (searchQ && !item.name.toLowerCase().includes(searchQ.toLowerCase())) return false
     return true
   })
 
-  const toggleLike = (id) => {
-    setLiked(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+  const stats = {
+    total: items.length,
+    products: items.filter(i => i.type === 'product').length,
+    models: items.filter(i => i.type === 'model').length,
+    liked: items.filter(i => i.liked).length,
   }
 
   return (
     <div className="fade-in">
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 22 }}>
-        <h1 className="page-title" style={{ marginBottom: 0 }}>📚 Thư viện</h1>
-        <button className="btn btn-primary">
-          <Plus size={15} />
-          Thêm mới
-        </button>
+      <div className="lib-header">
+        <h1 className="page-title" style={{ marginBottom: 0 }}>Thư viện</h1>
+        <div className="lib-stats">
+          <span className="lib-stat">{stats.total} ảnh</span>
+          <span className="lib-stat">•</span>
+          <span className="lib-stat">{stats.products} sản phẩm</span>
+          <span className="lib-stat">•</span>
+          <span className="lib-stat">{stats.models} mẫu</span>
+        </div>
       </div>
 
-      {/* Search + Filter Bar */}
-      <div className="library-toolbar">
-        <div className="library-search">
-          <Search size={15} style={{ color: 'var(--text-muted)', pointerEvents: 'none' }} />
-          <input
-            type="text"
-            placeholder="Tìm kiếm..."
-            value={searchQ}
-            onChange={e => setSearchQ(e.target.value)}
-            style={{
-              flex: 1, border: 'none', outline: 'none', background: 'none',
-              fontSize: 13.5, color: 'var(--text-primary)'
-            }}
-          />
+      {/* Toolbar */}
+      <div className="lib-toolbar">
+        <div className="lib-search">
+          <Search size={15} className="lib-search-icon" />
+          <input type="text" placeholder="Tìm kiếm..." value={searchQ}
+            onChange={e => setSearchQ(e.target.value)} className="lib-search-input" />
         </div>
-
-        <div className="library-view-toggle">
-          <button className={`library-view-btn${view === 'grid' ? ' active' : ''}`}
-            onClick={() => setView('grid')}>
-            <Grid size={15} />
-          </button>
-          <button className={`library-view-btn${view === 'list' ? ' active' : ''}`}
-            onClick={() => setView('list')}>
-            <List size={15} />
-          </button>
+        <div className="lib-view-toggle">
+          <button className={`lib-view-btn ${view === 'grid' ? 'active' : ''}`}
+            onClick={() => setView('grid')}><Grid size={16} /></button>
+          <button className={`lib-view-btn ${view === 'list' ? 'active' : ''}`}
+            onClick={() => setView('list')}><List size={16} /></button>
         </div>
-
-        <button className="btn btn-secondary" style={{ padding: '0 14px', height: 36 }}>
-          <SlidersHorizontal size={14} />
-          Lọc
-        </button>
       </div>
 
       {/* Category Tabs */}
-      <div className="category-tabs">
+      <div className="lib-tabs">
         {CATEGORIES.map(cat => (
-          <button
-            key={cat}
-            className={`category-tab${selectedCat === cat ? ' active' : ''}`}
-            onClick={() => setSelectedCat(cat)}
-          >
+          <button key={cat}
+            className={`lib-tab ${selectedCat === cat ? 'active' : ''}`}
+            onClick={() => setSelectedCat(cat)}>
             {cat}
           </button>
         ))}
       </div>
 
       {/* Count */}
-      <div style={{ fontSize: 12.5, color: 'var(--text-muted)', marginBottom: 16 }}>
-        Hiển thị {filtered.length} / {ITEMS.length} mẫu
+      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+        {filtered.length} / {items.length} ảnh
       </div>
 
-      {/* Grid */}
-      {view === 'grid' ? (
-        <div className="library-grid">
+      {/* Empty State */}
+      {filtered.length === 0 ? (
+        <div className="empty-state" style={{ minHeight: 300 }}>
+          <ImageOff size={48} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 16 }}>
+            {items.length === 0 ? 'Thư viện trống' : 'Không tìm thấy ảnh'}
+          </h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 280, textAlign: 'center' }}>
+            {items.length === 0
+              ? 'Hãy tách đồ từ ảnh và lưu vào đây để quản lý.'
+              : 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.'}
+          </p>
+        </div>
+      ) : view === 'grid' ? (
+        /* Grid View */
+        <div className="lib-grid">
           {filtered.map(item => (
-            <div key={item.id} className="library-card">
-              <div className="library-card-img-wrap">
-                <img
-                  src={item.src}
-                  alt={item.name}
-                  className="library-card-img"
-                  loading="lazy"
-                />
-                <div className="library-card-overlay">
-                  <button className="library-card-action">
-                    <Eye size={13} />
+            <div key={item.id} className="lib-card">
+              <div className="lib-card-img-wrap">
+                <img src={item.imageSrc} alt={item.name} className="lib-card-img" loading="lazy" />
+                <div className="lib-card-overlay">
+                  <button className="lib-card-action" onClick={() => setPreview(item)} title="Xem">
+                    <Eye size={14} />
                   </button>
-                  <button className="library-card-action">
-                    <Download size={13} />
+                  <button className="lib-card-action" onClick={() => handleDownload(item)} title="Tải xuống">
+                    <Download size={14} />
                   </button>
-                  <button className="library-card-action danger">
-                    <Trash2 size={13} />
+                  <button className="lib-card-action danger" onClick={() => handleDelete(item.id)} title="Xóa">
+                    <Trash2 size={14} />
                   </button>
                 </div>
+                {item.type === 'model' && (
+                  <span className="lib-card-badge model">Mẫu</span>
+                )}
               </div>
-              <div className="library-card-footer">
-                <div>
-                  <div className="library-card-name">{item.name}</div>
-                  <div className="library-card-meta">{item.category} • {item.date}</div>
+              <div className="lib-card-footer">
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  <div className="lib-card-name">{item.name}</div>
+                  <div className="lib-card-meta">
+                    {mapCategory(item.category)} • {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                  </div>
                 </div>
-                <button
-                  onClick={() => toggleLike(item.id)}
-                  style={{
-                    background: 'none', border: 'none', cursor: 'pointer',
-                    color: liked.has(item.id) ? '#ef4444' : 'var(--text-muted)',
-                    padding: 4, flexShrink: 0
-                  }}
-                >
-                  <Heart size={15} fill={liked.has(item.id) ? 'currentColor' : 'none'} />
+                <button onClick={() => handleToggleLike(item.id)} className="lib-like-btn"
+                  style={{ color: item.liked ? '#ef4444' : 'var(--text-muted)' }}>
+                  <Heart size={15} fill={item.liked ? 'currentColor' : 'none'} />
                 </button>
               </div>
             </div>
           ))}
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        /* List View */
+        <div className="lib-list">
           {filtered.map(item => (
-            <div key={item.id} className="library-list-row">
-              <img src={item.src} alt={item.name}
-                style={{ width: 52, height: 72, objectFit: 'cover', borderRadius: 'var(--r-sm)', flexShrink: 0 }} />
+            <div key={item.id} className="lib-list-row">
+              <img src={item.imageSrc} alt={item.name} className="lib-list-thumb" loading="lazy" />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{item.category} • {item.date}</div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {mapCategory(item.category)} • {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                </div>
               </div>
               <div style={{ display: 'flex', gap: 6 }}>
-                <button className="btn btn-secondary" style={{ padding: '0 10px', height: 30, fontSize: 12 }}>
-                  <Download size={12} />
+                <button className="icon-btn" onClick={() => setPreview(item)}><Eye size={14} /></button>
+                <button className="icon-btn" onClick={() => handleDownload(item)}><Download size={14} /></button>
+                <button className="icon-btn" onClick={() => handleToggleLike(item.id)}
+                  style={{ color: item.liked ? '#ef4444' : undefined }}>
+                  <Heart size={14} fill={item.liked ? 'currentColor' : 'none'} />
                 </button>
-                <button onClick={() => toggleLike(item.id)}
-                  style={{
-                    height: 30, width: 30, background: 'none', border: '1.5px solid var(--border)',
-                    borderRadius: 'var(--r-sm)', cursor: 'pointer',
-                    color: liked.has(item.id) ? '#ef4444' : 'var(--text-muted)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                  }}>
-                  <Heart size={13} fill={liked.has(item.id) ? 'currentColor' : 'none'} />
-                </button>
+                <button className="icon-btn" onClick={() => handleDelete(item.id)}
+                  style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Preview Modal */}
+      <PreviewModal item={preview} onClose={() => setPreview(null)} />
     </div>
   )
 }

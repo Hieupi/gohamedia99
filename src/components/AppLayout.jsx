@@ -1,30 +1,39 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
-  Home, Wand2, Scissors, Image, Shield, Settings, LogOut
+  Home, Wand2, Scissors, Image, Shield, Settings, LogOut, Phone
 } from 'lucide-react'
 
 const NAV_ITEMS = [
-  { path: '/home',           label: 'Trang chủ',     icon: Home      },
-  { path: '/new-design',     label: 'Thiết kế mới',  icon: Wand2     },
-  { path: '/remove-clothes', label: 'Tách đồ áo',    icon: Scissors  },
-  { path: '/library',        label: 'Thư viện',      icon: Image     },
-  { path: '/admin',          label: 'Quản trị',      icon: Shield    },
-  { path: '/settings',       label: 'Cài đặt',       icon: Settings  },
+  { path: '/home', label: 'Trang chủ', icon: Home },
+  { path: '/new-design', label: 'Thiết kế mới', icon: Wand2 },
+  { path: '/remove-clothes', label: 'Tách đồ áo', icon: Scissors },
+  { path: '/library', label: 'Thư viện', icon: Image },
+  { path: '/admin', label: 'Quản trị', icon: Shield },
+  { path: '/settings', label: 'Cài đặt', icon: Settings },
 ]
 
 export default function AppLayout({ user, onLogout }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
-
   const initial = (user.name || 'U').charAt(0).toUpperCase()
 
   return (
     <div className="app-layout">
       <aside className="sidebar">
         {/* Logo */}
-        <div className="sidebar-logo">
-          <div className="sidebar-logo-icon">FS</div>
-          <div className="sidebar-logo-text">FashionStudio</div>
+        <div className="sidebar-logo" onClick={() => navigate('/home')} style={{ cursor: 'pointer' }}>
+          <img
+            src="/assets/logo.png"
+            alt="Goha Studio"
+            className="sidebar-logo-img"
+          />
+          <div>
+            <div className="sidebar-logo-text">Goha Studio</div>
+            <div className="sidebar-logo-phone">
+              <Phone size={10} />
+              0981.228.229
+            </div>
+          </div>
         </div>
 
         {/* Navigation */}
@@ -37,7 +46,7 @@ export default function AppLayout({ user, onLogout }) {
                 className={`sidebar-nav-item${active ? ' active' : ''}`}
                 onClick={() => navigate(path)}
               >
-                <Icon />
+                <Icon size={18} />
                 {label}
               </button>
             )
@@ -54,7 +63,7 @@ export default function AppLayout({ user, onLogout }) {
             </div>
           </div>
           <button className="sidebar-logout" onClick={onLogout}>
-            <LogOut />
+            <LogOut size={16} />
             Đăng xuất
           </button>
         </div>

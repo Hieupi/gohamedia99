@@ -3,6 +3,7 @@ import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle } from 'luc
 import { detectObjects, generateGarmentImage } from '../services/geminiService'
 import { getPrompt } from '../services/masterPrompts'
 import { getApiKeys } from '../services/apiKeyService'
+import { saveToLibrary, createLibraryRecord, downloadImage } from '../services/libraryService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -96,17 +97,13 @@ function SaveModal({ item, imageSrc, onClose, onSave }) {
   const [type, setType] = useState(item?.category === 'model' ? 'model' : 'product')
 
   const handleSave = () => {
-    const record = {
-      id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    const record = createLibraryRecord({
       name: name || item?.nameVi || 'Không tên',
       type,
       category: item?.category || 'other',
       imageSrc,
-      createdAt: new Date().toISOString(),
-    }
-    const existing = JSON.parse(localStorage.getItem('fashionStudio_library') || '[]')
-    existing.unshift(record)
-    localStorage.setItem('fashionStudio_library', JSON.stringify(existing))
+    })
+    saveToLibrary(record)
     onSave(record)
     onClose()
   }
