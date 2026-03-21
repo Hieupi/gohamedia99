@@ -54,15 +54,17 @@ export default function LibraryPage() {
 
   const refresh = useCallback(() => setItems(getLibraryItems()), [])
 
-  const handleDelete = (id) => {
-    if (!confirm('Xóa ảnh này khỏi thư viện?')) return
-    deleteFromLibrary(id)
-    refresh()
+  const handleDelete = (e, id) => {
+    e.stopPropagation()
+    e.preventDefault()
+    const updated = deleteFromLibrary(id)
+    setItems(updated)
   }
 
-  const handleToggleLike = (id) => {
-    toggleLikeInLibrary(id)
-    refresh()
+  const handleToggleLike = (e, id) => {
+    e.stopPropagation()
+    const updated = toggleLikeInLibrary(id)
+    setItems(updated)
   }
 
   const handleDownload = (item) => {
@@ -154,7 +156,7 @@ export default function LibraryPage() {
                   <button className="lib-card-action" onClick={() => handleDownload(item)} title="Tải xuống">
                     <Download size={14} />
                   </button>
-                  <button className="lib-card-action danger" onClick={() => handleDelete(item.id)} title="Xóa">
+                  <button className="lib-card-action danger" onClick={(e) => handleDelete(e, item.id)} title="Xóa">
                     <Trash2 size={14} />
                   </button>
                 </div>
@@ -169,7 +171,7 @@ export default function LibraryPage() {
                     {mapCategory(item.category)} • {new Date(item.createdAt).toLocaleDateString('vi-VN')}
                   </div>
                 </div>
-                <button onClick={() => handleToggleLike(item.id)} className="lib-like-btn"
+                <button onClick={(e) => handleToggleLike(e, item.id)} className="lib-like-btn"
                   style={{ color: item.liked ? '#ef4444' : 'var(--text-muted)' }}>
                   <Heart size={15} fill={item.liked ? 'currentColor' : 'none'} />
                 </button>
@@ -192,11 +194,11 @@ export default function LibraryPage() {
               <div style={{ display: 'flex', gap: 6 }}>
                 <button className="icon-btn" onClick={() => setPreview(item)}><Eye size={14} /></button>
                 <button className="icon-btn" onClick={() => handleDownload(item)}><Download size={14} /></button>
-                <button className="icon-btn" onClick={() => handleToggleLike(item.id)}
+                <button className="icon-btn" onClick={(e) => handleToggleLike(e, item.id)}
                   style={{ color: item.liked ? '#ef4444' : undefined }}>
                   <Heart size={14} fill={item.liked ? 'currentColor' : 'none'} />
                 </button>
-                <button className="icon-btn" onClick={() => handleDelete(item.id)}
+                <button className="icon-btn" onClick={(e) => handleDelete(e, item.id)}
                   style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
               </div>
             </div>
