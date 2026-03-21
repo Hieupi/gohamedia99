@@ -1,22 +1,50 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff
+  Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff, Upload, Loader
 } from 'lucide-react'
 import {
   getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
-  downloadImage, migrateOldLibrary
+  downloadImage, migrateOldLibrary, saveToLibrary, createLibraryRecord
 } from '../services/libraryService'
+import { callGemini } from '../services/geminiService'
 
-const CATEGORIES = ['Tất cả', 'Trang phục', 'Người mẫu', 'Phụ kiện', 'Bộ sưu tập']
+const CATEGORIES = ['Tất cả', 'Trang phục', 'Người mẫu', 'Phụ kiện', 'Bối cảnh', 'Bộ sưu tập']
+
+const CATEGORY_PREFIX = {
+  top: 'ÁO', bottom: 'QUẦN', dress: 'ĐẦM', outerwear: 'KHOÁC',
+  shoes: 'GIÀY', bag: 'TÚI', accessory: 'PKIỆN', model: 'MẪU',
+  background: 'NỀN', other: 'SP',
+}
 
 function mapCategory(cat) {
   const m = {
     top: 'Trang phục', bottom: 'Trang phục', dress: 'Trang phục',
     outerwear: 'Trang phục', shoes: 'Phụ kiện', bag: 'Phụ kiện',
-    accessory: 'Phụ kiện', model: 'Người mẫu', background: 'Khác', other: 'Bộ sưu tập',
+    accessory: 'Phụ kiện', model: 'Người mẫu', background: 'Bối cảnh', other: 'Bộ sưu tập',
   }
   return m[cat] || 'Trang phục'
 }
+
+function generateSmartName(nameVi, category, existingItems) {
+  const prefix = CATEGORY_PREFIX[category] || 'SP'
+  let baseName = (nameVi || 'Không tên').replace(/^(Áo|Quần|Đầm|Giày|Túi|Mũ)\s*/i, '').trim()
+  if (baseName.length > 30) baseName = baseName.slice(0, 30).trim()
+  const fullBase = `${prefix}-${baseName}`
+  const sameBase = existingItems.filter(i => i.name && i.name.startsWith(fullBase))
+  const num = String(sameBase.length + 1).padStart(3, '0')
+  return `${fullBase}-${num}`
+}
+
+// ─── AI Analyze Prompt ────────────────────────────────────────────────────────
+
+const ANALYZE_PROMPT = `Bạn là chuyên gia thời trang. Phân tích ảnh và trả về JSON duy nhất (không markdown):
+{
+  "nameVi": "Tên tiếng Việt ngắn gọn của sản phẩm/đối tượng chính",
+  "category": "top|bottom|dress|outerwear|shoes|bag|accessory|model|background",
+  "type": "product hoặc model",
+  "description": "Mô tả ngắn 1 dòng về màu sắc, chất liệu, phong cách"
+}
+Chỉ trả về đúng 1 đối tượng nổi bật nhất. Chỉ JSON, không text khác.`
 
 // ─── Preview Modal ────────────────────────────────────────────────────────────
 
@@ -37,6 +65,147 @@ function PreviewModal({ item, onClose }) {
   )
 }
 
+// ─── Upload Modal ─────────────────────────────────────────────────────────────
+
+function UploadModal({ onClose, onSaved }) {
+  const fileRef = useRef()
+  const [file, setFile] = useState(null)
+  const [previewUrl, setPreviewUrl] = useState(null)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [aiResult, setAiResult] = useState(null)
+  const [name, setName] = useState('')
+  const [type, setType] = useState('product')
+  const [category, setCategory] = useState('other')
+  const [saving, setSaving] = useState(false)
+
+  const handleFile = async (f) => {
+    if (!f || !f.type.startsWith('image/')) return
+    setFile(f)
+    setPreviewUrl(URL.createObjectURL(f))
+    setAnalyzing(true)
+    setAiResult(null)
+
+    try {
+      const raw = await callGemini({ prompt: ANALYZE_PROMPT, images: [f], temperature: 0.2 })
+      const clean = raw.replace(/```json\s*/g, '').replace(/```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      setAiResult(parsed)
+      setCategory(parsed.category || 'other')
+      setType(parsed.type || 'product')
+      // Auto-generate smart name
+      const existingItems = getLibraryItems()
+      setName(generateSmartName(parsed.nameVi, parsed.category, existingItems))
+    } catch (err) {
+      console.error('[AI Analyze]', err)
+      setName('SP-Upload-' + Date.now().toString(36))
+    } finally {
+      setAnalyzing(false)
+    }
+  }
+
+  const handleSave = () => {
+    if (!previewUrl || !name.trim()) return
+    setSaving(true)
+    const record = createLibraryRecord({
+      name: name.trim(),
+      type,
+      category,
+      imageSrc: previewUrl,
+    })
+    saveToLibrary(record)
+    onSaved()
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
+          Tải ảnh lên Kho
+        </h3>
+
+        {/* Upload zone / Preview */}
+        {!previewUrl ? (
+          <div className="upload-zone" onClick={() => fileRef.current?.click()}
+            style={{ marginBottom: 16, minHeight: 160 }}>
+            <Upload size={28} style={{ color: 'var(--text-muted)' }} />
+            <div style={{ fontSize: 13, fontWeight: 600, marginTop: 8 }}>Chọn ảnh sản phẩm</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>PNG, JPG, WEBP</div>
+            <input ref={fileRef} type="file" accept="image/*" hidden
+              onChange={e => handleFile(e.target.files?.[0])} />
+          </div>
+        ) : (
+          <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
+            <img src={previewUrl} alt="preview"
+              style={{ width: 90, height: 90, objectFit: 'contain', borderRadius: 'var(--r-sm)', background: '#f5f5f5' }} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 4 }}>
+              {analyzing ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <Loader size={16} className="spin" style={{ color: 'var(--brand)' }} />
+                  <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>AI đang phân tích...</span>
+                </div>
+              ) : aiResult ? (
+                <>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{
+                      padding: '2px 10px', borderRadius: 'var(--r-full)',
+                      fontSize: 11, fontWeight: 700, background: 'var(--brand-08)', color: 'var(--brand)',
+                    }}>
+                      {CATEGORY_PREFIX[aiResult.category] || 'SP'}
+                    </span>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>{aiResult.nameVi}</span>
+                  </div>
+                  {aiResult.description && (
+                    <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                      {aiResult.description}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>Không thể phân tích</span>
+              )}
+              <button onClick={() => { setFile(null); setPreviewUrl(null); setAiResult(null); setName('') }}
+                style={{
+                  alignSelf: 'flex-start', marginTop: 4, fontSize: 12, color: 'var(--brand)',
+                  background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline',
+                }}>
+                Đổi ảnh khác
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Name field */}
+        {previewUrl && !analyzing && (
+          <>
+            <label className="select-label" style={{ marginBottom: 4, display: 'block' }}>
+              Mã định danh
+            </label>
+            <input type="text" value={name} onChange={e => setName(e.target.value)}
+              className="input-field"
+              style={{ marginBottom: 12, fontFamily: 'monospace', fontSize: 13.5, fontWeight: 600 }} />
+
+            <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+              <button className={`toggle-pill ${type === 'product' ? 'active' : ''}`}
+                onClick={() => setType('product')}>Sản phẩm</button>
+              <button className={`toggle-pill ${type === 'model' ? 'active' : ''}`}
+                onClick={() => setType('model')}>Người mẫu</button>
+            </div>
+          </>
+        )}
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Hủy</button>
+          <button className="btn btn-primary" onClick={handleSave}
+            disabled={!previewUrl || analyzing || !name.trim() || saving}>
+            {saving ? 'Đang lưu...' : 'Nhập vào Kho'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function LibraryPage() {
@@ -45,14 +214,12 @@ export default function LibraryPage() {
   const [selectedCat, setSelectedCat] = useState('Tất cả')
   const [searchQ, setSearchQ] = useState('')
   const [preview, setPreview] = useState(null)
+  const [showUpload, setShowUpload] = useState(false)
 
-  // Load items on mount + migrate old data
   useEffect(() => {
     migrateOldLibrary()
     setItems(getLibraryItems())
   }, [])
-
-  const refresh = useCallback(() => setItems(getLibraryItems()), [])
 
   const handleDelete = (e, id) => {
     e.stopPropagation()
@@ -67,11 +234,8 @@ export default function LibraryPage() {
     setItems(updated)
   }
 
-  const handleDownload = (item) => {
-    downloadImage(item.imageSrc, item.name)
-  }
+  const handleDownload = (item) => downloadImage(item.imageSrc, item.name)
 
-  // Filter
   const filtered = items.filter(item => {
     if (selectedCat !== 'Tất cả' && mapCategory(item.category) !== selectedCat) return false
     if (searchQ && !item.name.toLowerCase().includes(searchQ.toLowerCase())) return false
@@ -82,7 +246,6 @@ export default function LibraryPage() {
     total: items.length,
     products: items.filter(i => i.type === 'product').length,
     models: items.filter(i => i.type === 'model').length,
-    liked: items.filter(i => i.liked).length,
   }
 
   return (
@@ -96,6 +259,11 @@ export default function LibraryPage() {
           <span className="lib-stat">•</span>
           <span className="lib-stat">{stats.models} mẫu</span>
         </div>
+        <button className="btn btn-primary" style={{ marginLeft: 'auto' }}
+          onClick={() => setShowUpload(true)}>
+          <Upload size={15} />
+          Tải lên & Nhập kho
+        </button>
       </div>
 
       {/* Toolbar */}
@@ -124,7 +292,6 @@ export default function LibraryPage() {
         ))}
       </div>
 
-      {/* Count */}
       <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
         {filtered.length} / {items.length} ảnh
       </div>
@@ -138,12 +305,17 @@ export default function LibraryPage() {
           </h3>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 280, textAlign: 'center' }}>
             {items.length === 0
-              ? 'Hãy tách đồ từ ảnh và lưu vào đây để quản lý.'
+              ? 'Tách đồ hoặc tải ảnh lên để bắt đầu.'
               : 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.'}
           </p>
+          {items.length === 0 && (
+            <button className="btn btn-primary" style={{ marginTop: 16 }}
+              onClick={() => setShowUpload(true)}>
+              <Upload size={15} /> Tải ảnh lên
+            </button>
+          )}
         </div>
       ) : view === 'grid' ? (
-        /* Grid View */
         <div className="lib-grid">
           {filtered.map(item => (
             <div key={item.id} className="lib-card">
@@ -160,9 +332,7 @@ export default function LibraryPage() {
                     <Trash2 size={14} />
                   </button>
                 </div>
-                {item.type === 'model' && (
-                  <span className="lib-card-badge model">Mẫu</span>
-                )}
+                {item.type === 'model' && <span className="lib-card-badge model">Mẫu</span>}
               </div>
               <div className="lib-card-footer">
                 <div style={{ minWidth: 0, flex: 1 }}>
@@ -180,7 +350,6 @@ export default function LibraryPage() {
           ))}
         </div>
       ) : (
-        /* List View */
         <div className="lib-list">
           {filtered.map(item => (
             <div key={item.id} className="lib-list-row">
@@ -206,8 +375,14 @@ export default function LibraryPage() {
         </div>
       )}
 
-      {/* Preview Modal */}
       <PreviewModal item={preview} onClose={() => setPreview(null)} />
+
+      {showUpload && (
+        <UploadModal
+          onClose={() => setShowUpload(false)}
+          onSaved={() => setItems(getLibraryItems())}
+        />
+      )}
     </div>
   )
 }
