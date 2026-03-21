@@ -352,7 +352,6 @@ export default function NewDesignPage() {
     setLoadingIdx(new Set([0, 1, 2, 3]))
 
     const basePrompt = buildDesignPrompt({ modelType, background, pose, style, skinFilter, toneFilter, quality, aspect, prompt })
-    // Build 4 variations
     const variations = [
       basePrompt + '\nVariation 1: default composition.',
       basePrompt + '\nVariation 2: different angle, slight pose change.',
@@ -360,11 +359,26 @@ export default function NewDesignPage() {
       basePrompt + '\nVariation 4: creative/editorial style.',
     ]
 
+    // Lấy File từ product image — hỗ trợ cả upload lẫn Library (dataURL)
     const mainProduct = productImages[0]
+    let productFile = mainProduct.file
+    if (!productFile && mainProduct.url) {
+      try {
+        const resp = await fetch(mainProduct.url)
+        const blob = await resp.blob()
+        productFile = new File([blob], 'product.png', { type: blob.type || 'image/png' })
+      } catch (e) {
+        setErrors({ 0: 'Không thể đọc ảnh sản phẩm', 1: 'Không thể đọc ảnh sản phẩm' })
+        setGenerating(false)
+        setLoadingIdx(new Set())
+        return
+      }
+    }
+
     const tasks = variations.map((vPrompt, idx) =>
       (async () => {
         try {
-          const result = await generateGarmentImage(mainProduct.file, vPrompt, { quality, aspect })
+          const result = await generateGarmentImage(productFile, vPrompt, { quality, aspect })
           const dataUrl = `data:${result.mimeType};base64,${result.base64}`
           setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
         } catch (err) {
