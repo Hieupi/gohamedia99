@@ -6,7 +6,7 @@ import {
 } from 'lucide-react'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt, VN_DNA_DEFAULTS } from '../services/masterPrompts'
-import { downloadImage, getLibraryItems } from '../services/libraryService'
+import { downloadImage, getLibraryItems, saveToLibrary, createLibraryRecord, generateUniqueName } from '../services/libraryService'
 import { POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 
 // ─── Options ──────────────────────────────────────────────────────────────────
@@ -89,7 +89,7 @@ const STORY_TEMPLATES = [
 
 // ─── Scene Card Component ─────────────────────────────────────────────────────
 
-function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemove, isCustom }) {
+function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemove, onSave, onDownload, isCustom }) {
     return (
         <div className="st-scene-card">
             <div className="st-scene-header">
@@ -113,9 +113,17 @@ function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemo
                 ) : imageSrc ? (
                     <>
                         <img src={imageSrc} alt={scene.title} className="st-scene-img" />
-                        <button className="nd-preview-btn" onClick={onPreview} title="Xem phóng to">
-                            <Eye size={16} />
-                        </button>
+                        <div style={{ position: 'absolute', top: 6, right: 6, display: 'flex', gap: 4 }}>
+                            <button className="nd-preview-btn" onClick={onPreview} title="Xem phóng to" style={{ position: 'relative', top: 0, right: 0 }}>
+                                <Eye size={14} />
+                            </button>
+                            <button className="nd-preview-btn" onClick={onSave} title="Lưu vào kho" style={{ position: 'relative', top: 0, right: 0 }}>
+                                <Save size={14} />
+                            </button>
+                            <button className="nd-preview-btn" onClick={onDownload} title="Tải xuống" style={{ position: 'relative', top: 0, right: 0 }}>
+                                <Download size={14} />
+                            </button>
+                        </div>
                     </>
                 ) : (
                     <div className="st-scene-placeholder">
@@ -321,29 +329,41 @@ export default function StorytellingPage() {
             const refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
             const allImages = [...refFiles, ...productFiles]
 
-            const analyzePrompt = `You are a professional fashion content director for TikTok/Reels.
+            const analyzePrompt = `You are an elite fashion content director creating VIRAL TikTok/Reels videos.
 
-Analyze these images carefully — the model, outfit, accessories, setting, and mood.
+Analyze these images carefully — model, outfit, accessories, setting, mood.
 
-Create EXACTLY 9 storytelling scenes for a fashion video. Each scene = 1 photo that will become a 3-second video clip.
+=== 8 YẾU TỐ TRIỆU VIEW FORMULA ===
+Apply these 8 viral factors to create the storytelling:
+1. TIÊU ĐỀ HẤP DẪN: Suggest a catchy video title that triggers curiosity
+2. THUMBNAIL: Scene 1 must work as an eye-catching thumbnail
+3. 3 GIÂY ĐẦU CUỐN: Scene 1 = powerful HOOK (shocking image, mystery, dramatic pose)
+4. ÂM NHẠC: Note trending music style for each scene
+5. HASHTAG: Suggest 3-5 Vietnamese hashtags for the video
+6. NỘI DUNG GIỮ NGƯỜI XEM: Each scene builds anticipation for the next
+7. TÌNH HUỐNG XOAY CHUYỂN: Include a twist/surprise moment (scene 6-7)
+8. GIÁ TRỊ CHIA SẺ: Final scene must make viewers want to share
+
+Create EXACTLY 9 scenes for a fashion video. Each scene = 1 photo → 3-second video clip.
 
 Rules:
-- All 9 scenes feature the SAME person wearing the SAME outfit from the images
-- Each scene has a DIFFERENT pose, camera angle, and emotion
+- All 9 scenes: SAME person, SAME outfit from images
+- Scene 1: HOOK (3 giây đầu cuốn) — dramatic, unexpected, or ultra-glamorous
+- Scenes 2-5: Rising action — showcase outfit from different angles
+- Scenes 6-7: TWIST — surprise pose/location/emotion change
+- Scenes 8-9: CLIMAX + FINALE — most beautiful shot + memorable ending
 - Mix camera angles: front, back, side, close-up, selfie, wide, artistic
-- Build a narrative arc: introduction → exploration → climax → finale
-- Highlight the outfit's best features from multiple angles
-- Each scene should feel like natural continuation of the previous
-${storyContext ? `\nShared context: ${storyContext}` : ''}
+- Each scene must feel like natural continuation of the story
+${storyContext ? `\\nShared context: ${storyContext}` : ''}
 
-Return ONLY a valid JSON array with exactly 9 objects, each having:
+Return ONLY a valid JSON array with exactly 9 objects:
 - "title": short Vietnamese scene name (2-4 words)
 - "pose": detailed English pose description (full sentence, 15+ words)
 - "camera": English camera angle description
 - "emotion": English emotion/expression (2-3 words)
 
-Example format:
-[{"title":"Đứng hero","pose":"Standing upright facing camera, one hand on hip, slight S-curve, confident natural smile","camera":"Full-body front-facing at eye level","emotion":"Confident, bright"}]
+Example:
+[{"title":"Đóng băng thời gian","pose":"Standing frozen mid-stride, hair and skirt caught in wind, dramatic backlit silhouette, one hand reaching forward","camera":"Low angle wide shot, golden hour backlight","emotion":"Mysterious, powerful"}]
 
 Return ONLY the JSON array, no markdown, no explanation.`
 
@@ -419,7 +439,18 @@ Pose & Action: ${scene.pose}
 Camera Angle: ${scene.camera || 'Professional fashion photography angle'}
 Emotion & Expression: ${scene.emotion}
 ${storyContext ? `Shared Story Context (location, props, accessories): ${storyContext}` : ''}
-IMPORTANT: Maintain 100% visual consistency with all other scenes — same person, same outfit, same location style, same color grading. Each scene should feel like the next moment in a continuous story.`
+
+=== DNA PROFILE — CRITICAL CHARACTER CONSISTENCY ===
+You MUST maintain 100% identical character across ALL ${scenes.length} scenes:
+- SAME face shape, eyes, nose, lips, jawline — this is the SAME person in every scene
+- SAME hair color, length, style — do NOT change hairstyle between scenes
+- SAME skin tone and complexion
+- Accessories: ONLY include items visible in the reference images. If NO glasses in reference → NO glasses in any scene. If NO hat → NO hat. Do NOT add or remove accessories.
+- SAME outfit, same fabric color, same shoes
+- SAME body proportions and build
+${extractedIdentity ? `\nExtracted Identity DNA: ${extractedIdentity}` : ''}
+
+IMPORTANT: Maintain 100% visual consistency — same person, same outfit, same color grading. Each scene = next moment in a continuous story.`
 
                         const prompt = buildMasterImagePrompt({
                             extractedIdentity,
@@ -743,6 +774,24 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                         error={errors[idx]}
                                         onPreview={() => setPreviewImg(results[idx])}
                                         onRemove={() => removeScene(idx)}
+                                        onSave={async () => {
+                                            if (!results[idx]) return
+                                            try {
+                                                const record = createLibraryRecord({
+                                                    name: generateUniqueName({ category: 'storytelling', description: scene.title }),
+                                                    type: 'storytelling',
+                                                    category: 'storytelling',
+                                                    imageSrc: results[idx],
+                                                    source: 'storytelling',
+                                                })
+                                                const res = await saveToLibrary(record)
+                                                alert(res.success ? `✅ Đã lưu "${scene.title}" vào kho!` : '❌ Lỗi lưu: ' + res.error)
+                                            } catch (e) { alert('❌ Lỗi: ' + e.message) }
+                                        }}
+                                        onDownload={() => {
+                                            if (!results[idx]) return
+                                            downloadImage(results[idx], `Story-Scene-${idx + 1}-${scene.title}.png`)
+                                        }}
                                         isCustom={isCustom}
                                     />
                                 ))}
