@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { User, Palette, Bell, Shield, Key, ChevronRight } from 'lucide-react'
+import { useTheme } from '../contexts/ThemeProvider'
 
 const LANGUAGES = ['Tiếng Việt', 'English', '日本語', '한국어']
 const THEMES = ['Sáng', 'Tối', 'Theo hệ thống']
@@ -7,25 +8,32 @@ const THEMES = ['Sáng', 'Tối', 'Theo hệ thống']
 export default function SettingsPage({ user }) {
   const [activeSection, setActiveSection] = useState('account')
 
+  const { theme: currentTheme, setTheme: applyTheme } = useTheme()
+  const themeMap = { 'Sáng': 'light', 'Tối': 'dark', 'Theo hệ thống': 'system' }
+  const themeMapReverse = { light: 'Sáng', dark: 'Tối', system: 'Theo hệ thống' }
+
   const [form, setForm] = useState({
-    name:       user?.name  || '',
-    email:      user?.email || '',
-    phone:      '',
-    language:   'Tiếng Việt',
-    theme:      'Sáng',
+    name: user?.name || '',
+    email: user?.email || '',
+    phone: '',
+    language: 'Tiếng Việt',
+    theme: themeMapReverse[currentTheme] || 'Sáng',
     emailNotif: true,
-    pushNotif:  false,
-    mktNotif:   true,
+    pushNotif: false,
+    mktNotif: true,
   })
 
-  const set = (k, v) => setForm(prev => ({ ...prev, [k]: v }))
+  const set = (k, v) => {
+    setForm(prev => ({ ...prev, [k]: v }))
+    if (k === 'theme' && themeMap[v]) applyTheme(themeMap[v])
+  }
 
   const SECTIONS = [
-    { id: 'account',  label: 'Tài khoản',  icon: User    },
-    { id: 'display',  label: 'Giao diện',  icon: Palette },
-    { id: 'notif',    label: 'Thông báo',  icon: Bell    },
-    { id: 'security', label: 'Bảo mật',    icon: Shield  },
-    { id: 'api',      label: 'API Keys',   icon: Key     },
+    { id: 'account', label: 'Tài khoản', icon: User },
+    { id: 'display', label: 'Giao diện', icon: Palette },
+    { id: 'notif', label: 'Thông báo', icon: Bell },
+    { id: 'security', label: 'Bảo mật', icon: Shield },
+    { id: 'api', label: 'API Keys', icon: Key },
   ]
 
   const Toggle = ({ value, onChange }) => (
@@ -150,9 +158,9 @@ export default function SettingsPage({ user }) {
             <div>
               <div className="settings-panel-title">Thông báo</div>
               {[
-                { key: 'emailNotif', label: 'Email thông báo',    desc: 'Gửi email khi tạo ảnh hoàn thành' },
-                { key: 'pushNotif',  label: 'Thông báo đẩy',      desc: 'Nhận thông báo trực tiếp trên trình duyệt' },
-                { key: 'mktNotif',   label: 'Khuyến mãi & Tin tức', desc: 'Nhận thông tin về gói Pro và tính năng mới' },
+                { key: 'emailNotif', label: 'Email thông báo', desc: 'Gửi email khi tạo ảnh hoàn thành' },
+                { key: 'pushNotif', label: 'Thông báo đẩy', desc: 'Nhận thông báo trực tiếp trên trình duyệt' },
+                { key: 'mktNotif', label: 'Khuyến mãi & Tin tức', desc: 'Nhận thông tin về gói Pro và tính năng mới' },
               ].map(({ key, label, desc }) => (
                 <div key={key} style={{
                   display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -218,27 +226,27 @@ export default function SettingsPage({ user }) {
    Lưu trong localStorage của trình duyệt.
    ==================================================================== */
 
-const LS_KEYS  = 'fsa_api_keys'
-const LS_IDX   = 'fsa_api_key_index'
+const LS_KEYS = 'fsa_api_keys'
+const LS_IDX = 'fsa_api_key_index'
 
 function lsLoadKeys() {
   try { return JSON.parse(localStorage.getItem(LS_KEYS) || '[]') } catch { return [] }
 }
 function lsSaveKeys(k) { localStorage.setItem(LS_KEYS, JSON.stringify(k)) }
-function lsGetIdx()   { return parseInt(localStorage.getItem(LS_IDX) || '0', 10) }
+function lsGetIdx() { return parseInt(localStorage.getItem(LS_IDX) || '0', 10) }
 function lsSaveIdx(i) { localStorage.setItem(LS_IDX, String(i)) }
-function maskKey(k)   { return k && k.length > 8 ? '••••' + k.slice(-4) : '••••••••' }
+function maskKey(k) { return k && k.length > 8 ? '••••' + k.slice(-4) : '••••••••' }
 
 function ApiKeyManager() {
-  const [keys,       setKeys]       = useState(lsLoadKeys)
-  const [newKey,     setNewKey]     = useState('')
-  const [newLabel,   setNewLabel]   = useState('')
-  const [errMsg,     setErrMsg]     = useState('')
-  const [okMsg,      setOkMsg]      = useState('')
+  const [keys, setKeys] = useState(lsLoadKeys)
+  const [newKey, setNewKey] = useState('')
+  const [newLabel, setNewLabel] = useState('')
+  const [errMsg, setErrMsg] = useState('')
+  const [okMsg, setOkMsg] = useState('')
   const [visibleSet, setVisibleSet] = useState(new Set())
-  const [editId,     setEditId]     = useState(null)
-  const [editLabel,  setEditLabel]  = useState('')
-  const [rotIdx,     setRotIdx]     = useState(lsGetIdx)
+  const [editId, setEditId] = useState(null)
+  const [editLabel, setEditLabel] = useState('')
+  const [rotIdx, setRotIdx] = useState(lsGetIdx)
 
   const persist = updated => { lsSaveKeys(updated); setKeys(updated) }
 
@@ -299,8 +307,8 @@ function ApiKeyManager() {
 
   const doSimulate = () => {
     if (!activeKeys.length) return flash('err', 'Không có key nào đang bật.')
-    const idx     = rotIdx % activeKeys.length
-    const chosen  = activeKeys[idx]
+    const idx = rotIdx % activeKeys.length
+    const chosen = activeKeys[idx]
     persist(keys.map(k => k.id === chosen.id ? { ...k, requestCount: (k.requestCount || 0) + 1 } : k))
     const nxt = (idx + 1) % activeKeys.length
     lsSaveIdx(nxt); setRotIdx(nxt)
@@ -400,7 +408,7 @@ function ApiKeyManager() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
           {keys.map((k, i) => {
-            const isNext    = currentKey?.id === k.id
+            const isNext = currentKey?.id === k.id
             const isVisible = visibleSet.has(k.id)
             const isEditing = editId === k.id
 
@@ -432,8 +440,8 @@ function ApiKeyManager() {
                         style={{ height: 30, padding: '0 8px', fontSize: 13 }}
                         autoFocus
                       />
-                      <button className="btn btn-primary"    onClick={() => doRename(k.id)} style={{ height: 30, padding: '0 12px', fontSize: 12 }}>Lưu</button>
-                      <button className="btn btn-secondary"  onClick={() => setEditId(null)} style={{ height: 30, padding: '0 10px', fontSize: 12 }}>Hủy</button>
+                      <button className="btn btn-primary" onClick={() => doRename(k.id)} style={{ height: 30, padding: '0 12px', fontSize: 12 }}>Lưu</button>
+                      <button className="btn btn-secondary" onClick={() => setEditId(null)} style={{ height: 30, padding: '0 10px', fontSize: 12 }}>Hủy</button>
                     </div>
                   ) : (
                     <span
