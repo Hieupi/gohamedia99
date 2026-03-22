@@ -6,7 +6,7 @@ import {
 } from '../services/videoPromptService'
 import { callGemini } from '../services/geminiService'
 import { getApiKeys } from '../services/apiKeyService'
-import { getLibraryItems } from '../services/libraryService'
+import { getLibraryItems, getFolders } from '../services/libraryService'
 import { getOriginalImage } from '../services/imageStorageService'
 
 export default function VideoPromptPage() {
@@ -452,8 +452,12 @@ ${imageDescriptions.join('\n\n')}`
 
 /** Modal chọn ảnh từ Thư viện */
 function LibraryPickerModal({ maxPick, onPick, onClose }) {
-    const items = getLibraryItems().filter(i => i.imageSrc)
+    const allItems = getLibraryItems().filter(i => i.imageSrc)
+    const folders = getFolders()
     const [selected, setSelected] = useState([])
+    const [activeFolder, setActiveFolder] = useState('all')
+
+    const filtered = activeFolder === 'all' ? allItems : allItems.filter(i => i.folderId === activeFolder)
 
     const toggle = (item) => {
         setSelected(prev => {
@@ -463,21 +467,76 @@ function LibraryPickerModal({ maxPick, onPick, onClose }) {
         })
     }
 
+    const selectFolder = () => {
+        const folderItems = filtered.filter(i => !selected.find(s => s.id === i.id))
+        const canAdd = maxPick - selected.length
+        setSelected(prev => [...prev, ...folderItems.slice(0, canAdd)])
+    }
+
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" onClick={e => e.stopPropagation()}
-                style={{ maxWidth: 700, maxHeight: '80vh', overflow: 'auto' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                style={{ maxWidth: 720, maxHeight: '85vh', overflow: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                     <h3 style={{ fontSize: 16, fontWeight: 700 }}>📚 Chọn ảnh từ Thư viện ({selected.length}/{maxPick})</h3>
-                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-secondary)' }}><X size={18} /></button>
                 </div>
-                {items.length === 0 ? (
+
+                {/* Folder tabs */}
+                {folders.length > 0 && (
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 12 }}>
+                        <button
+                            onClick={() => setActiveFolder('all')}
+                            style={{
+                                padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                                border: '1.5px solid', cursor: 'pointer',
+                                borderColor: activeFolder === 'all' ? 'var(--brand)' : 'var(--border)',
+                                background: activeFolder === 'all' ? 'var(--brand)' : 'transparent',
+                                color: activeFolder === 'all' ? '#fff' : 'var(--text-secondary)',
+                            }}>
+                            📋 Tất cả ({allItems.length})
+                        </button>
+                        {folders.map(f => {
+                            const count = allItems.filter(i => i.folderId === f.id).length
+                            if (count === 0) return null
+                            return (
+                                <button key={f.id}
+                                    onClick={() => setActiveFolder(f.id)}
+                                    style={{
+                                        padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                                        border: '1.5px solid', cursor: 'pointer',
+                                        borderColor: activeFolder === f.id ? 'var(--brand)' : 'var(--border)',
+                                        background: activeFolder === f.id ? 'var(--brand)' : 'transparent',
+                                        color: activeFolder === f.id ? '#fff' : 'var(--text-secondary)',
+                                    }}>
+                                    📁 {f.name} ({count})
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
+
+                {/* Chọn cả thư mục */}
+                {filtered.length > 0 && (
+                    <button
+                        onClick={selectFolder}
+                        style={{
+                            width: '100%', marginBottom: 12, padding: '8px 0',
+                            background: 'var(--brand-bg)', color: 'var(--brand)',
+                            border: '1.5px dashed var(--brand)', borderRadius: 8,
+                            cursor: 'pointer', fontSize: 13, fontWeight: 700,
+                        }}>
+                        ⚡ Chọn cả {activeFolder === 'all' ? 'thư viện' : `thư mục "${folders.find(f => f.id === activeFolder)?.name}"`} ({Math.min(filtered.length, maxPick - selected.length)} ảnh)
+                    </button>
+                )}
+
+                {filtered.length === 0 ? (
                     <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                        <p>Thư viện trống. Hãy lưu ảnh từ Thiết kế mới trước.</p>
+                        <p>{activeFolder === 'all' ? 'Thư viện trống.' : 'Thư mục này chưa có ảnh.'}</p>
                     </div>
                 ) : (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
-                        {items.map(item => (
+                        {filtered.map(item => (
                             <div key={item.id}
                                 onClick={() => toggle(item)}
                                 style={{
