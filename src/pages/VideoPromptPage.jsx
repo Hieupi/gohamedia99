@@ -1,11 +1,13 @@
 import { useState, useRef } from 'react'
-import { Copy, Check, Video, Upload, X, Wand2, Send, RotateCcw, ImagePlus, Trash2, GripVertical, ChevronDown, ChevronUp } from 'lucide-react'
+import { Copy, Check, Video, Upload, X, Wand2, Send, RotateCcw, ImagePlus, Trash2, GripVertical, ChevronDown, ChevronUp, BookOpen } from 'lucide-react'
 import {
     PLATFORMS, PLATFORM_CONFIGS,
     VIDEO_SYSTEM_PROMPT, SCENE_ANALYSIS_PROMPT
 } from '../services/videoPromptService'
 import { callGemini } from '../services/geminiService'
 import { getApiKeys } from '../services/apiKeyService'
+import { getLibraryItems } from '../services/libraryService'
+import { getOriginalImage } from '../services/imageStorageService'
 
 export default function VideoPromptPage() {
     // ─── State ───
@@ -20,6 +22,7 @@ export default function VideoPromptPage() {
     const [isChatting, setIsChatting] = useState(false)
     const [copiedId, setCopiedId] = useState(null)
     const [expandedScene, setExpandedScene] = useState(null)
+    const [showLibPicker, setShowLibPicker] = useState(false)
     const fileInputRef = useRef(null)
 
     // ─── Image Upload ───
@@ -35,6 +38,25 @@ export default function VideoPromptPage() {
 
     const removeScene = (id) => setScenes(prev => prev.filter(s => s.id !== id))
     const clearAll = () => { setScenes([]); setStoryboard(null); setChatMessages([]) }
+
+    /** Thêm ảnh từ Thư viện vào scenes */
+    const addFromLibrary = async (items) => {
+        const newScenes = []
+        for (const item of items) {
+            const hdSrc = await getOriginalImage(item.id) || item.imageSrc
+            const res = await fetch(hdSrc)
+            const blob = await res.blob()
+            const file = new File([blob], item.name + '.png', { type: 'image/png' })
+            newScenes.push({
+                id: `lib_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+                file,
+                preview: hdSrc,
+                name: item.name,
+            })
+        }
+        setScenes(prev => [...prev, ...newScenes].slice(0, 9))
+        setShowLibPicker(false)
+    }
 
     const handleDrop = (e) => {
         e.preventDefault()
@@ -237,10 +259,17 @@ ${imageDescriptions.join('\n\n')}`
                                 </div>
                             ))}
                             {scenes.length < 9 && (
-                                <div className="vp-scene-add" onClick={() => fileInputRef.current?.click()}>
-                                    <ImagePlus size={20} />
-                                    <span>Thêm</span>
-                                </div>
+                                <>
+                                    <div className="vp-scene-add" onClick={() => fileInputRef.current?.click()}>
+                                        <Upload size={16} />
+                                        <span>Từ PC</span>
+                                    </div>
+                                    <div className="vp-scene-add" style={{ borderColor: 'var(--brand)', color: 'var(--brand)' }}
+                                        onClick={() => setShowLibPicker(true)}>
+                                        <BookOpen size={16} />
+                                        <span>Từ Kho</span>
+                                    </div>
+                                </>
                             )}
                         </div>
                     )}
@@ -393,6 +422,85 @@ ${imageDescriptions.join('\n\n')}`
                     </div>
                 </div>
             )}
+
+            {/* Library Picker Modal */}
+            {showLibPicker && (
+                <LibraryPickerModal
+                    maxPick={9 - scenes.length}
+                    onPick={addFromLibrary}
+                    onClose={() => setShowLibPicker(false)}
+                />
+            )}
+        </div>
+    )
+}
+
+/** Modal chọn ảnh từ Thư viện */
+function LibraryPickerModal({ maxPick, onPick, onClose }) {
+    const items = getLibraryItems().filter(i => i.imageSrc)
+    const [selected, setSelected] = useState([])
+
+    const toggle = (item) => {
+        setSelected(prev => {
+            if (prev.find(s => s.id === item.id)) return prev.filter(s => s.id !== item.id)
+            if (prev.length >= maxPick) return prev
+            return [...prev, item]
+        })
+    }
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal-content" onClick={e => e.stopPropagation()}
+                style={{ maxWidth: 700, maxHeight: '80vh', overflow: 'auto' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                    <h3 style={{ fontSize: 16, fontWeight: 700 }}>📚 Chọn ảnh từ Thư viện ({selected.length}/{maxPick})</h3>
+                    <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer' }}><X size={18} /></button>
+                </div>
+                {items.length === 0 ? (
+                    <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                        <p>Thư viện trống. Hãy lưu ảnh từ Thiết kế mới trước.</p>
+                    </div>
+                ) : (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 8 }}>
+                        {items.map(item => (
+                            <div key={item.id}
+                                onClick={() => toggle(item)}
+                                style={{
+                                    position: 'relative', cursor: 'pointer', borderRadius: 8,
+                                    border: selected.find(s => s.id === item.id) ? '3px solid var(--brand)' : '2px solid var(--border)',
+                                    overflow: 'hidden', aspectRatio: '1',
+                                    transition: 'all 0.12s',
+                                }}>
+                                <img src={item.imageSrc} alt={item.name}
+                                    style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                {selected.find(s => s.id === item.id) && (
+                                    <div style={{
+                                        position: 'absolute', top: 4, right: 4,
+                                        background: 'var(--brand)', color: '#fff',
+                                        width: 22, height: 22, borderRadius: '50%',
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: 11, fontWeight: 800,
+                                    }}>
+                                        {selected.findIndex(s => s.id === item.id) + 1}
+                                    </div>
+                                )}
+                                <div style={{
+                                    position: 'absolute', bottom: 0, left: 0, right: 0, padding: '2px 4px',
+                                    background: 'rgba(0,0,0,0.6)', color: '#fff', fontSize: 9, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis'
+                                }}>
+                                    {item.name}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+                {selected.length > 0 && (
+                    <button className="btn btn-primary" style={{ width: '100%', marginTop: 16, padding: '10px 0', fontSize: 14, fontWeight: 700 }}
+                        onClick={() => onPick(selected)}>
+                        ✅ Thêm {selected.length} ảnh vào phân cảnh
+                    </button>
+                )}
+            </div>
         </div>
     )
 }
