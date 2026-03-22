@@ -7,7 +7,7 @@ import {
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt, VN_DNA_DEFAULTS } from '../services/masterPrompts'
 import { downloadImage, getLibraryItems } from '../services/libraryService'
-import { POSE_LIBRARY, POSE_CATEGORIES, getPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
+import { POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 const QUALITY_OPTS = ['2K (HD)', '1K (SD)', '4K (Ultra)']
@@ -620,7 +620,7 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                                 ))}
                                             </div>
                                             <div className="pose-grid">
-                                                {getPosesByCategory(poseCategory).map(p => {
+                                                {getAllPosesByCategory(poseCategory).map(p => {
                                                     const isSelected = selectedPoses.some(sp => sp.id === p.id)
                                                     return (
                                                         <div key={p.id}

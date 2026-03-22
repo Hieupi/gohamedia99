@@ -23,6 +23,7 @@ export const POSE_CATEGORIES = [
     { id: 'momkid', label: '👩‍👧 Mẹ & bé' },
     { id: 'genz', label: '🔥 Gen Z' },
     { id: 'menswear', label: '🤵 Thời trang Nam' },
+    { id: 'custom', label: '📌 Tự tạo' },
 ]
 
 export const POSE_LIBRARY = [
@@ -120,13 +121,44 @@ export const POSE_LIBRARY = [
     { id: 'men_lean', name: 'Tựa tường editorial nam', emoji: '😎', thumbnail: '/assets/poses/men_lean.png', category: 'menswear', description: 'Tựa tường, khoanh tay, 1 chân co, sunglasses', bodyFocus: 'Toàn thân, attitude cool', cameraAngle: 'Side view, full body leaning', promptEN: 'Side view full-body shot. Male model leaning back against concrete or brick wall, arms crossed over chest, one foot flat on ground other bent with sole against wall. Wearing stylish outfit — leather jacket or overcoat, dark jeans, boots. Sunglasses, stubble. Cool intense expression. Gritty urban alley or industrial backdrop. Bad-boy editorial energy.' },
 ]
 
+// ─── Custom Pose Helpers (localStorage) ───────────────────────────────────────
+
+const CUSTOM_POSES_KEY = 'goha_custom_poses'
+
+/** Load custom poses from localStorage */
+export function getCustomPoses() {
+    try {
+        return JSON.parse(localStorage.getItem(CUSTOM_POSES_KEY) || '[]')
+    } catch { return [] }
+}
+
+/** Get ALL poses: static library + custom */
+export function getAllPoses() {
+    return [...POSE_LIBRARY, ...getCustomPoses()]
+}
+
+/** Get poses by category (static + custom merged) */
+export function getAllPosesByCategory(categoryId) {
+    const all = getAllPoses()
+    if (categoryId === 'all') return all
+    return all.filter(p => p.category === categoryId)
+}
+
+/** Delete a custom pose by id */
+export function deleteCustomPose(poseId) {
+    const poses = getCustomPoses().filter(p => p.id !== poseId)
+    localStorage.setItem(CUSTOM_POSES_KEY, JSON.stringify(poses))
+    return poses
+}
+
+/** Get static poses only by category */
 export function getPosesByCategory(categoryId) {
     if (categoryId === 'all') return POSE_LIBRARY
     return POSE_LIBRARY.filter(p => p.category === categoryId)
 }
 
 export function getPoseById(poseId) {
-    return POSE_LIBRARY.find(p => p.id === poseId) || null
+    return getAllPoses().find(p => p.id === poseId) || null
 }
 
 export const PROMPT_TEMPLATES = [

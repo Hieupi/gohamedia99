@@ -8,7 +8,7 @@ import {
 } from '../services/libraryService'
 import { callGemini } from '../services/geminiService'
 import {
-  POSE_LIBRARY, POSE_CATEGORIES, getPosesByCategory, PROMPT_TEMPLATES
+  POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES, getCustomPoses, deleteCustomPose
 } from '../services/poseLibrary'
 
 const CATEGORIES = ['Tất cả', 'Trang phục', 'Người mẫu', 'Phụ kiện', 'Bối cảnh', 'Bộ sưu tập']
@@ -406,24 +406,39 @@ export default function LibraryPage() {
           <div className="pose-categories" style={{ marginBottom: 16 }}>
             {POSE_CATEGORIES.map(cat => (
               <button key={cat.id}
-                className={`pose - cat - btn${poseCatFilter === cat.id ? ' active' : ''} `}
+                className={`pose-cat-btn${poseCatFilter === cat.id ? ' active' : ''}`}
                 onClick={() => setPoseCatFilter(cat.id)}>
                 {cat.label}
+                {cat.id === 'custom' && getCustomPoses().length > 0 && (
+                  <span style={{ marginLeft: 4, fontSize: 10, background: 'var(--brand)', color: '#fff', borderRadius: 99, padding: '1px 5px' }}>
+                    {getCustomPoses().length}
+                  </span>
+                )}
               </button>
             ))}
           </div>
           <div className="lib-pose-grid">
-            {getPosesByCategory(poseCatFilter).map(p => (
+            {getAllPosesByCategory(poseCatFilter).map(p => (
               <div key={p.id} className="lib-pose-card">
                 <img src={p.thumbnail} alt={p.name} className="lib-pose-img"
                   onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
                 <div className="pose-card-emoji-fallback" style={{ display: 'none', height: 140 }}>{p.emoji}</div>
                 <div className="lib-pose-info">
-                  <div className="lib-pose-name">{p.emoji} {p.name}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <div className="lib-pose-name">{p.emoji} {p.name}</div>
+                    {p.isCustom && (
+                      <button className="btn btn-ghost" style={{ fontSize: 10, padding: '2px 6px', color: '#ef4444' }}
+                        onClick={() => { deleteCustomPose(p.id); setPoseCatFilter(prev => prev) /* force re-render */; window.location.reload() }}
+                        title="Xóa pose tự tạo">
+                        🗑️ Xóa
+                      </button>
+                    )}
+                  </div>
                   <div className="lib-pose-desc">{p.description}</div>
                   <div className="lib-pose-meta">
                     <span>📷 {p.cameraAngle}</span>
                     <span>🎯 {p.bodyFocus}</span>
+                    {p.isCustom && <span>📌 Pose tự tạo</span>}
                   </div>
                   <div className="lib-pose-prompt">
                     <code>{p.promptEN.substring(0, 120)}...</code>
@@ -435,6 +450,12 @@ export default function LibraryPage() {
                 </div>
               </div>
             ))}
+            {getAllPosesByCategory(poseCatFilter).length === 0 && (
+              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                <p style={{ fontSize: 14 }}>Chưa có pose nào trong mục này.</p>
+                <p style={{ fontSize: 12, marginTop: 4 }}>Vào tab <strong>Tách đồ áo</strong> → lưu ảnh với type <strong>Pose</strong> để tạo pose tùy chỉnh.</p>
+              </div>
+            )}
           </div>
         </div>
       )}
