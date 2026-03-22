@@ -273,11 +273,23 @@ function SaveDesignModal({ imageSrc, projectName, onClose }) {
   const num = String(existing.filter(i => i.name?.startsWith('DESIGN')).length + 1).padStart(3, '0')
   const [name, setName] = useState(projectName ? `DESIGN-${projectName}-${num}` : `DESIGN-${num}`)
   const [type, setType] = useState('product')
+  const [saving, setSaving] = useState(false)
+  const [saveResult, setSaveResult] = useState(null)
 
-  const handleSave = () => {
-    const record = createLibraryRecord({ name: name.trim() || `DESIGN-${num}`, type, category: 'other', imageSrc })
-    saveToLibrary(record)
-    onClose()
+  const handleSave = async () => {
+    setSaving(true)
+    try {
+      const record = createLibraryRecord({ name: name.trim() || `DESIGN-${num}`, type, category: 'other', imageSrc })
+      const result = await saveToLibrary(record)
+      if (result.success) {
+        setSaveResult('ok')
+        setTimeout(() => onClose(), 1000)
+      } else {
+        setSaveResult('error')
+      }
+    } catch {
+      setSaveResult('error')
+    }
   }
 
   return (
@@ -294,7 +306,9 @@ function SaveDesignModal({ imageSrc, projectName, onClose }) {
         </div>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
           <button className="btn btn-ghost" onClick={onClose}>Hủy</button>
-          <button className="btn btn-primary" onClick={handleSave}>Lưu ngay</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving || saveResult === 'ok'}>
+            {saving && !saveResult ? '⏳ Đang lưu...' : saveResult === 'ok' ? '✅ Đã lưu!' : saveResult === 'error' ? '❌ Lỗi lưu' : 'Lưu ngay'}
+          </button>
         </div>
       </div>
     </div>

@@ -182,15 +182,27 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
       }
       return
     }
-    const record = createLibraryRecord({
-      name: name || autoName,
-      type,
-      category: item?.category || 'other',
-      imageSrc,
-    })
-    saveToLibrary(record)
-    onSave(record)
-    onClose()
+    setSaving(true)
+    try {
+      const record = createLibraryRecord({
+        name: name || autoName,
+        type,
+        category: item?.category || 'other',
+        imageSrc,
+      })
+      const result = await saveToLibrary(record)
+      if (result.success) {
+        setSaveResult('ok')
+        onSave(record)
+        setTimeout(() => onClose(), 1000)
+      } else {
+        console.error('Save error:', result.error)
+        setSaveResult('error')
+      }
+    } catch (err) {
+      console.error('Save error:', err)
+      setSaveResult('error')
+    }
   }
 
   // Gợi ý các tên thay thế

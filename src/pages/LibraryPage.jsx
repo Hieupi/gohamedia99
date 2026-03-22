@@ -106,18 +106,28 @@ function UploadModal({ onClose, onSaved }) {
     }
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!previewUrl || !name.trim()) return
     setSaving(true)
-    const record = createLibraryRecord({
-      name: name.trim(),
-      type,
-      category,
-      imageSrc: previewUrl,
-    })
-    saveToLibrary(record)
-    onSaved()
-    onClose()
+    try {
+      const record = createLibraryRecord({
+        name: name.trim(),
+        type,
+        category,
+        imageSrc: previewUrl,
+      })
+      const result = await saveToLibrary(record)
+      if (result.success) {
+        onSaved()
+        onClose()
+      } else {
+        alert(result.error || 'Lỗi lưu ảnh. Thử xóa bớt ảnh trong thư viện.')
+        setSaving(false)
+      }
+    } catch (err) {
+      alert('Lỗi lưu: ' + err.message)
+      setSaving(false)
+    }
   }
 
   return (
