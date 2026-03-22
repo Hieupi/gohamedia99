@@ -6,6 +6,7 @@ import {
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt } from '../services/masterPrompts'
 import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems } from '../services/libraryService'
+import { POSE_LIBRARY, POSE_CATEGORIES, getPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 
 // ─── Option Data (Auto = AI tự chọn tối ưu) ──────────────────────────────────
 
@@ -333,7 +334,15 @@ export default function NewDesignPage() {
   // Modals
   const [saveModal, setSaveModal] = useState(null)
   const [previewImg, setPreviewImg] = useState(null)
-  const [libraryPicker, setLibraryPicker] = useState(null) // 'ref' | 'product' | null
+  const [libraryPicker, setLibraryPicker] = useState(null)
+
+  // Pose Library
+  const [selectedPose, setSelectedPose] = useState(null)
+  const [poseCategory, setPoseCategory] = useState('all')
+  const [poseRefImages, setPoseRefImages] = useState([])
+  const [showPoseLibrary, setShowPoseLibrary] = useState(false)
+  const [selectedTemplate, setSelectedTemplate] = useState(null)
+  const poseRefFileRef = useRef() // 'ref' | 'product' | null
 
   // ─── File handlers ────────────────────────────────────────────────────────
 
@@ -384,15 +393,20 @@ export default function NewDesignPage() {
       console.log('[Bot1 Identity]', extractedIdentity?.substring(0, 120))
       console.log('[Bot2 Garment]', extractedProduct?.substring(0, 120))
 
-      // STEP 3: Build 4 Master Prompts (one per shot variation)
+      // STEP 3: Build 8 Master Prompts (one per shot variation)
+      // If user selected a specific pose, use it for ALL shots
+      const posePromptExtra = selectedPose ? `\n[POSE REFERENCE — MUST FOLLOW EXACTLY]\n${selectedPose.promptEN}\nCamera angle: ${selectedPose.cameraAngle}\nBody focus: ${selectedPose.bodyFocus}` : ''
+      const templateExtra = selectedTemplate ? `\nPhotography style: ${selectedTemplate.promptPrefix}` : ''
+      const combinedUserPrompt = [prompt, posePromptExtra, templateExtra].filter(Boolean).join('\n')
+
       const masterPrompts = SHOT_VARIATIONS.map(shotDesc =>
         buildMasterImagePrompt({
           extractedIdentity,
           extractedProduct,
           modelType, background, pose, style, skinFilter, toneFilter,
           quality, aspect,
-          userPrompt: prompt,
-          shotDescription: shotDesc,
+          userPrompt: combinedUserPrompt,
+          shotDescription: selectedPose ? selectedPose.promptEN : shotDesc,
         })
       )
 
@@ -496,6 +510,106 @@ export default function NewDesignPage() {
               {productImages.length < 8 && (
                 <ImageSlot onPickLibrary={() => setLibraryPicker('product')} />
               )}
+            </div>
+          </div>
+
+          {/* ── Step 2.5: Pose Library ── */}
+          <div className="design-step">
+            <div className="design-step-header">
+              <div className="design-step-number" style={{ background: 'linear-gradient(135deg, #e91e63, #ff5722)' }}>P</div>
+              <div className="design-step-title">📸 THƯ VIỆN TƯ THẾ (POSE)</div>
+            </div>
+            <div className="nd-settings-body">
+
+              {/* Upload pose reference images */}
+              <div className="form-group">
+                <label className="nd-label">ẢNH TƯ THẾ THAM CHIẾU (tùy chọn)</label>
+                <div className="nd-img-grid">
+                  {poseRefImages.map((img, i) => (
+                    <div key={i} className="img-slot filled">
+                      <img src={img.url} alt="" />
+                      <button className="img-slot-remove" onClick={() => setPoseRefImages(prev => prev.filter((_, j) => j !== i))}><X size={12} /></button>
+                    </div>
+                  ))}
+                  {poseRefImages.length < 3 && (
+                    <div className="img-slot empty" onClick={() => poseRefFileRef.current?.click()}>
+                      <Plus size={18} style={{ color: 'var(--brand)' }} />
+                      <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>Pose</span>
+                    </div>
+                  )}
+                  <input ref={poseRefFileRef} type="file" accept="image/*" multiple hidden
+                    onChange={e => {
+                      const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/')).slice(0, 3 - poseRefImages.length)
+                      setPoseRefImages(prev => [...prev, ...files.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
+                    }} />
+                </div>
+              </div>
+
+              {/* Selected pose display */}
+              {selectedPose && (
+                <div className="pose-selected-card">
+                  <div className="pose-selected-info">
+                    <span className="pose-selected-emoji">{selectedPose.emoji}</span>
+                    <div>
+                      <div className="pose-selected-name">{selectedPose.name}</div>
+                      <div className="pose-selected-desc">{selectedPose.description}</div>
+                    </div>
+                  </div>
+                  <button className="btn btn-ghost" style={{ fontSize: 11, flexShrink: 0 }}
+                    onClick={() => setSelectedPose(null)}>
+                    <X size={12} /> Bỏ chọn
+                  </button>
+                </div>
+              )}
+
+              {/* Pose Library toggle */}
+              <button className="pose-lib-toggle" onClick={() => setShowPoseLibrary(p => !p)}>
+                {showPoseLibrary ? 'Thu gọn thư viện' : `📚 Mở thư viện ${POSE_LIBRARY.length} tư thế`}
+              </button>
+
+              {/* Pose Library grid */}
+              {showPoseLibrary && (
+                <div className="pose-library">
+                  {/* Category tabs */}
+                  <div className="pose-categories">
+                    {POSE_CATEGORIES.map(cat => (
+                      <button key={cat.id}
+                        className={`pose-cat-btn${poseCategory === cat.id ? ' active' : ''}`}
+                        onClick={() => setPoseCategory(cat.id)}>
+                        {cat.label}
+                      </button>
+                    ))}
+                  </div>
+                  {/* Pose cards */}
+                  <div className="pose-grid">
+                    {getPosesByCategory(poseCategory).map(p => (
+                      <div key={p.id}
+                        className={`pose-card${selectedPose?.id === p.id ? ' selected' : ''}`}
+                        onClick={() => setSelectedPose(selectedPose?.id === p.id ? null : p)}>
+                        <div className="pose-card-emoji">{p.emoji}</div>
+                        <div className="pose-card-name">{p.name}</div>
+                        <div className="pose-card-focus">{p.bodyFocus}</div>
+                        {selectedPose?.id === p.id && <Check size={14} className="pose-card-check" />}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Prompt Template quick select */}
+              <div className="form-group">
+                <label className="nd-label">PHONG CÁCH CHỤP</label>
+                <div className="pose-templates">
+                  {PROMPT_TEMPLATES.map(t => (
+                    <button key={t.id}
+                      className={`pose-tpl-btn${selectedTemplate?.id === t.id ? ' active' : ''}`}
+                      onClick={() => setSelectedTemplate(selectedTemplate?.id === t.id ? null : t)}
+                      title={t.description}>
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
 

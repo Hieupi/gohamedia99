@@ -1,0 +1,279 @@
+/**
+ * ═══════════════════════════════════════════════════════════════════════════
+ * POSE LIBRARY — Thư viện tư thế người mẫu + Prompt mẫu tối ưu
+ * ═══════════════════════════════════════════════════════════════════════════
+ * 
+ * Mỗi pose gồm:
+ * - id: unique identifier
+ * - name: tên tiếng Việt ngắn gọn
+ * - emoji: icon visual
+ * - category: 'front' | 'back' | 'side' | 'selfie' | 'action'
+ * - description: mô tả ngắn cho user
+ * - promptEN: prompt tiếng Anh chi tiết cho AI (auto-fill khi chọn)
+ * - cameraAngle: góc máy mô tả
+ * - bodyFocus: phần cơ thể được tôn vinh
+ */
+
+// ─── Pose Categories ──────────────────────────────────────────────────────────
+export const POSE_CATEGORIES = [
+    { id: 'all', label: '🔥 Tất cả' },
+    { id: 'front', label: '🎯 Chính diện' },
+    { id: 'back', label: '🔙 Sau lưng' },
+    { id: 'side', label: '📐 Nghiêng 3/4' },
+    { id: 'selfie', label: '🤳 Selfie' },
+    { id: 'action', label: '🏃 Hành động' },
+    { id: 'sitting', label: '💺 Ngồi' },
+    { id: 'editorial', label: '📸 Editorial' },
+]
+
+// ─── Master Pose Library ──────────────────────────────────────────────────────
+export const POSE_LIBRARY = [
+    // ═══ FRONT POSES ═══
+    {
+        id: 'front_hero',
+        name: 'Đứng hero chính diện',
+        emoji: '🦸‍♀️',
+        category: 'front',
+        description: 'Đứng thẳng, tự tin, hông nhẹ S-curve, tay thả tự nhiên',
+        bodyFocus: 'Toàn thân, tỷ lệ cơ thể',
+        cameraAngle: 'Full-body front-facing, eye level',
+        promptEN: `Full-body front-facing, confident natural stance with slight S-curve hip shift, one hand lightly touching thigh, other hand relaxed at side. Sweet genuine smile, eyes looking directly at camera. Legs slightly apart, weight shifted to one leg creating elegant body line. Camera at eye level, full-body shot from feet to head showing complete garment and model proportions.`,
+    },
+    {
+        id: 'front_bust_closeup',
+        name: 'Cận ngực & mặt',
+        emoji: '💋',
+        category: 'front',
+        description: 'Cận thân trên, focus ngực + khuôn mặt',
+        bodyFocus: 'Ngực, khuôn mặt',
+        cameraAngle: 'Close-up chest to face, straight-on',
+        promptEN: `Upper body close-up from chest to face, straight-on facing camera, arms relaxed at sides (barely visible). Confident calm expression, slight natural smile, eyes open looking at lens. Tight-fit garment showing bust volume with natural fabric stretch and light reflections. Focus on face beauty and bust presentation. Shallow depth of field, studio lighting with soft highlights on fabric.`,
+    },
+    {
+        id: 'front_arms_wide',
+        name: 'Tay dang rộng',
+        emoji: '🤗',
+        category: 'front',
+        description: 'Chính diện, 2 tay dang rộng, thân hình chữ V',
+        bodyFocus: 'Ngực, eo, tỷ lệ vai-eo',
+        cameraAngle: 'Front, upper body, slightly above',
+        promptEN: `Front-facing, both arms spread wide open past the frame edges, palms open. Slight warm smile, looking directly at camera. Arms extended create V-shape from shoulders to waist emphasizing bust and narrow waist. Upper body shot, camera slightly above eye level. Dynamic, welcoming, confident energy.`,
+    },
+    {
+        id: 'front_hands_block',
+        name: 'Tay vươn che lens',
+        emoji: '🖐️',
+        category: 'selfie',
+        description: '2 bàn tay xòe ra phía camera, tạo phối cảnh sáng tạo',
+        bodyFocus: 'Ngực từ trên, bàn tay foreground',
+        cameraAngle: 'Front, slightly below, wide angle perspective',
+        promptEN: `Front-facing, both hands reaching forward toward camera with fingers spread open wide, creating forced perspective effect where hands appear large in foreground and body appears smaller behind. Cool confident expression, slight head tilt. Upper body to thigh visible between arms. Camera slightly below eye level, wide-angle lens feel creating intimate engaging perspective.`,
+    },
+
+    // ═══ BACK POSES ═══
+    {
+        id: 'back_pinch',
+        name: 'Quay lưng kéo áo',
+        emoji: '👐',
+        category: 'back',
+        description: 'Quay lưng, 2 tay kéo nhẹ lai áo ở eo',
+        bodyFocus: 'Eo thon, mông tròn',
+        cameraAngle: 'Back view, waist level',
+        promptEN: `Back view, model facing away from camera. Both hands at waist level pinching and slightly pulling the hem of the shirt upward, revealing a sliver of skin at waist. Feet shoulder-width apart, weight evenly distributed on both legs. Hair falling down the back. Camera at waist level, upper body to thigh shot emphasizing waist-to-hip ratio and rounded butt silhouette.`,
+    },
+    {
+        id: 'back_arms_up_wall',
+        name: 'Giơ tay bám tường',
+        emoji: '🙌',
+        category: 'back',
+        description: 'Quay lưng, 2 tay giơ cao bám tường, chân kiễng',
+        bodyFocus: 'Lưng dài, mông nâng, chân thon',
+        cameraAngle: 'Back view, full body',
+        promptEN: `Back view, model facing wall with both arms raised high above head, palms flat against wall/air with fingers spread. Standing on tiptoes slightly, legs together and straight creating elongated body line. Hair cascading down one side. Full-body shot showing complete back silhouette — long back, lifted butt, elongated legs. Dynamic and playful energy.`,
+    },
+    {
+        id: 'back_closeup_butt',
+        name: 'Cận mông kéo áo',
+        emoji: '🍑',
+        category: 'back',
+        description: 'Cận eo xuống mông, 2 tay kéo lai áo',
+        bodyFocus: 'Mông tròn cận cảnh',
+        cameraAngle: 'Back view, close-up waist to thigh',
+        promptEN: `Back view close-up from waist down to mid-thigh. Both hands at waist pinching the shirt hem. Focus zoomed on the waist-hip-butt area, showing the fabric stretch across rounded butt with natural light reflection on tight shorts/pants. Detailed texture visible on clothing. Camera at hip level for flattering butt perspective.`,
+    },
+    {
+        id: 'back_fullbody_tiptoe',
+        name: 'Sau lưng toàn thân',
+        emoji: '👠',
+        category: 'back',
+        description: 'Full body quay lưng, kiễng chân, giày sneaker',
+        bodyFocus: 'Toàn bộ silhouette từ sau',
+        cameraAngle: 'Back view, full body head to toe',
+        promptEN: `Full-body back view from head to feet. Model facing completely away from camera. Both hands at waist pulling shirt hem slightly. Standing on tiptoes in white sneakers, feet slightly pigeon-toed. Long dark hair flowing down the back. Complete rear silhouette showing: hair + narrow waist + rounded butt + slim long legs + shoes. Clean studio background.`,
+    },
+
+    // ═══ SIDE / 3/4 POSES ═══
+    {
+        id: 'side_scurve',
+        name: 'S-curve nghiêng',
+        emoji: '💃',
+        category: 'side',
+        description: '3/4 nghiêng, 1 tay vuốt tóc, chân bắt chéo',
+        bodyFocus: 'Chân dài, ngực side, mông profile',
+        cameraAngle: '3/4 angle, full body',
+        promptEN: `3/4 angle full-body shot, model turned partially away from camera but looking back over shoulder. One arm raised touching/running through hair at the top of head. Legs in a model stance — one foot forward, legs creating elongated crossed line. Shows side profile of bust, narrow waist, and butt silhouette simultaneously. Sultry confident expression looking at camera. Classic fashion model S-curve pose.`,
+    },
+    {
+        id: 'side_profile_glance',
+        name: 'Ngoảnh nhìn qua vai',
+        emoji: '😏',
+        category: 'side',
+        description: '3/4 lưng, ngoảnh mặt nhìn camera qua vai, 1 tay vuốt tóc',
+        bodyFocus: 'Mông + ngực side + gương mặt',
+        cameraAngle: '3/4 rear, upper body',
+        promptEN: `3/4 rear angle, upper body shot. Model turned with back partially toward camera, looking back over right shoulder at lens. One hand raised touching hair at the crown. Shows side profile: bust visible from side creating volume, rounded butt profile in shorts/pants, and beautiful face looking back with alluring confident expression. Hair flowing down one side.`,
+    },
+
+    // ═══ SELFIE POSES ═══
+    {
+        id: 'selfie_reach',
+        name: 'Vươn tay ôm',
+        emoji: '🫶',
+        category: 'selfie',
+        description: '2 tay vươn ra phía camera như ôm người xem',
+        bodyFocus: 'Ngực từ trên, gương mặt gần',
+        cameraAngle: 'Front, slightly above, intimate',
+        promptEN: `Front-facing, both arms extended forward toward camera as if reaching to grab or hug the viewer. Slight lean forward, warm inviting expression with gentle smile. Creates intimate engaging perspective where viewer feels embraced. Upper body shot, camera slightly above creating flattering angle showing bust from above. Warm, personal, social-media-ready feel.`,
+    },
+    {
+        id: 'selfie_one_arm',
+        name: 'Selfie 1 tay',
+        emoji: '🤳',
+        category: 'selfie',
+        description: '1 tay giơ cao cầm camera, thân hơi nghiêng',
+        bodyFocus: 'Ngực side profile, eo',
+        cameraAngle: 'Selfie angle, above looking down',
+        promptEN: `Selfie perspective — one arm raised high holding camera (pointed at viewer), other hand relaxed at side or touching hip. Body slightly angled to camera creating natural curves. Confident calm expression, slight head tilt, eyes looking up at lens. Upper body shot from selfie angle above, showing bust volume from slightly above and to the side. Natural, authentic selfie energy.`,
+    },
+
+    // ═══ SITTING POSES ═══
+    {
+        id: 'sit_elegant',
+        name: 'Ngồi ghế thanh lịch',
+        emoji: '💺',
+        category: 'sitting',
+        description: 'Ngồi ghế cao, chân bắt chéo, tay đặt đùi',
+        bodyFocus: 'Chân dài bắt chéo, eo, ngực',
+        cameraAngle: 'Eye level, 3/4 angle',
+        promptEN: `Sitting elegantly on a high stool or chair, legs crossed at the knee showing long slender legs. One hand resting on thigh, other hand touching chair or resting on lap. Back straight, slight forward lean, charming smile. 3/4 angle showing body curves while seated. Full-body shot from feet up including the chair/stool. Graceful, sophisticated editorial feel.`,
+    },
+    {
+        id: 'sit_playful',
+        name: 'Ngồi tinh nghịch',
+        emoji: '😜',
+        category: 'sitting',
+        description: 'Ngồi vắt chéo chân, tay chống cằm, đầu nghiêng',
+        bodyFocus: 'Chân + gương mặt dễ thương',
+        cameraAngle: 'Eye level, front or 3/4',
+        promptEN: `Sitting casually on a stool/step/seat, one leg dangling, other leg bent up. One hand propping up chin, head tilted to one side with dreamy playful expression looking away from camera. Relaxed youthful energy. Front or 3/4 angle showing full body in relaxed seated position. Hair falling naturally, candid lifestyle feel.`,
+    },
+
+    // ═══ ACTION / DYNAMIC POSES ═══
+    {
+        id: 'action_walk',
+        name: 'Bước đi catwalk',
+        emoji: '🚶‍♀️',
+        category: 'action',
+        description: 'Đang bước đi tự tin, tóc bay, vải bay',
+        bodyFocus: 'Chân dài, toàn thân dynamic',
+        cameraAngle: '3/4 angle, mid-stride',
+        promptEN: `3/4 angle mid-stride catwalk walk toward camera. Hair flowing with movement, fabric swaying naturally. One foot forward, one foot behind in natural walking motion. Confident playful expression, slight head tilt. Full-body shot capturing the energy and motion of walking. Dynamic, editorial fashion walk energy.`,
+    },
+    {
+        id: 'action_jump',
+        name: 'Nhảy tung tăng',
+        emoji: '🤸',
+        category: 'action',
+        description: 'Nhảy lên, tóc bay, biểu cảm vui vẻ tự do',
+        bodyFocus: 'Toàn thân, năng lượng',
+        cameraAngle: 'Full body, slightly below looking up',
+        promptEN: `Mid-air jump with both feet off the ground, hair flying upward, clothing floating with the motion. Arms playfully positioned — one up, one out. Genuine joyful laugh, eyes bright. Camera slightly below looking up to emphasize the jump height and create powerful dynamic composition. Full-body shot with space above for the jump.`,
+    },
+    {
+        id: 'action_twirl',
+        name: 'Xoay váy/đầm',
+        emoji: '🌀',
+        category: 'action',
+        description: 'Xoay người, váy/vải bay tạo vòng tròn',
+        bodyFocus: 'Váy bay, toàn thân xoay',
+        cameraAngle: 'Full body, eye level',
+        promptEN: `Mid-twirl spin with skirt/dress fabric fanning out in a beautiful circular motion. One arm extended outward for balance, hair whipping with the turn. Joyful carefree expression, eyes slightly closed in the moment. Full-body shot at eye level capturing the fabric movement frozen mid-spin. Dreamy romantic editorial quality.`,
+    },
+
+    // ═══ EDITORIAL / CREATIVE POSES ═══
+    {
+        id: 'editorial_leaning',
+        name: 'Tựa tường cool',
+        emoji: '😎',
+        category: 'editorial',
+        description: 'Tựa lưng vào tường, 1 chân co, tay cho túi',
+        bodyFocus: 'Chân dài, thái độ cool',
+        cameraAngle: 'Full body, slight angle',
+        promptEN: `Leaning back against a clean wall, one foot flat on the ground, other foot bent with sole pressed against the wall behind. Arms crossed or one hand in pocket/at hip. Cool effortless expression, chin slightly raised, looking at camera with attitude. Full-body shot at a slight angle. Streetwear editorial cool-girl energy.`,
+    },
+    {
+        id: 'editorial_golden_hour',
+        name: 'Golden hour finale',
+        emoji: '🌅',
+        category: 'editorial',
+        description: 'Ánh sáng golden hour, tóc bay, biểu cảm dreamy',
+        bodyFocus: 'Silhouette, rim lighting',
+        cameraAngle: 'Wide angle, artistic composition',
+        promptEN: `Artistic wide-angle composition, gentle wind blowing hair and fabric. Golden-hour warm rim lighting creating a halo/backlight effect around the model. Graceful flowing pose with arms slightly extended or one hand touching hair. Dreamy far-away expression. Wide shot showing model against golden sky/sunset. Magazine-cover cinematic finale quality.`,
+    },
+]
+
+// ─── Helper: Get poses by category ──────────────────────────────────────────
+export function getPosesByCategory(categoryId) {
+    if (categoryId === 'all') return POSE_LIBRARY
+    return POSE_LIBRARY.filter(p => p.category === categoryId)
+}
+
+// ─── Helper: Get pose by ID ─────────────────────────────────────────────────
+export function getPoseById(poseId) {
+    return POSE_LIBRARY.find(p => p.id === poseId) || null
+}
+
+// ─── Prompt Templates (for different use cases) ─────────────────────────────
+export const PROMPT_TEMPLATES = [
+    {
+        id: 'lookbook',
+        name: '📷 Lookbook sản phẩm',
+        description: 'Ảnh catalogue chuyên nghiệp cho shop online',
+        promptPrefix: 'Professional fashion lookbook product shot. Clean minimal background.',
+    },
+    {
+        id: 'lifestyle',
+        name: '🌿 Lifestyle tự nhiên',
+        description: 'Ảnh đời thường, tự nhiên như influencer chụp',
+        promptPrefix: 'Natural lifestyle photography, candid authentic feel, real-world setting.',
+    },
+    {
+        id: 'editorial',
+        name: '🎬 Editorial cao cấp',
+        description: 'Ảnh tạp chí thời trang high-end',
+        promptPrefix: 'High-end editorial fashion photography, dramatic lighting, magazine-quality composition.',
+    },
+    {
+        id: 'social',
+        name: '📱 Social media / TikTok',
+        description: 'Ảnh tối ưu cho mạng xã hội, bắt mắt, viral',
+        promptPrefix: 'Social media optimized photo, eye-catching, vibrant, vertical 9:16 format.',
+    },
+    {
+        id: 'streetwear',
+        name: '🏙️ Streetwear / Urban',
+        description: 'Phong cách đường phố, cool, trendy',
+        promptPrefix: 'Urban streetwear photography, cool edgy vibe, city backdrop or grunge setting.',
+    },
+]
