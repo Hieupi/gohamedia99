@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt } from '../services/masterPrompts'
-import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems } from '../services/libraryService'
+import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems, generateUniqueName } from '../services/libraryService'
 import { POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 
 // ─── Option Data (Auto = AI tự chọn tối ưu) ──────────────────────────────────
@@ -269,9 +269,8 @@ function ImagePreviewModal({ imageSrc, onClose }) {
 // ─── Save Modal ───────────────────────────────────────────────────────────────
 
 function SaveDesignModal({ imageSrc, projectName, onClose }) {
-  const existing = getLibraryItems()
-  const num = String(existing.filter(i => i.name?.startsWith('DESIGN')).length + 1).padStart(3, '0')
-  const [name, setName] = useState(projectName ? `DESIGN-${projectName}-${num}` : `DESIGN-${num}`)
+  const autoName = generateUniqueName({ category: 'design', description: projectName })
+  const [name, setName] = useState(autoName)
   const [type, setType] = useState('product')
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState(null)

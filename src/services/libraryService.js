@@ -47,6 +47,38 @@ export function getLibraryItems() {
     }
 }
 
+// ─── Smart Unique Name Generator ──────────────────────────────────────────────
+
+const CATEGORY_PREFIXES = {
+    top: 'ÁO', bottom: 'QUẦN', dress: 'ĐẦM', outerwear: 'KHOÁC',
+    shoes: 'GIÀY', bag: 'TÚI', accessory: 'PKIỆN', model: 'MẪU',
+    background: 'NỀN', other: 'SP', design: 'DESIGN', pose: 'POSE',
+}
+
+/**
+ * Tạo tên unique: PREFIX-MôTả-HHmm-xx
+ * VD: ÁO-Sơmi-1523-a7, ĐẦM-Dạhội-1524-k3, DESIGN-Lookbook-1525-m9
+ */
+export function generateUniqueName({ category, description, prefix } = {}) {
+    const existing = getLibraryItems()
+    const p = prefix || CATEGORY_PREFIXES[category] || 'SP'
+    let desc = (description || '')
+        .replace(/^(Áo|Quần|Đầm|Giày|Túi|Mũ|Váy)\s*/i, '')
+        .trim()
+    if (desc.length > 20) desc = desc.slice(0, 20).trim()
+    if (!desc) desc = p === 'DESIGN' ? 'Mới' : 'Item'
+    const now = new Date()
+    const time = String(now.getHours()).padStart(2, '0') + String(now.getMinutes()).padStart(2, '0')
+    const rand = Math.random().toString(36).slice(2, 4)
+    let candidate = `${p}-${desc}-${time}${rand}`
+    let attempt = 0
+    while (existing.some(i => i.name === candidate)) {
+        attempt++
+        candidate = `${p}-${desc}-${time}${rand}${attempt}`
+    }
+    return candidate
+}
+
 // ─── Write (có resize + try/catch) ────────────────────────────────────────────
 
 export async function saveToLibrary(record) {

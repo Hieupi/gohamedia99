@@ -3,7 +3,7 @@ import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle, Users, Eye
 import { detectObjects, generateGarmentImage } from '../services/geminiService'
 import { getPrompt } from '../services/masterPrompts'
 import { getApiKeys } from '../services/apiKeyService'
-import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems } from '../services/libraryService'
+import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems, generateUniqueName } from '../services/libraryService'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -90,35 +90,7 @@ ${productName ? `- Collection name: "${productName}"` : ''}
 Generate the master composite image now.`
 }
 
-// ─── Smart Naming Helpers ─────────────────────────────────────────────────────
-
-const CATEGORY_PREFIX = {
-  top: 'ÁO', bottom: 'QUẦN', dress: 'ĐẦM', outerwear: 'KHOÁC',
-  shoes: 'GIÀY', bag: 'TÚI', accessory: 'PKIỆN', model: 'MẪU',
-  background: 'NỀN', other: 'BST',
-}
-
-function generateSmartName(item, existingItems = []) {
-  const prefix = CATEGORY_PREFIX[item?.category] || 'SP'
-  // Lấy tên rút gọn từ nameVi (bỏ các từ chung)
-  let baseName = (item?.nameVi || 'Không tên')
-    .replace(/^(Áo|Quần|Đầm|Giày|Túi|Mũ|Băng|Vợt|Tất)\s*/i, '')
-    .trim()
-  if (baseName.length > 30) baseName = baseName.slice(0, 30).trim()
-
-  const fullBase = `${prefix}-${baseName}`
-
-  // Đếm số item trùng prefix + base
-  const sameBase = existingItems.filter(i =>
-    i.name && i.name.startsWith(fullBase)
-  )
-  const num = String(sameBase.length + 1).padStart(3, '0')
-  return `${fullBase}-${num}`
-}
-
-function checkDuplicate(name, existingItems) {
-  return existingItems.some(i => i.name === name)
-}
+// ─── Smart Naming (dùng generateUniqueName từ libraryService) ─────────────────
 
 // ─── Save Modal Component ─────────────────────────────────────────────────────
 
@@ -142,13 +114,13 @@ function resizeImageToThumbnail(dataUrl, maxSize = 300) {
 function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
   const existingItems = getLibraryItems()
 
-  const autoName = generateSmartName(item, existingItems)
+  const autoName = generateUniqueName({ category: item?.category, description: item?.nameVi })
   const [name, setName] = useState(autoName)
   const [type, setType] = useState(item?.category === 'model' ? 'model' : 'product')
   const [saving, setSaving] = useState(false)
-  const [saveResult, setSaveResult] = useState(null) // 'ok' | 'error'
+  const [saveResult, setSaveResult] = useState(null)
 
-  const isDuplicate = checkDuplicate(name, existingItems)
+  const isDuplicate = getLibraryItems().some(i => i.name === name)
 
   const handleSave = async () => {
     if (type === 'pose') {
