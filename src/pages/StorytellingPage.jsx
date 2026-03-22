@@ -2,57 +2,83 @@ import { useState, useRef } from 'react'
 import {
     Upload, Sparkles, Download, Save, Trash2, X, Send, Plus,
     Image as ImageIcon, Loader, FolderOpen, Eye, GripVertical,
-    ChevronDown, Film, BookOpen, PlusCircle
+    ChevronDown, Film, BookOpen, PlusCircle, Check
 } from 'lucide-react'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt, VN_DNA_DEFAULTS } from '../services/masterPrompts'
 import { downloadImage, getLibraryItems } from '../services/libraryService'
+import { POSE_LIBRARY, POSE_CATEGORIES, getPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 
-// ─── Story Templates ──────────────────────────────────────────────────────────
+// ─── Story Templates (9 scenes each for maximum diversity) ────────────────────
 const STORY_TEMPLATES = [
     {
         id: 'motorbike',
         name: '🏍️ Lái xe máy',
-        description: 'Cô gái trẻ với xe máy trên đường quê, golden hour',
+        description: 'Cô gái trẻ với xe máy trên đường quê, golden hour — 9 cảnh × 3s',
         scenes: [
-            { title: 'Đứng trước xe', pose: 'Standing upright beside the scooter, holding helmet in one hand, slight hip shift, confident smile, full-body front-facing', camera: 'Full-body shot from feet up, scooter visible behind her', emotion: 'Confident, bright, cheerful' },
-            { title: 'Ngồi bấm điện thoại', pose: 'Sitting relaxed on scooter seat, legs crossed, one hand holding phone close to face reading a message, playful charming expression', camera: 'Eye level, slightly tilted, encompassing subject and scooter', emotion: 'Relaxed, playful, enjoying the moment' },
+            { title: 'Hero đứng cạnh xe', pose: 'Standing upright beside the scooter, one hand on seat, slight hip shift, confident smile, full-body front-facing', camera: 'Full-body shot from feet up, scooter visible behind her', emotion: 'Confident, bright, cheerful' },
+            { title: 'Cận mặt + xe', pose: 'Leaning forward on scooter handlebars with both arms, chin resting on hands, sweet coy smile looking at camera, hair flowing to one side', camera: 'Close-up face and upper body, scooter handlebars visible', emotion: 'Sweet, intimate, charming' },
+            { title: 'Ngồi bấm điện thoại', pose: 'Sitting relaxed on scooter seat, legs crossed, one hand holding phone close to face reading a message, playful charming expression', camera: 'Eye level, slightly tilted, encompassing subject and scooter', emotion: 'Relaxed, playful, modern' },
             { title: 'Selfie trước xe', pose: 'Standing in front of scooter wearing helmet, one hand holding phone high for selfie, other hand on hip, leaning slightly forward, mischievous smile', camera: "Bird's eye view from phone perspective, panoramic from face downward", emotion: 'Fun, youthful, social media vibe' },
-            { title: 'Ngồi tinh nghịch', pose: 'Sitting on seat wearing helmet, one hand on handlebars, head tilted to side looking away dreamily, playful expression', camera: 'Full-body close-up from feet up with scooter and background', emotion: 'Dreamy, captivating, artistic' },
+            { title: 'Quay lưng kéo áo', pose: 'Back view standing beside scooter, both hands at waist pulling shirt hem slightly, looking over shoulder at camera with coy smile, hair cascading down back', camera: 'Full-body back view, scooter beside her', emotion: 'Flirty, artistic, body-focused' },
+            { title: 'Ngồi tinh nghịch', pose: 'Sitting sideways on seat, one hand on handlebars, head tilted to side looking away dreamily, playful expression, legs dangling', camera: 'Full-body close-up with scooter and background', emotion: 'Dreamy, captivating, artistic' },
             { title: 'Cận mặt dễ thương', pose: 'Sitting on scooter, hand touching chin/lips, looking to the side with sweet coy smile, hair flowing', camera: 'Close-up upper body and face, shallow DOF bokeh', emotion: 'Sweet, charming, intimate' },
-            { title: 'Lái xe trên đường', pose: 'Riding scooter on road, helmet on, hands on handlebars, slight smile, hair and clothes flowing in wind', camera: 'Front view at eye level from road, wide shot', emotion: 'Free, adventurous, cinematic' },
+            { title: 'Lái xe trên đường', pose: 'Riding scooter on road, helmet on, hands on handlebars, slight smile, hair and clothes flowing in wind, dynamic motion', camera: 'Front view at eye level from road, wide cinematic shot', emotion: 'Free, adventurous, cinematic' },
+            { title: 'Golden hour finale', pose: 'Standing beside scooter at golden hour, arms stretched wide, head tilted back, hair flowing in warm wind, ethereal silhouette with rim lighting', camera: 'Wide angle artistic composition, golden backlight', emotion: 'Freedom, euphoria, cinematic finale' },
         ]
     },
     {
         id: 'cafe',
         name: '☕ Cafe chiều',
-        description: 'Buổi chiều thư giãn tại quán cafe vintage',
+        description: 'Buổi chiều thư giãn tại quán cafe vintage — 9 cảnh × 3s',
         scenes: [
-            { title: 'Bước vào quán', pose: 'Walking through cafe entrance, pushing glass door, slight turn back at camera with sweet smile', camera: 'Full-body from inside cafe looking toward entrance', emotion: 'Anticipation, elegant arrival' },
-            { title: 'Chọn chỗ ngồi', pose: 'Standing by window table, hand touching chair back, looking down at the seat deciding, natural stance', camera: '3/4 angle showing cafe interior and window light', emotion: 'Casual, contemplative' },
+            { title: 'Bước vào quán', pose: 'Walking through cafe entrance, pushing glass door open, slight turn back at camera with sweet smile, hair flowing with movement', camera: 'Full-body from inside cafe looking toward entrance', emotion: 'Anticipation, elegant arrival' },
+            { title: 'Đứng ngắm quán', pose: 'Standing inside cafe, one hand touching chin contemplating, looking around at the vintage decor, natural relaxed stance', camera: 'Wide shot showing cafe interior and model', emotion: 'Curious, appreciative' },
+            { title: 'Chọn chỗ ngồi', pose: 'Standing by window table, hand touching chair back, looking down at the seat deciding, hip shifted, natural stance', camera: '3/4 angle showing cafe interior and window light', emotion: 'Casual, contemplative' },
             { title: 'Đọc menu', pose: 'Sitting at table, holding menu with both hands, looking down at it with interested expression, gentle smile', camera: 'Waist-up from across table, warm bokeh background', emotion: 'Curious, relaxed' },
+            { title: 'Selfie tại bàn', pose: 'Holding phone up for selfie at the table, peace sign with other hand, cute pouty expression, coffee shop background visible', camera: 'Selfie angle from phone perspective', emotion: 'Playful, social, fun' },
             { title: 'Thưởng thức đồ uống', pose: 'Holding coffee cup with both hands near face, eyes closed in enjoyment, gentle steam visible, serene expression', camera: 'Close-up face and hands with cup, shallow DOF', emotion: 'Blissful, cozy, warm' },
-            { title: 'Chụp ảnh đồ uống', pose: 'Holding phone above coffee cup taking photo for social media, bird eye view of table setup, concentrated cute expression', camera: 'Over-shoulder angle showing phone and table', emotion: 'Modern, social, fun' },
+            { title: 'Chụp ảnh đồ uống', pose: 'Holding phone above coffee cup taking photo for social media, bird eye view of table setup, concentrated cute expression', camera: 'Over-shoulder angle showing phone and table', emotion: 'Modern, social, creative' },
             { title: 'Ngắm ra cửa sổ', pose: 'Chin resting on hand, gazing out window with dreamy far-away look, golden light on face, coffee cup in front', camera: 'Side profile with window light, cinematic wide', emotion: 'Peaceful, dreamy, golden hour' },
+            { title: 'Tạm biệt quán', pose: 'Standing at cafe door looking back inside with nostalgic sweet smile, hand on door frame, warm backlight creating silhouette', camera: 'Inside looking out, artistic backlit composition', emotion: 'Grateful, warm, bittersweet finale' },
         ]
     },
     {
         id: 'shopping',
         name: '🛍️ Đi mua sắm',
-        description: 'Một ngày shopping tại trung tâm thương mại',
+        description: 'Một ngày shopping tại trung tâm thương mại — 9 cảnh × 3s',
         scenes: [
-            { title: 'Bước vào mall', pose: 'Walking confidently through mall entrance, shopping bags in hand, hair flowing, bright smile', camera: 'Full-body front facing, mall interior visible behind', emotion: 'Excited, confident' },
+            { title: 'Bước vào mall', pose: 'Walking confidently through mall entrance, shopping bags in hand, hair flowing, bright smile, one hand pushing hair back', camera: 'Full-body front facing, mall interior behind', emotion: 'Excited, confident' },
+            { title: 'Escalator selfie', pose: 'Standing on escalator, phone held up for selfie, looking at screen with cute expression, mall levels visible behind', camera: 'Selfie perspective from phone', emotion: 'Fun, modern, social' },
             { title: 'Xem đồ trên kệ', pose: 'Standing at clothing rack, one hand touching fabric, head tilted examining the garment, thoughtful expression', camera: '3/4 angle showing clothes rack and model', emotion: 'Curious, interested' },
             { title: 'Thử đồ trước gương', pose: 'Standing before full-length mirror, holding outfit against body, turning slightly, checking reflection with pleased smile', camera: 'Mirror reflection shot showing both model and reflection', emotion: 'Happy, deciding' },
             { title: 'Selfie phòng thử đồ', pose: 'In fitting room, new outfit on, phone held up for mirror selfie, confident pose, peace sign', camera: 'Mirror selfie perspective from phone', emotion: 'Proud, fun, sharing moment' },
+            { title: 'Catwalk hành lang', pose: 'Walking down mall corridor like a catwalk, one hand on hip, chin up, confident strut, shopping bags swinging, hair bouncing', camera: 'Full-body from front, corridor stretching behind', emotion: 'Sassy, confident, main character energy' },
             { title: 'Nghỉ ngơi ăn kem', pose: 'Sitting at food court bench, legs crossed, eating ice cream, playful expression, shopping bags beside her', camera: 'Eye level lifestyle shot with mall background', emotion: 'Relaxed, sweet, enjoying' },
-            { title: 'Ra về hạnh phúc', pose: 'Walking out of mall doors, multiple shopping bags, big genuine smile, sunset light behind, looking back at camera', camera: 'Full-body from outside, golden hour backlight', emotion: 'Satisfied, glowing, cinematic finale' },
+            { title: 'Khoe chiến lợi phẩm', pose: 'Sitting on bench, holding up a shopping bag showing the brand, other bags around her, excited proud expression looking at camera', camera: 'Medium shot, lifestyle angle', emotion: 'Triumphant, proud, showing off' },
+            { title: 'Ra về hạnh phúc', pose: 'Walking out of mall doors, multiple shopping bags, big genuine smile, sunset light behind, looking back at camera with wave', camera: 'Full-body from outside, golden hour backlight', emotion: 'Satisfied, glowing, cinematic finale' },
+        ]
+    },
+    {
+        id: 'gym',
+        name: '💪 Phòng gym',
+        description: 'Buổi tập tại gym, năng động khỏe khoắn — 9 cảnh × 3s',
+        scenes: [
+            { title: 'Đến gym', pose: 'Walking into gym entrance with gym bag, wearing tight workout outfit, confident energetic smile, hair in ponytail', camera: 'Full-body front facing at gym entrance', emotion: 'Motivated, energetic, ready' },
+            { title: 'Warm up stretching', pose: 'Standing stretching one arm across body, other hand pulling elbow, feet hip-width apart, looking at camera with determined smile', camera: 'Full-body 3/4 angle, gym equipment visible', emotion: 'Focused, warming up' },
+            { title: 'Squat position', pose: 'Mid-squat position with perfect form, hands clasped in front, back arched, butt pushed back and down, focused expression', camera: 'Side angle showing squat form, glutes emphasized', emotion: 'Strong, powerful, concentrated' },
+            { title: 'Tạo dáng với tạ', pose: 'Holding dumbbells at sides, standing with hip shifted, slight arm flex, confident smirk looking at camera, athletic stance', camera: 'Full-body front 3/4, mirrors behind showing reflection', emotion: 'Strong, confident, fierce' },
+            { title: 'Selfie gương gym', pose: 'Mirror selfie in gym, phone held up, flexing one arm subtly, body turned slightly to show curves in workout gear, smirk', camera: 'Mirror reflection, gym equipment in background', emotion: 'Proud, confident, showing progress' },
+            { title: 'Nghỉ giữa set', pose: 'Sitting on gym bench, one hand holding water bottle, other hand wiping forehead with towel, breathing visible, glowing skin from sweat', camera: 'Close-up upper body, gym background bokeh', emotion: 'Exhausted but satisfied, raw beauty' },
+            { title: 'Plank position', pose: 'In forearm plank position on yoga mat, perfect straight body line, looking forward with fierce determination, core engaged', camera: 'Low angle from floor level showing body line', emotion: 'Powerful, determined, strong' },
+            { title: 'Quay lưng khoe body', pose: 'Back view standing, both hands on waist pulling up shirt edge slightly, showing defined lower back and waist-to-hip curve, looking over shoulder', camera: 'Full-body back view, gym mirrors behind', emotion: 'Proud, body-confident, alluring' },
+            { title: 'After-workout glow', pose: 'Leaning against gym wall, towel around neck, water bottle in hand, hair slightly messy from workout, serene accomplished smile, skin glowing', camera: 'Waist-up portrait, soft gym lighting', emotion: 'Accomplished, glowing, peaceful finale' },
         ]
     },
     {
         id: 'custom',
         name: '✏️ Tự tạo kịch bản',
-        description: 'Tạo câu chuyện của riêng bạn',
+        description: 'Tạo câu chuyện riêng của bạn — tùy ý số cảnh × 3s',
         scenes: []
     },
 ]
@@ -65,6 +91,7 @@ function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemo
             <div className="st-scene-header">
                 <span className="st-scene-number">{index + 1}</span>
                 <span className="st-scene-title">{scene.title}</span>
+                <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 'auto' }}>3s</span>
                 {isCustom && (
                     <button className="st-scene-remove" onClick={onRemove} title="Xóa cảnh"><X size={14} /></button>
                 )}
@@ -180,6 +207,7 @@ async function entriesToFiles(entries) {
 export default function StorytellingPage() {
     const refFileRef = useRef()
     const productFileRef = useRef()
+    const poseRefFileRef = useRef()
 
     // Images
     const [refImages, setRefImages] = useState([])
@@ -188,7 +216,13 @@ export default function StorytellingPage() {
     // Story
     const [selectedTemplate, setSelectedTemplate] = useState(null)
     const [scenes, setScenes] = useState([])
-    const [storyContext, setStoryContext] = useState('')  // shared context: location, props, accessories
+    const [storyContext, setStoryContext] = useState('')
+
+    // Pose Library
+    const [selectedPose, setSelectedPose] = useState(null)
+    const [poseCategory, setPoseCategory] = useState('all')
+    const [poseRefImages, setPoseRefImages] = useState([])
+    const [showPoseLibrary, setShowPoseLibrary] = useState(false)
 
     // Settings
     const [quality] = useState('2K (HD)')
@@ -253,6 +287,13 @@ export default function StorytellingPage() {
         setLibraryPicker(null)
     }
 
+    // Apply pose from library to a specific scene
+    const applyPoseToScene = (sceneIdx, pose) => {
+        updateScene(sceneIdx, 'pose', pose.promptEN)
+        updateScene(sceneIdx, 'camera', pose.cameraAngle)
+        updateScene(sceneIdx, 'emotion', 'Confident, alluring')
+    }
+
     // ─── Generate ALL scenes ──────────────────────────────────────────────────
 
     const handleGenerateAll = async () => {
@@ -285,11 +326,12 @@ export default function StorytellingPage() {
                 (async () => {
                     try {
                         const shotDesc = `STORYTELLING SCENE ${idx + 1} of ${scenes.length}: "${scene.title}"
+VIDEO CLIP: This image will become a 3-second short video clip. Design the pose to have subtle motion potential (hair sway, fabric movement, gentle body shift).
 Pose & Action: ${scene.pose}
 Camera Angle: ${scene.camera || 'Professional fashion photography angle'}
 Emotion & Expression: ${scene.emotion}
 ${storyContext ? `Shared Story Context (location, props, accessories): ${storyContext}` : ''}
-IMPORTANT: Maintain 100% visual consistency with all other scenes — same person, same outfit, same location style, same color grading.`
+IMPORTANT: Maintain 100% visual consistency with all other scenes — same person, same outfit, same location style, same color grading. Each scene should feel like the next moment in a continuous story.`
 
                         const prompt = buildMasterImagePrompt({
                             extractedIdentity,
@@ -327,6 +369,7 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
 
     const canGenerate = productImages.length > 0 && scenes.length > 0 && !generating
     const isCustom = selectedTemplate?.id === 'custom'
+    const totalDuration = scenes.length * 3
 
     // ─── RENDER ───────────────────────────────────────────────────────────────
 
@@ -339,8 +382,8 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                 <div className="st-templates">
                     <h2 className="st-section-title">Chọn kịch bản câu chuyện</h2>
                     <p style={{ color: 'var(--text-muted)', marginBottom: 20, fontSize: 14 }}>
-                        Mỗi kịch bản gồm nhiều phân cảnh liên tục, tạo thành 1 câu chuyện hình ảnh thu hút.
-                        Lý tưởng để làm video TikTok/Reels kể chuyện.
+                        Mỗi kịch bản gồm <strong>9 phân cảnh × 3 giây</strong> = video 27s hấp dẫn.
+                        Đa dạng góc máy + cảm xúc → tăng tỷ lệ giữ chân tối đa trên TikTok/Reels.
                     </p>
                     <div className="st-template-grid">
                         {STORY_TEMPLATES.map(tpl => (
@@ -348,7 +391,7 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                 <div className="st-template-name">{tpl.name}</div>
                                 <div className="st-template-desc">{tpl.description}</div>
                                 <div className="st-template-count">
-                                    {tpl.scenes.length > 0 ? `${tpl.scenes.length} phân cảnh` : 'Tự do'}
+                                    {tpl.scenes.length > 0 ? `${tpl.scenes.length} cảnh × 3s = ${tpl.scenes.length * 3}s` : 'Tự do'}
                                 </div>
                             </div>
                         ))}
@@ -362,7 +405,7 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                             ← Đổi kịch bản
                         </button>
                         <h2 className="st-active-title">{selectedTemplate.name}</h2>
-                        <span className="st-scene-count">{scenes.length} phân cảnh</span>
+                        <span className="st-scene-count">{scenes.length} cảnh × 3s = {totalDuration}s</span>
                     </div>
 
                     <div className="st-layout">
@@ -419,6 +462,77 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                 </div>
                             </div>
 
+                            {/* ── Pose Library ── */}
+                            <div className="design-step">
+                                <div className="design-step-header">
+                                    <div className="design-step-number" style={{ background: 'linear-gradient(135deg, #e91e63, #ff5722)' }}>P</div>
+                                    <div className="design-step-title">📸 Thư viện Pose</div>
+                                </div>
+                                <div className="nd-settings-body">
+                                    {/* Pose ref upload */}
+                                    <div className="form-group">
+                                        <label className="nd-label">ẢNH TƯ THẾ THAM CHIẾU</label>
+                                        <div className="nd-img-grid">
+                                            {poseRefImages.map((img, i) => (
+                                                <div key={i} className="img-slot filled">
+                                                    <img src={img.url} alt="" />
+                                                    <button className="img-slot-remove" onClick={() => setPoseRefImages(prev => prev.filter((_, j) => j !== i))}><X size={12} /></button>
+                                                </div>
+                                            ))}
+                                            {poseRefImages.length < 3 && (
+                                                <div className="img-slot empty" onClick={() => poseRefFileRef.current?.click()}>
+                                                    <Plus size={18} style={{ color: 'var(--brand)' }} />
+                                                    <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>Pose</span>
+                                                </div>
+                                            )}
+                                            <input ref={poseRefFileRef} type="file" accept="image/*" multiple hidden
+                                                onChange={e => {
+                                                    const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/')).slice(0, 3 - poseRefImages.length)
+                                                    setPoseRefImages(prev => [...prev, ...files.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
+                                                }} />
+                                        </div>
+                                    </div>
+
+                                    {/* Pose Library toggle */}
+                                    <button className="pose-lib-toggle" onClick={() => setShowPoseLibrary(p => !p)}>
+                                        {showPoseLibrary ? 'Thu gọn thư viện' : `📚 Mở thư viện ${POSE_LIBRARY.length} tư thế`}
+                                    </button>
+
+                                    {showPoseLibrary && (
+                                        <div className="pose-library">
+                                            <div className="pose-categories">
+                                                {POSE_CATEGORIES.map(cat => (
+                                                    <button key={cat.id}
+                                                        className={`pose-cat-btn${poseCategory === cat.id ? ' active' : ''}`}
+                                                        onClick={() => setPoseCategory(cat.id)}>
+                                                        {cat.label}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                            <div className="pose-grid">
+                                                {getPosesByCategory(poseCategory).map(p => (
+                                                    <div key={p.id}
+                                                        className={`pose-card${selectedPose?.id === p.id ? ' selected' : ''}`}
+                                                        onClick={() => setSelectedPose(selectedPose?.id === p.id ? null : p)}>
+                                                        <div className="pose-card-emoji">{p.emoji}</div>
+                                                        <div className="pose-card-name">{p.name}</div>
+                                                        <div className="pose-card-focus">{p.bodyFocus}</div>
+                                                        {selectedPose?.id === p.id && <Check size={14} className="pose-card-check" />}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            {selectedPose && (
+                                                <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(255,107,53,0.06)', borderRadius: 8, fontSize: 11, color: 'var(--text-muted)' }}>
+                                                    <strong style={{ color: 'var(--brand)' }}>Đã chọn: {selectedPose.emoji} {selectedPose.name}</strong>
+                                                    <br />{selectedPose.description}
+                                                    <br /><em>Click vào 1 cảnh bên phải để áp dụng pose này</em>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
                             {/* Story context */}
                             <div className="design-step">
                                 <div className="design-step-header">
@@ -437,7 +551,7 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                 {generating ? (
                                     <><Loader size={18} className="spin" /> Đang tạo {scenes.length} phân cảnh...</>
                                 ) : (
-                                    <><Sparkles size={18} /> Tạo {scenes.length} phân cảnh Storytelling</>
+                                    <><Sparkles size={18} /> Tạo {scenes.length} cảnh × 3s = {totalDuration}s video</>
                                 )}
                             </button>
                         </div>
@@ -446,7 +560,7 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                         <div className="st-timeline">
                             <div className="st-timeline-header">
                                 <h3 className="st-section-title" style={{ margin: 0 }}>
-                                    <Film size={18} style={{ verticalAlign: -3 }} /> Timeline — {scenes.length} cảnh
+                                    <Film size={18} style={{ verticalAlign: -3 }} /> Timeline — {scenes.length} cảnh ({totalDuration}s)
                                 </h3>
                                 {isCustom && (
                                     <button className="btn btn-ghost" onClick={addScene}>

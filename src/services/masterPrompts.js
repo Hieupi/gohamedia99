@@ -391,9 +391,11 @@ ABSOLUTE RULES (VIOLATION = FAILURE):
   parts.push(`\n[BODY ENHANCEMENT — BEAUTY BODY SCULPTING]
 Apply these body enhancements that adapt naturally to the clothing:
 
-- BUST: Enhance the bust to a natural D-cup size with full, rounded and voluptuous yet natural volume, forming tasteful and pronounced cleavage. The chest looks tight, firm, perky and visually stunning in a perfectly proportioned, sensual manner — elegant, attractive and never oversized or unnatural. Do not increase the waist at all. IMPORTANT: Adapt bust presentation to the garment type — if the outfit has a high neckline or is modest, show the bust volume through fabric stretch and shape rather than exposed cleavage. If the outfit has a low neckline, show natural alluring cleavage.
+- BUST: Enhance the bust to a natural D-cup size with full, rounded and voluptuous yet natural volume, forming tasteful and pronounced cleavage. The chest looks tight, firm, perky and visually stunning in a perfectly proportioned, sensual manner — elegant, attractive and never oversized or unnatural. IMPORTANT: Adapt bust presentation to the garment type — if the outfit has a high neckline or is modest, show the bust volume through fabric stretch and shape rather than exposed cleavage. If the outfit has a low neckline, show natural alluring cleavage. SIGNATURE DETAIL: A small, elegant beauty mark (nốt ruồi son) on the upper chest/décolletage area — adds charm and uniqueness.
 
 - BUTT & THIGHS (GYM BODY): Full, round, lifted bubble-butt with athletic toned volume like a fitness model. Thighs are thick, sculpted and powerful yet feminine — the kind that looks incredible in any outfit. The butt and thigh area is the most visually magnetic part of the body, drawing eyes naturally. Think Brazilian gym goddess meets Korean beauty. The curves should be the most eye-catching, attractive feature — beautifully shaped, never vulgar or disproportionate.
+
+- CROTCH AREA (CRITICAL FOR TIGHT CLOTHING): When wearing tight shorts, leggings, or form-fitting bottoms, render the crotch/groin area with anatomically correct fabric contour. The fabric should naturally follow and define the body's Y-shaped crease at the junction of inner thighs, creating visible and realistic fabric tension lines. The center seam should be visible and naturally following body contours. This is a hallmark of professional fitness/sportswear photography — the fabric hugs every curve authentically like real gym wear photos.
 
 - LEGS: Elongate legs to create tall model proportions (leg-to-torso ratio 1.15:1), long graceful calves, totaling 170cm+ height appearance.
 
@@ -402,12 +404,15 @@ Apply these body enhancements that adapt naturally to the clothing:
 - OVERALL: Professional fashion model body — tall, curvy, athletic-toned but soft and feminine. Every enhancement must look 100% natural and realistic, as if the model simply has an incredible body naturally.`)
 
   parts.push(`\n[SKIN PERFECTION — VIETNAMESE PORCELAIN DREAM]
-- Skin color: Luminous porcelain white-pink (trắng hồng) — like Korean glass skin with Vietnamese warmth
-- Texture: Flawless but with subtle natural micro-texture (NOT plastic/wax doll)
-- Glow: Dewy glass-like radiance, subsurface scattering visible on forehead and cheekbones
+- Skin color: Porcelain white sweet (trắng ngọt lịm) — luminous milky-white with subtle pink undertone, like fresh cream with a kiss of rose
+- Texture: Silky smooth, flawless but with subtle natural micro-texture (NOT plastic/wax doll), light catches on skin creating soft highlight zones
+- Glow: Dewy glass-like radiance, subsurface scattering visible on forehead, cheekbones, and shoulders. Skin looks like it's lit from within
 - Makeup: Sweet Gen Z Korean-Vietnamese style — gradient lip tint (coral/rose), soft peach blush, sparkly eyeshadow, defined but natural brows
+- Body skin: Even porcelain tone across entire body — arms, legs, chest all match the face's luminous quality
 - Expression: Sweet, charming, approachable — appealing to BOTH female AND male viewers
+- Hair: Long, dark, with voluminous soft waves (sóng to bồng bềnh), healthy lustrous shine
 - The look should make female viewers aspire to be her, and make everyone find her naturally beautiful`)
+
 
   parts.push(`\n[SCENE & ART DIRECTION]`)
   parts.push(`Model Casting: ${isAuto(modelType) ? VN_DNA_DEFAULTS.modelType : modelType}`)
