@@ -3113,3 +3113,35 @@ textarea {
   line-height: 1.5;
   word-break: break-word;
 }
+
+/* ─── Result Card Eye Preview Button ──────────────────────────────────────── */
+.result-preview-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  border: 1.5px solid var(--border);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  opacity: 0;
+  transition: all 0.15s;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.result-card-img:hover .result-preview-btn {
+  opacity: 1;
+}
+
+.result-preview-btn:hover {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+  transform: scale(1.1);
+}

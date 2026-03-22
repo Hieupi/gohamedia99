@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle, Users } from 'lucide-react'
+import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle, Users, Eye, X } from 'lucide-react'
 import { detectObjects, generateGarmentImage } from '../services/geminiService'
 import { getPrompt } from '../services/masterPrompts'
 import { getApiKeys } from '../services/apiKeyService'
@@ -132,6 +132,28 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
   const isDuplicate = checkDuplicate(name, existingItems)
 
   const handleSave = () => {
+    if (type === 'pose') {
+      // Save as custom pose to localStorage
+      const customPose = {
+        id: `custom_${Date.now()}`,
+        name: name || autoName,
+        emoji: '📌',
+        thumbnail: imageSrc,
+        category: 'custom',
+        description: item?.description || name,
+        bodyFocus: 'Toàn thân',
+        cameraAngle: 'Custom reference',
+        promptEN: `Custom pose reference: ${name}. ${item?.description || ''}`,
+        isCustom: true,
+        createdAt: new Date().toISOString(),
+      }
+      const existing = JSON.parse(localStorage.getItem('goha_custom_poses') || '[]')
+      existing.push(customPose)
+      localStorage.setItem('goha_custom_poses', JSON.stringify(existing))
+      onSave(customPose)
+      onClose()
+      return
+    }
     const record = createLibraryRecord({
       name: name || autoName,
       type,
@@ -230,7 +252,14 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
             onClick={() => setType('product')}>Sản phẩm</button>
           <button className={`toggle-pill ${type === 'model' ? 'active' : ''}`}
             onClick={() => setType('model')}>Người mẫu</button>
+          <button className={`toggle-pill ${type === 'pose' ? 'active' : ''}`}
+            onClick={() => setType('pose')} style={type === 'pose' ? { background: 'var(--brand)', color: '#fff', borderColor: 'var(--brand)' } : {}}>Pose</button>
         </div>
+        {type === 'pose' && (
+          <div style={{ fontSize: 11.5, color: 'var(--brand)', marginBottom: 12, padding: '6px 10px', background: 'rgba(255,107,53,0.06)', borderRadius: 8 }}>
+            🤸 Ảnh này sẽ được lưu vào <strong>Kho Pose tùy chỉnh</strong> để dùng làm tư thế tham chiếu khi thiết kế.
+          </div>
+        )}
 
         {/* Actions */}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
@@ -266,10 +295,10 @@ function ItemToggleRow({ item, isOn, onToggle }) {
 
 // ─── Result Card ──────────────────────────────────────────────────────────────
 
-function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, onSavePose }) {
+function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, onSavePose, onPreview }) {
   return (
     <div className="result-card">
-      <div className="result-card-img">
+      <div className="result-card-img" style={{ position: 'relative' }}>
         {isLoading ? (
           <div className="result-loading">
             <div className="spin" style={{
@@ -286,7 +315,12 @@ function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, o
             <span style={{ fontSize: 11, color: '#ef4444', textAlign: 'center', lineHeight: 1.4 }}>{errorMsg}</span>
           </div>
         ) : imageSrc ? (
-          <img src={imageSrc} alt={item.nameVi} />
+          <>
+            <img src={imageSrc} alt={item.nameVi} />
+            <button onClick={onPreview} className="result-preview-btn" title="Phóng to xem">
+              <Eye size={16} />
+            </button>
+          </>
         ) : (
           <div className="result-loading">
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>Chờ xử lý...</span>
@@ -298,7 +332,6 @@ function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, o
         {imageSrc && (
           <div className="result-card-actions">
             <button onClick={onSave} title="Lưu vào Kho" className="icon-btn"><Save size={14} /></button>
-            <button onClick={onSavePose} title="Lưu làm Pose tham chiếu" className="icon-btn" style={{ color: 'var(--brand)' }}><Users size={14} /></button>
             <button onClick={onDownload} title="Tải xuống" className="icon-btn"><Download size={14} /></button>
           </div>
         )}
@@ -415,6 +448,7 @@ export default function RemoveClothesPage() {
   // Modal
   const [saveModalItem, setSaveModalItem] = useState(null)
   const [savePoseItem, setSavePoseItem] = useState(null)
+  const [previewZoom, setPreviewZoom] = useState(null)
   const [error, setError] = useState(null)
 
   // ─── File Handlers ──────────────────────────────────────────────────────
@@ -692,6 +726,7 @@ export default function RemoveClothesPage() {
                   errorMsg={itemErrors[item.id] || null}
                   onSave={() => setSaveModalItem({ item, imageSrc: generatedImages[item.id] })}
                   onSavePose={() => setSavePoseItem({ item, imageSrc: generatedImages[item.id] })}
+                  onPreview={() => setPreviewZoom({ name: item.nameVi, src: generatedImages[item.id] })}
                   onDownload={() => downloadImage(generatedImages[item.id], item.nameVi)} />
               ))}
             </div>
@@ -721,6 +756,21 @@ export default function RemoveClothesPage() {
       {savePoseItem && (
         <SavePoseModal item={savePoseItem.item} imageSrc={savePoseItem.imageSrc}
           onClose={() => setSavePoseItem(null)} />
+      )}
+
+      {/* Preview Zoom Overlay */}
+      {previewZoom && (
+        <div className="modal-overlay" onClick={() => setPreviewZoom(null)} style={{ zIndex: 9999 }}>
+          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+            <img src={previewZoom.src} alt={previewZoom.name}
+              style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+            <div style={{ textAlign: 'center', color: '#fff', fontSize: 14, fontWeight: 600, marginTop: 10 }}>{previewZoom.name}</div>
+            <button onClick={() => setPreviewZoom(null)}
+              style={{ position: 'absolute', top: -12, right: -12, width: 32, height: 32, borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+              <X size={16} />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )
