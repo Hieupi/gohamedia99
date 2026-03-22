@@ -27,6 +27,12 @@ const CATEGORY_EMOJI = {
   background: '🏞️', model: '🧑',
 }
 
+const CATEGORY_PREFIX = {
+  top: 'ÁO', bottom: 'QUẦN', dress: 'ĐẦM', outerwear: 'KHOÁC',
+  shoes: 'GIÀY', bag: 'TÚI', accessory: 'PK', other: 'SP',
+  background: 'BG', model: 'MẪU',
+}
+
 // ─── Build image-gen prompt cho từng item ──────────────────────────────────────
 
 function buildItemPrompt(item, productName, quality, aspect) {
