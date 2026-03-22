@@ -4021,146 +4021,254 @@ textarea {
 .lib-breadcrumb-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: var(--text-secondary); font-weight: 600; padding: 2px 6px; border-radius: 4px; }
 .lib-breadcrumb-btn:hover { background: var(--surface); color: var(--brand); }
 
-/* --- DARK THEME (inspired by AI+DESIGN VN) ------------------------------- */
+
+/* --- DARK THEME — Cosmic Purple (Reference: Crypto Wallet UI) ----------- */
 [data-theme="dark"] {
-  --brand: #F37021;
-  --brand-dark: #FF8C42;
-  --brand-light: #E86510;
-  --brand-bg: rgba(243, 112, 33, 0.08);
-  --brand-15: rgba(243, 112, 33, 0.18);
-  --brand-08: rgba(243, 112, 33, 0.10);
+  --brand: #d058f3;
+  --brand-dark: #b840e0;
+  --brand-light: #e87cff;
+  --brand-bg: rgba(208, 88, 243, 0.08);
+  --brand-15: rgba(208, 88, 243, 0.15);
+  --brand-08: rgba(208, 88, 243, 0.08);
 
-  --white: #1a1a1a;
-  --bg-page: #0d0d0d;
-  --bg-card: #1a1a1a;
-  --surface: #1e1e22;
-  --border: #2a2a30;
-  --border-light: #222228;
+  --white: #1e1e3a;
+  --bg-page: #12122a;
+  --bg-card: #1a1a35;
+  --surface: #222245;
+  --border: #2d2d55;
+  --border-light: #252548;
 
-  --text-primary: #f0f0f0;
-  --text-secondary: #a0a0a8;
-  --text-muted: #666670;
+  --text-primary: #eeeef5;
+  --text-secondary: #9898c0;
+  --text-muted: #5e5e88;
   --text-on-brand: #ffffff;
 
-  --shadow-sm: 0 1px 3px rgba(0,0,0,0.3);
-  --shadow-md: 0 4px 12px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 30px rgba(0,0,0,0.5);
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.4);
+  --shadow-md: 0 4px 14px rgba(0,0,0,0.5);
+  --shadow-lg: 0 8px 32px rgba(5,5,30,0.6);
 
   color-scheme: dark;
 }
 
 [data-theme="dark"] body {
-  background: #0d0d0d;
-  color: #f0f0f0;
+  background: #12122a;
+  color: #eeeef5;
 }
 
 [data-theme="dark"] .sidebar {
-  background: #111114;
-  border-color: #222228;
+  background: #0f0f25;
+  border-color: #1e1e42;
+}
+
+[data-theme="dark"] .sidebar-nav-link.active {
+  background: linear-gradient(135deg, rgba(208,88,243,0.15), rgba(0,212,255,0.10));
+  border-left: 3px solid #d058f3;
+}
+
+[data-theme="dark"] .sidebar-nav-link:hover {
+  background: rgba(208,88,243,0.08);
 }
 
 [data-theme="dark"] .input-field,
 [data-theme="dark"] textarea,
 [data-theme="dark"] select {
-  background: #1e1e22;
-  border-color: #2a2a30;
-  color: #f0f0f0;
+  background: #1a1a38;
+  border-color: #2d2d55;
+  color: #eeeef5;
 }
 
 [data-theme="dark"] .input-field:focus,
 [data-theme="dark"] textarea:focus {
-  border-color: var(--brand);
-  background: #222228;
+  border-color: #d058f3;
+  background: #222248;
+  box-shadow: 0 0 0 3px rgba(208,88,243,0.12);
+}
+
+[data-theme="dark"] .btn-primary {
+  background: linear-gradient(135deg, #d058f3, #00d4ff);
+  border: none;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+}
+
+[data-theme="dark"] .btn-primary:hover {
+  background: linear-gradient(135deg, #e06cff, #20e0ff);
+  box-shadow: 0 4px 20px rgba(208,88,243,0.3);
 }
 
 [data-theme="dark"] .btn-ghost {
-  color: #a0a0a8;
-  border-color: #2a2a30;
+  color: #9898c0;
+  border-color: #2d2d55;
 }
 
 [data-theme="dark"] .btn-ghost:hover {
-  background: #222228;
-  color: #f0f0f0;
+  background: #222248;
+  color: #eeeef5;
+  border-color: #d058f3;
 }
 
 [data-theme="dark"] .card,
 [data-theme="dark"] .lib-card {
-  background: #1a1a1a;
-  border-color: #2a2a30;
+  background: #1a1a35;
+  border-color: #2d2d55;
 }
 
 [data-theme="dark"] .lib-card:hover {
-  border-color: #3a3a40;
+  border-color: #d058f3;
+  box-shadow: 0 4px 20px rgba(208,88,243,0.1);
 }
 
 [data-theme="dark"] .modal-overlay {
-  background: rgba(0,0,0,0.75);
+  background: rgba(8,8,25,0.85);
+  backdrop-filter: blur(4px);
 }
 
 [data-theme="dark"] .modal-content,
 [data-theme="dark"] .preview-modal {
-  background: #1a1a1a;
-  border: 1px solid #2a2a30;
+  background: #1a1a38;
+  border: 1px solid #2d2d55;
+  box-shadow: 0 12px 48px rgba(0,0,0,0.5);
 }
 
 [data-theme="dark"] .page-title {
-  color: #f0f0f0;
+  color: #eeeef5;
+}
+
+[data-theme="dark"] .page-subtitle {
+  color: #9898c0;
 }
 
 [data-theme="dark"] .lib-main-tab {
-  color: #a0a0a8;
+  color: #9898c0;
   border-color: transparent;
 }
 
 [data-theme="dark"] .lib-main-tab.active {
-  color: var(--brand);
-  border-color: var(--brand);
+  color: #d058f3;
+  border-color: #d058f3;
 }
 
 [data-theme="dark"] .lib-tab {
-  color: #a0a0a8;
-  background: #1a1a1a;
-  border-color: #2a2a30;
+  color: #9898c0;
+  background: #1a1a35;
+  border-color: #2d2d55;
 }
 
 [data-theme="dark"] .lib-tab.active {
-  background: var(--brand);
+  background: linear-gradient(135deg, #d058f3, #00d4ff);
   color: #fff;
+  border-color: transparent;
 }
 
 [data-theme="dark"] .lib-folder-bar {
-  background: #1a1a1a;
-  border-color: #2a2a30;
+  background: #161632;
+  border-color: #2d2d55;
 }
 
 [data-theme="dark"] .lib-folder-btn {
-  background: #222228;
-  border-color: #2a2a30;
-  color: #a0a0a8;
+  background: #1e1e3a;
+  border-color: #2d2d55;
+  color: #9898c0;
+}
+
+[data-theme="dark"] .lib-folder-btn.active {
+  background: linear-gradient(135deg, #d058f3, #00d4ff);
+  color: #fff;
+  border-color: transparent;
 }
 
 [data-theme="dark"] .lib-folder-card {
-  background: #1a1a1a;
-  border-color: #2a2a30;
+  background: #1a1a35;
+  border-color: #2d2d55;
 }
 
 [data-theme="dark"] .lib-folder-card:hover {
-  border-color: var(--brand);
+  border-color: #d058f3;
+  box-shadow: 0 4px 16px rgba(208,88,243,0.12);
 }
 
 [data-theme="dark"] .empty-state {
-  color: #666670;
-}
-
-[data-theme="dark"] .sidebar-nav-link.active {
-  background: rgba(243, 112, 33, 0.12);
+  color: #5e5e88;
 }
 
 [data-theme="dark"] .form-label {
-  color: #a0a0a8;
+  color: #9898c0;
+}
+
+[data-theme="dark"] .vp-step {
+  background: #161632;
+  border-color: #2d2d55;
+}
+
+[data-theme="dark"] .vp-step-num {
+  background: linear-gradient(135deg, #d058f3, #00d4ff);
+}
+
+[data-theme="dark"] .vp-platform-btn {
+  background: #1a1a38;
+  border-color: #2d2d55;
+  color: #9898c0;
+}
+
+[data-theme="dark"] .vp-platform-btn.active {
+  border-color: #d058f3;
+  background: rgba(208,88,243,0.08);
+}
+
+[data-theme="dark"] .vp-dropzone {
+  border-color: #2d2d55;
+  color: #9898c0;
+}
+
+[data-theme="dark"] .vp-dropzone:hover {
+  border-color: #d058f3;
+  background: rgba(208,88,243,0.04);
+}
+
+[data-theme="dark"] .toggle-pill {
+  background: #1a1a38;
+  border-color: #2d2d55;
+  color: #9898c0;
+}
+
+[data-theme="dark"] .toggle-pill.active {
+  background: linear-gradient(135deg, #d058f3, #00d4ff);
+  color: #fff;
+  border-color: transparent;
+}
+
+[data-theme="dark"] .vp-sb-scene {
+  background: #1a1a38;
+  border-color: #2d2d55;
+}
+
+[data-theme="dark"] .vp-storyboard {
+  background: #161632;
+  border-color: #2d2d55;
+}
+
+[data-theme="dark"] .select-label {
+  color: #9898c0;
 }
 
 [data-theme="dark"] ::selection {
-  background: rgba(243, 112, 33, 0.3);
+  background: rgba(208,88,243,0.35);
   color: #fff;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar {
+  width: 6px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-track {
+  background: #12122a;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb {
+  background: #3a3a60;
+  border-radius: 3px;
+}
+
+[data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
+  background: #d058f3;
 }
