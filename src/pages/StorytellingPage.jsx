@@ -9,6 +9,10 @@ import { getPrompt, buildMasterImagePrompt, VN_DNA_DEFAULTS } from '../services/
 import { downloadImage, getLibraryItems } from '../services/libraryService'
 import { POSE_LIBRARY, POSE_CATEGORIES, getPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 
+// ─── Options ──────────────────────────────────────────────────────────────────
+const QUALITY_OPTS = ['2K (HD)', '1K (SD)', '4K (Ultra)']
+const ASPECT_OPTS = ['9:16 Dọc (Story)', '4:5 Dọc (IG)', '1:1 Vuông', '16:9 Ngang', '3:4 Chân dung']
+
 // ─── Story Templates (9 scenes each for maximum diversity) ────────────────────
 const STORY_TEMPLATES = [
     {
@@ -225,8 +229,11 @@ export default function StorytellingPage() {
     const [showPoseLibrary, setShowPoseLibrary] = useState(false)
 
     // Settings
-    const [quality] = useState('2K (HD)')
-    const [aspect] = useState('9:16 Dọc (Story)')
+    const [quality, setQuality] = useState('2K (HD)')
+    const [aspect, setAspect] = useState('9:16 Dọc (Story)')
+
+    // Auto-analyze
+    const [analyzing, setAnalyzing] = useState(false)
 
     // Generation
     const [results, setResults] = useState({})
@@ -292,6 +299,77 @@ export default function StorytellingPage() {
         updateScene(sceneIdx, 'pose', pose.promptEN)
         updateScene(sceneIdx, 'camera', pose.cameraAngle)
         updateScene(sceneIdx, 'emotion', 'Confident, alluring')
+    }
+
+    // ─── Auto-analyze images to generate 9-scene script ─────────────────────
+
+    const handleAutoAnalyze = async () => {
+        if (productImages.length === 0) return
+        setAnalyzing(true)
+        try {
+            const productFiles = await entriesToFiles(productImages)
+            const refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+            const allImages = [...refFiles, ...productFiles]
+
+            const analyzePrompt = `You are a professional fashion content director for TikTok/Reels.
+
+Analyze these images carefully — the model, outfit, accessories, setting, and mood.
+
+Create EXACTLY 9 storytelling scenes for a fashion video. Each scene = 1 photo that will become a 3-second video clip.
+
+Rules:
+- All 9 scenes feature the SAME person wearing the SAME outfit from the images
+- Each scene has a DIFFERENT pose, camera angle, and emotion
+- Mix camera angles: front, back, side, close-up, selfie, wide, artistic
+- Build a narrative arc: introduction → exploration → climax → finale
+- Highlight the outfit's best features from multiple angles
+- Each scene should feel like natural continuation of the previous
+${storyContext ? `\nShared context: ${storyContext}` : ''}
+
+Return ONLY a valid JSON array with exactly 9 objects, each having:
+- "title": short Vietnamese scene name (2-4 words)
+- "pose": detailed English pose description (full sentence, 15+ words)
+- "camera": English camera angle description
+- "emotion": English emotion/expression (2-3 words)
+
+Example format:
+[{"title":"Đứng hero","pose":"Standing upright facing camera, one hand on hip, slight S-curve, confident natural smile","camera":"Full-body front-facing at eye level","emotion":"Confident, bright"}]
+
+Return ONLY the JSON array, no markdown, no explanation.`
+
+            const aiResponse = await callGemini({ prompt: analyzePrompt, images: allImages })
+
+            // Parse JSON from response
+            let parsed
+            try {
+                const jsonMatch = aiResponse.match(/\[\s*\{[\s\S]*\}\s*\]/)
+                if (jsonMatch) {
+                    parsed = JSON.parse(jsonMatch[0])
+                } else {
+                    parsed = JSON.parse(aiResponse)
+                }
+            } catch (e) {
+                console.error('Failed to parse AI scene response:', e, aiResponse)
+                alert('AI không thể phân tích. Vui lòng thử lại hoặc viết kịch bản thủ công.')
+                setAnalyzing(false)
+                return
+            }
+
+            if (Array.isArray(parsed) && parsed.length > 0) {
+                const newScenes = parsed.slice(0, 9).map(s => ({
+                    title: s.title || 'Cảnh',
+                    pose: s.pose || '',
+                    camera: s.camera || '',
+                    emotion: s.emotion || 'Natural'
+                }))
+                setScenes(newScenes)
+                console.log('[Auto-analyze] Generated', newScenes.length, 'scenes')
+            }
+        } catch (err) {
+            console.error('[Auto-analyze error]', err)
+            alert('Lỗi phân tích: ' + err.message)
+        }
+        setAnalyzing(false)
     }
 
     // ─── Generate ALL scenes ──────────────────────────────────────────────────
@@ -533,16 +611,69 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                 </div>
                             </div>
 
-                            {/* Story context */}
+                            {/* Quality + Aspect */}
                             <div className="design-step">
                                 <div className="design-step-header">
                                     <div className="design-step-number">3</div>
-                                    <div className="design-step-title">Bối cảnh chung</div>
+                                    <div className="design-step-title">Cài đặt đầu ra</div>
                                 </div>
-                                <div style={{ padding: '0' }}>
-                                    <label className="nd-label">ĐỊA ĐIỂM, ĐẠO CỤ, PHỤ KIỆN (áp dụng tất cả cảnh)</label>
-                                    <textarea className="nd-textarea" value={storyContext} onChange={e => setStoryContext(e.target.value)}
-                                        placeholder="VD: Đường quê lúc golden hour, xe Honda Vision bạc, mũ bảo hiểm trắng, Apple Watch trắng, đồng hồ trái tay, giày trắng..." />
+                                <div className="nd-settings-body">
+                                    <div className="nd-row-2">
+                                        <div className="form-group">
+                                            <label className="nd-label">CHẤT LƯỢNG ẢNH</label>
+                                            <div className="pose-templates">
+                                                {QUALITY_OPTS.map(q => (
+                                                    <button key={q}
+                                                        className={`pose-tpl-btn${quality === q ? ' active' : ''}`}
+                                                        onClick={() => setQuality(q)}>
+                                                        {q}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="nd-label">TỶ LỆ KHUNG HÌNH</label>
+                                            <div className="pose-templates">
+                                                {ASPECT_OPTS.map(a => (
+                                                    <button key={a}
+                                                        className={`pose-tpl-btn${aspect === a ? ' active' : ''}`}
+                                                        onClick={() => setAspect(a)}>
+                                                        {a}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Story context + Auto-analyze */}
+                            <div className="design-step">
+                                <div className="design-step-header">
+                                    <div className="design-step-number">4</div>
+                                    <div className="design-step-title">Bối cảnh & Kịch bản</div>
+                                </div>
+                                <div className="nd-settings-body">
+                                    <div className="form-group">
+                                        <label className="nd-label">ĐỊA ĐIỂM, ĐẠO CỤ, PHỤ KIỆN <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>(áp dụng tất cả cảnh)</span></label>
+                                        <textarea className="nd-textarea" value={storyContext} onChange={e => setStoryContext(e.target.value)}
+                                            placeholder="VD: Đường quê lúc golden hour, xe Honda Vision bạc, mũ bảo hiểm trắng..." />
+                                    </div>
+
+                                    {/* Auto-analyze button */}
+                                    <button className="pose-lib-toggle" onClick={handleAutoAnalyze}
+                                        disabled={productImages.length === 0 || analyzing}
+                                        style={{ background: analyzing ? 'rgba(255,107,53,0.06)' : undefined }}>
+                                        {analyzing ? (
+                                            <><Loader size={14} className="spin" style={{ verticalAlign: -2 }} /> AI đang phân tích ảnh và tạo kịch bản 9 cảnh...</>
+                                        ) : (
+                                            <>🧠 AI tự động phân tích ảnh → Tạo kịch bản 9 cảnh</>
+                                        )}
+                                    </button>
+                                    <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0 }}>
+                                        💡 AI sẽ phân tích trang phục, người mẫu, bối cảnh từ ảnh upload để tự tạo 9 phân cảnh tối ưu.
+                                        <br />⚡ Nếu bạn viết kịch bản hoặc chọn template → kịch bản đó được <strong>ưu tiên tuyệt đối</strong>.
+                                    </p>
                                 </div>
                             </div>
 
