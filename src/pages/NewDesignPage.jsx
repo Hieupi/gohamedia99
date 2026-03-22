@@ -3,7 +3,8 @@ import {
   Upload, Sparkles, RotateCcw, Download, Save, Trash2, ChevronDown, X,
   Send, Plus, Image as ImageIcon, Settings2, Loader, FolderOpen, Check
 } from 'lucide-react'
-import { generateGarmentImage } from '../services/geminiService'
+import { generateGarmentImage, callGemini } from '../services/geminiService'
+import { getPrompt, buildMasterImagePrompt } from '../services/masterPrompts'
 import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems } from '../services/libraryService'
 
 // ─── Option Data (Auto = AI tự chọn tối ưu) ──────────────────────────────────
@@ -48,42 +49,24 @@ const QUICK_EDITS = [
   '🔆 Tăng sáng tổng thể', '🌈 Màu sắc sống động', '📐 Cân đối bố cục',
 ]
 
-// ─── Vietnamese DNA Auto Defaults ─────────────────────────────────────────────
-// Khi Auto: AI tự động tối ưu cho DNA mẫu Việt Nam + Gen Z sweet makeup
-
-const VN_DNA_PROMPT = `
-IMPORTANT AUTO DEFAULTS (apply when no specific preference is given):
-- Model DNA: Vietnamese / East Asian young woman (18-28), naturally beautiful
-- Skin: Porcelain white-pink (trắng hồng), smooth, dewy glow
-- Makeup: Sweet Gen Z style - gradient lip tint, soft blush, sparkly eye shadow, natural eyebrows
-- Hair: Trendy Gen Z Vietnamese hairstyle (layered, curtain bangs, or sleek)
-- Pose: Confident yet approachable, flattering for the garment
-- Background: Choose the most suitable background that complements the clothing style
-- Lighting: Soft, flattering studio lighting with gentle fill
-- Color grading: Fresh, youthful, slightly warm with pastel undertones
-- Overall vibe: High-end Vietnamese fashion lookbook, Instagram-worthy, aspirational
-`
-
-function buildDesignPrompt(opts) {
-  const parts = ['Generate a professional fashion product photograph.']
-  const isAuto = (v) => !v || v === AUTO
-
-  if (isAuto(opts.modelType)) {
-    parts.push(VN_DNA_PROMPT) // inject full VN DNA defaults
-  } else {
-    parts.push(`Model type: ${opts.modelType}.`)
-  }
-  if (!isAuto(opts.background)) parts.push(`Background/setting: ${opts.background}.`)
-  if (!isAuto(opts.pose)) parts.push(`Pose: ${opts.pose}.`)
-  if (!isAuto(opts.style)) parts.push(`Fashion style: ${opts.style}.`)
-  if (!isAuto(opts.skinFilter)) parts.push(`Skin tone: ${opts.skinFilter}.`)
-  if (!isAuto(opts.toneFilter)) parts.push(`Color grading/filter: ${opts.toneFilter}.`)
-  if (!isAuto(opts.quality)) parts.push(`Output quality: ${opts.quality} resolution.`)
-  if (!isAuto(opts.aspect)) parts.push(`Aspect ratio: ${opts.aspect}.`)
-  // User prompt luôn ưu tiên cuối cùng
-  if (opts.prompt) parts.push(`\nCRITICAL — USER'S CUSTOM REQUEST (ALWAYS PRIORITIZE THIS OVER EVERYTHING): ${opts.prompt}`)
-  return parts.join('\n')
+// ─── Helper: Convert image entry to File ──────────────────────────────────────
+async function entryToFile(entry, name = 'image.png') {
+  if (entry.file) return entry.file
+  const resp = await fetch(entry.url)
+  const blob = await resp.blob()
+  return new File([blob], name, { type: blob.type || 'image/png' })
 }
+async function entriesToFiles(entries) {
+  return Promise.all(entries.map((e, i) => entryToFile(e, `img-${i}.png`)))
+}
+
+// ─── 4 Shot Variations (Bot 5 template) ───────────────────────────────────────
+const SHOT_VARIATIONS = [
+  'Full-body front-facing confident stance, slight S-curve, hands naturally at sides, garment fully visible head to toe — hero lookbook shot.',
+  '3/4 angle walking toward camera, left foot forward mid-stride, hair flowing, fabric in gentle motion — dynamic transition angle.',
+  'Waist-up close-up, hands gently touching neckline, focus on fabric texture and design details, soft bokeh background — product detail showcase.',
+  'Editorial over-shoulder look-back, dramatic rim lighting, wind effect on hair and dress, cinematic wide composition — magazine-cover finale.',
+]
 
 // ─── Dropdown Component ───────────────────────────────────────────────────────
 
@@ -344,6 +327,8 @@ export default function NewDesignPage() {
   }
 
 
+  // ─── 🤖 MULTI-BOT PIPELINE: Generate 4 images ─────────────────────────────
+
   const handleGenerate = async () => {
     if (productImages.length === 0) return
     setGenerating(true)
@@ -351,49 +336,59 @@ export default function NewDesignPage() {
     setResults([null, null, null, null])
     setLoadingIdx(new Set([0, 1, 2, 3]))
 
-    const basePrompt = buildDesignPrompt({ modelType, background, pose, style, skinFilter, toneFilter, quality, aspect, prompt })
-    const variations = [
-      basePrompt + '\nVariation 1: default composition.',
-      basePrompt + '\nVariation 2: different angle, slight pose change.',
-      basePrompt + '\nVariation 3: close-up detail shot.',
-      basePrompt + '\nVariation 4: creative/editorial style.',
-    ]
+    try {
+      // STEP 1: Convert all images to Files
+      const productFiles = await entriesToFiles(productImages)
+      const refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
 
-    // Lấy File từ product image — hỗ trợ cả upload lẫn Library (dataURL)
-    const mainProduct = productImages[0]
-    let productFile = mainProduct.file
-    if (!productFile && mainProduct.url) {
-      try {
-        const resp = await fetch(mainProduct.url)
-        const blob = await resp.blob()
-        productFile = new File([blob], 'product.png', { type: blob.type || 'image/png' })
-      } catch (e) {
-        setErrors({ 0: 'Không thể đọc ảnh sản phẩm', 1: 'Không thể đọc ảnh sản phẩm' })
-        setGenerating(false)
-        setLoadingIdx(new Set())
-        return
-      }
+      // STEP 2: Bot 1 (Identity) + Bot 2 (Garment) — PARALLEL analysis
+      const [extractedIdentity, extractedProduct] = await Promise.all([
+        refFiles.length > 0
+          ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFiles })
+          : Promise.resolve(''),
+        callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFiles }),
+      ])
+
+      console.log('[Bot1 Identity]', extractedIdentity?.substring(0, 120))
+      console.log('[Bot2 Garment]', extractedProduct?.substring(0, 120))
+
+      // STEP 3: Build 4 Master Prompts (one per shot variation)
+      const masterPrompts = SHOT_VARIATIONS.map(shotDesc =>
+        buildMasterImagePrompt({
+          extractedIdentity,
+          extractedProduct,
+          modelType, background, pose, style, skinFilter, toneFilter,
+          quality, aspect,
+          userPrompt: prompt,
+          shotDescription: shotDesc,
+        })
+      )
+
+      // STEP 4: Generate 4 images in parallel
+      const mainProductFile = productFiles[0]
+      const tasks = masterPrompts.map((mPrompt, idx) =>
+        (async () => {
+          try {
+            const result = await generateGarmentImage(mainProductFile, mPrompt, { quality, aspect })
+            const dataUrl = `data:${result.mimeType};base64,${result.base64}`
+            setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
+          } catch (err) {
+            console.error(`[Design Gen ${idx}]`, err)
+            setErrors(prev => ({ ...prev, [idx]: err.message }))
+          }
+          setLoadingIdx(prev => { const n = new Set(prev); n.delete(idx); return n })
+        })()
+      )
+      await Promise.all(tasks)
+    } catch (err) {
+      console.error('[Pipeline Error]', err)
+      setErrors({ 0: err.message, 1: err.message, 2: err.message, 3: err.message })
+      setLoadingIdx(new Set())
     }
-
-    const tasks = variations.map((vPrompt, idx) =>
-      (async () => {
-        try {
-          const result = await generateGarmentImage(productFile, vPrompt, { quality, aspect })
-          const dataUrl = `data:${result.mimeType};base64,${result.base64}`
-          setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
-        } catch (err) {
-          console.error(`[Design Gen ${idx}]`, err)
-          setErrors(prev => ({ ...prev, [idx]: err.message }))
-        }
-        setLoadingIdx(prev => { const n = new Set(prev); n.delete(idx); return n })
-      })()
-    )
-
-    await Promise.all(tasks)
     setGenerating(false)
   }
 
-  // ─── Edit image via chat ──────────────────────────────────────────────────
+  // ─── 🤖 BOT 7: Edit image via chat ───────────────────────────────────────
 
   const handleEditImage = async (idx, editPrompt) => {
     if (!results[idx]) return
@@ -401,13 +396,13 @@ export default function NewDesignPage() {
     setErrors(prev => { const n = { ...prev }; delete n[idx]; return n })
 
     try {
-      // Convert dataUrl back to file for API call
       const resp = await fetch(results[idx])
       const blob = await resp.blob()
       const file = new File([blob], 'edit.png', { type: 'image/png' })
 
-      const fullPrompt = `Edit this image: ${editPrompt}. Keep the clothing product exactly the same. Only apply the requested changes.`
-      const result = await generateGarmentImage(file, fullPrompt, { quality, aspect })
+      // Bot 7: Precision Retoucher
+      const retouchPrompt = `${getPrompt('BOT7_PRECISION_RETOUCHER')}\n\nUSER EDIT COMMAND: ${editPrompt}\n\nApply the edit precisely. Return the modified image.`
+      const result = await generateGarmentImage(file, retouchPrompt, { quality, aspect })
       const dataUrl = `data:${result.mimeType};base64,${result.base64}`
       setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
     } catch (err) {
