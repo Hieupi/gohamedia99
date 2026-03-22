@@ -3899,3 +3899,90 @@ textarea {
   display: flex;
   gap: 8px;
 }
+
+/* ─── Library Folder Bar ───────────────────────────────────────────────────── */
+.lib-folder-bar {
+  margin-bottom: 14px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+}
+
+.lib-folder-list {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.lib-folder-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 10px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--border);
+  background: var(--white);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--text-secondary);
+  transition: all 0.15s;
+}
+
+.lib-folder-btn:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.lib-folder-btn.active {
+  background: var(--brand);
+  color: #fff;
+  border-color: var(--brand);
+}
+
+.lib-folder-count {
+  background: rgba(0, 0, 0, 0.08);
+  padding: 1px 5px;
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.lib-folder-btn.active .lib-folder-count {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.lib-folder-del {
+  font-size: 10px;
+  opacity: 0;
+  margin-left: 2px;
+  cursor: pointer;
+  transition: opacity 0.12s;
+}
+
+.lib-folder-btn:hover .lib-folder-del {
+  opacity: 0.6;
+}
+
+.lib-folder-del:hover {
+  opacity: 1 !important;
+  color: #ef4444;
+}
+
+.lib-folder-add {
+  padding: 5px 10px;
+  border-radius: var(--r-full);
+  border: 1px dashed var(--border);
+  background: transparent;
+  font-size: 11px;
+  cursor: pointer;
+  color: var(--text-muted);
+  transition: all 0.15s;
+}
+
+.lib-folder-add:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}

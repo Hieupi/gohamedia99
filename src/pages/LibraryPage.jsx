@@ -4,7 +4,8 @@ import {
 } from 'lucide-react'
 import {
   getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
-  downloadImage, saveToLibrary, createLibraryRecord, migrateOldLibrary
+  downloadImage, saveToLibrary, createLibraryRecord, migrateOldLibrary,
+  getFolders, createFolder, deleteFolder
 } from '../services/libraryService'
 import { callGemini } from '../services/geminiService'
 import {
@@ -234,6 +235,30 @@ export default function LibraryPage() {
   const [poseCatFilter, setPoseCatFilter] = useState('all')
   const [copiedId, setCopiedId] = useState(null)
 
+  // Folder management
+  const [folders, setFolders] = useState(getFolders())
+  const [activeFolder, setActiveFolder] = useState('all')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [showNewFolder, setShowNewFolder] = useState(false)
+
+  const handleCreateFolder = () => {
+    if (!newFolderName.trim()) return
+    const updated = createFolder(newFolderName.trim())
+    setFolders(updated)
+    const created = updated.find(f => f.name === newFolderName.trim())
+    if (created) setActiveFolder(created.id)
+    setNewFolderName(''); setShowNewFolder(false)
+  }
+
+  const handleDeleteFolder = (e, folderId) => {
+    e.stopPropagation()
+    if (!confirm('Xóa thư mục này? Ảnh bên trong sẽ không bị xóa.')) return
+    const updated = deleteFolder(folderId)
+    setFolders(updated)
+    setActiveFolder('all')
+    setItems(getLibraryItems())
+  }
+
   useEffect(() => {
     migrateOldLibrary()
     setItems(getLibraryItems())
@@ -257,6 +282,7 @@ export default function LibraryPage() {
   const filtered = items.filter(item => {
     if (selectedCat !== 'Tất cả' && mapCategory(item.category) !== selectedCat) return false
     if (searchQ && !item.name.toLowerCase().includes(searchQ.toLowerCase())) return false
+    if (activeFolder !== 'all' && item.folderId !== activeFolder) return false
     return true
   })
 
@@ -326,8 +352,36 @@ export default function LibraryPage() {
           ))}
         </div>
 
+        {/* Folder Bar */}
+        <div className="lib-folder-bar">
+          <div className="lib-folder-list">
+            <button className={`lib-folder-btn${activeFolder === 'all' ? ' active' : ''}`}
+              onClick={() => setActiveFolder('all')}>📋 Tất cả</button>
+            {folders.map(f => (
+              <button key={f.id} className={`lib-folder-btn${activeFolder === f.id ? ' active' : ''}`}
+                onClick={() => setActiveFolder(f.id)}>
+                📁 {f.name}
+                <span className="lib-folder-count">{items.filter(i => i.folderId === f.id).length}</span>
+                <span className="lib-folder-del" onClick={e => handleDeleteFolder(e, f.id)}>✕</span>
+              </button>
+            ))}
+          </div>
+          {showNewFolder ? (
+            <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+              <input type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
+                placeholder="Tên thư mục..." className="input-field" style={{ flex: 1, fontSize: 12, height: 32 }}
+                onKeyDown={e => e.key === 'Enter' && handleCreateFolder()} autoFocus />
+              <button className="btn btn-primary" onClick={handleCreateFolder} style={{ fontSize: 11, height: 32 }}>Tạo</button>
+              <button className="btn btn-ghost" onClick={() => setShowNewFolder(false)} style={{ fontSize: 11, height: 32 }}>Hủy</button>
+            </div>
+          ) : (
+            <button className="lib-folder-add" onClick={() => setShowNewFolder(true)}>+ Thư mục mới</button>
+          )}
+        </div>
+
         <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
           {filtered.length} / {items.length} ảnh
+          {activeFolder !== 'all' && ` • 📁 ${folders.find(f => f.id === activeFolder)?.name}`}
         </div>
 
         {/* Empty State */}
