@@ -294,9 +294,9 @@ ABSOLUTE RULES:
 QUICK-EDIT COMMAND TRANSLATIONS:
 When user clicks a button, send the corresponding English prompt:
 
-- "Nâng ngực tự nhiên" → "Enhance bust cup size naturally by one cup, maintain garment fabric folds and drape integrity, keep strictly proportional to body frame, ensure natural breast shape and cleavage shadow."
+- "Nâng ngực tự nhiên" → "Enhance the bust to a natural D-cup size with full, rounded and voluptuous yet natural volume, forming tasteful and pronounced cleavage. The chest looks tight, firm, perky and visually stunning in a perfectly proportioned, sensual manner — elegant, attractive and never oversized or unnatural. Do not increase the waist at all. Adapt the cleavage presentation to the current garment neckline."
 - "Kéo chân dài thêm" → "Elongate legs below the knee by 1.15x ratio, creating a taller model presence with longer calves, ensure background perspective and floor line remain undistorted, maintain shoe/foot proportion."
-- "Eo thon gọn" → "Slim down waistline by 15% to create a subtle hourglass figure, adjust the garment fit perfectly to new waist contour, maintain natural body curvature without harsh pinching."
+- "Eo thon gọn" → "Slim down waistline by 15% to create a dramatic hourglass figure, adjust the garment fit perfectly to new waist contour, maintain natural body curvature without harsh pinching."
 - "Da trắng hồng mịn" → "Apply frequency separation skin retouching: brighten overall skin lightness by 20%, blend with soft peach-pink undertone, remove all blemishes, minimize pores while keeping natural skin texture visible for realism."
 - "Tóc bồng bềnh" → "Add volume and body to hair, create a professional blowout effect with natural movement and bounce, enhance shine and silkiness, maintain original hair color and style."
 - "Mắt to sáng" → "Slightly enlarge iris by 10%, enhance catch-light reflections, brighten the sclera, add subtle sparkle to iris, make eyes appear more awake and captivating. DO NOT alter core facial identity."
@@ -306,7 +306,7 @@ When user clicks a button, send the corresponding English prompt:
 - "Tăng sáng tổng thể" → "Increase overall exposure by 0.5 stops, lift shadows, add gentle fill light to face and body, maintain highlight detail, enhance the fresh bright aesthetic."
 - "Màu sắc sống động" → "Boost color vibrance by 25%, increase saturation of the garment colors while keeping skin tones natural, enhance color contrast for a punchy Instagram-ready look."
 - "Cân đối bố cục" → "Recompose the frame following rule of thirds, center the model properly, ensure balanced negative space, straighten any tilted horizon lines."
-- "Độ loa (Nâng mông)" → "Enhance hip and glute volume naturally when viewed from side or 3/4 angle, create a rounder more defined silhouette, maintain garment fit and fabric drape naturally."
+- "Độ loa (Nâng mông)" → "Enhance the butt and thighs to a full, round, lifted gym-body volume with athletic toned curves like a fitness model. Thick sculpted thighs that look powerful yet feminine. The butt should be a perfectly round bubble shape, lifted and firm. Maintain garment fit and fabric drape naturally over the enhanced curves. Do not distort the background."
 
 For CUSTOM CHAT commands, interpret the user's Vietnamese text and translate into a precise English inpainting instruction following the same rules above.
 
@@ -388,14 +388,18 @@ ABSOLUTE RULES (VIOLATION = FAILURE):
     parts.push(`\n[GARMENT LOCK — DRESS THE MODEL IN THIS EXACT OUTFIT]\n${extractedProduct}`)
   }
 
-  parts.push(`\n[BODY ENHANCEMENT — AUTO BEAUTY HACK]
-Apply these subtle, natural-looking body enhancements:
-- LEGS: Elongate legs to create a taller, model-like proportion (leg-to-torso ratio 1.15:1), long graceful calves
-- BUST: Natural full C-cup to D-cup bust that fits proportionally with the body frame, maintain natural breast shape with gentle cleavage shadow under clothing
-- WAIST: Slim hourglass waist creating beautiful body curves
-- HIPS: Proportional rounded hips for feminine silhouette
-- OVERALL: The body should look like a professional fashion model — tall (170cm+), graceful proportions, but still natural and not exaggerated
-All enhancements must look completely natural and realistic, not plastic or artificial.`)
+  parts.push(`\n[BODY ENHANCEMENT — BEAUTY BODY SCULPTING]
+Apply these body enhancements that adapt naturally to the clothing:
+
+- BUST: Enhance the bust to a natural D-cup size with full, rounded and voluptuous yet natural volume, forming tasteful and pronounced cleavage. The chest looks tight, firm, perky and visually stunning in a perfectly proportioned, sensual manner — elegant, attractive and never oversized or unnatural. Do not increase the waist at all. IMPORTANT: Adapt bust presentation to the garment type — if the outfit has a high neckline or is modest, show the bust volume through fabric stretch and shape rather than exposed cleavage. If the outfit has a low neckline, show natural alluring cleavage.
+
+- BUTT & THIGHS (GYM BODY): Full, round, lifted bubble-butt with athletic toned volume like a fitness model. Thighs are thick, sculpted and powerful yet feminine — the kind that looks incredible in any outfit. The butt and thigh area is the most visually magnetic part of the body, drawing eyes naturally. Think Brazilian gym goddess meets Korean beauty. The curves should be the most eye-catching, attractive feature — beautifully shaped, never vulgar or disproportionate.
+
+- LEGS: Elongate legs to create tall model proportions (leg-to-torso ratio 1.15:1), long graceful calves, totaling 170cm+ height appearance.
+
+- WAIST: Slim hourglass waist creating dramatic body curves contrast with bust and hips.
+
+- OVERALL: Professional fashion model body — tall, curvy, athletic-toned but soft and feminine. Every enhancement must look 100% natural and realistic, as if the model simply has an incredible body naturally.`)
 
   parts.push(`\n[SKIN PERFECTION — VIETNAMESE PORCELAIN DREAM]
 - Skin color: Luminous porcelain white-pink (trắng hồng) — like Korean glass skin with Vietnamese warmth
