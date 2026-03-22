@@ -122,36 +122,64 @@ function checkDuplicate(name, existingItems) {
 
 // ─── Save Modal Component ─────────────────────────────────────────────────────
 
+function resizeImageToThumbnail(dataUrl, maxSize = 300) {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const canvas = document.createElement('canvas')
+      let w = img.width, h = img.height
+      if (w > h) { h = Math.round(h * maxSize / w); w = maxSize }
+      else { w = Math.round(w * maxSize / h); h = maxSize }
+      canvas.width = w; canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.7))
+    }
+    img.onerror = () => resolve(dataUrl) // fallback
+    img.src = dataUrl
+  })
+}
+
 function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
   const existingItems = getLibraryItems()
 
   const autoName = generateSmartName(item, existingItems)
   const [name, setName] = useState(autoName)
   const [type, setType] = useState(item?.category === 'model' ? 'model' : 'product')
+  const [saving, setSaving] = useState(false)
+  const [saveResult, setSaveResult] = useState(null) // 'ok' | 'error'
 
   const isDuplicate = checkDuplicate(name, existingItems)
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (type === 'pose') {
-      // Save as custom pose to localStorage
-      const customPose = {
-        id: `custom_${Date.now()}`,
-        name: name || autoName,
-        emoji: '📌',
-        thumbnail: imageSrc,
-        category: 'custom',
-        description: item?.description || name,
-        bodyFocus: 'Toàn thân',
-        cameraAngle: 'Custom reference',
-        promptEN: `Custom pose reference: ${name}. ${item?.description || ''}`,
-        isCustom: true,
-        createdAt: new Date().toISOString(),
+      setSaving(true)
+      try {
+        // Resize ảnh xuống 300px để tránh tràn localStorage (5MB limit)
+        const smallThumb = await resizeImageToThumbnail(imageSrc, 300)
+        const customPose = {
+          id: `custom_${Date.now()}`,
+          name: name || autoName,
+          emoji: '📌',
+          thumbnail: smallThumb,
+          category: 'custom',
+          description: item?.description || name,
+          bodyFocus: 'Toàn thân',
+          cameraAngle: 'Custom reference',
+          promptEN: `Custom pose reference: ${name}. ${item?.description || ''}`,
+          isCustom: true,
+          createdAt: new Date().toISOString(),
+        }
+        const existing = JSON.parse(localStorage.getItem('goha_custom_poses') || '[]')
+        existing.push(customPose)
+        localStorage.setItem('goha_custom_poses', JSON.stringify(existing))
+        setSaveResult('ok')
+        onSave(customPose)
+        setTimeout(() => onClose(), 1000)
+      } catch (err) {
+        console.error('Save pose error:', err)
+        setSaveResult('error')
+        setSaving(false)
       }
-      const existing = JSON.parse(localStorage.getItem('goha_custom_poses') || '[]')
-      existing.push(customPose)
-      localStorage.setItem('goha_custom_poses', JSON.stringify(existing))
-      onSave(customPose)
-      onClose()
       return
     }
     const record = createLibraryRecord({
@@ -262,10 +290,15 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
         )}
 
         {/* Actions */}
+        {saveResult === 'error' && (
+          <div style={{ fontSize: 11.5, color: '#ef4444', marginBottom: 8, textAlign: 'center' }}>
+            ❌ Lỗi lưu Pose — bộ nhớ local đã đầy. Xóa bớt pose cũ rồi thử lại.
+          </div>
+        )}
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-          <button className="btn btn-ghost" onClick={onClose}>Hủy</button>
-          <button className="btn btn-primary" onClick={handleSave} disabled={!name.trim()}>
-            Lưu ngay
+          <button className="btn btn-ghost" onClick={onClose} disabled={saving}>Hủy</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={!name.trim() || saving || saveResult === 'ok'}>
+            {saving && !saveResult ? '⏳ Đang lưu...' : saveResult === 'ok' ? '✅ Đã lưu thành công!' : type === 'pose' ? '🤸 Lưu Pose' : 'Lưu ngay'}
           </button>
         </div>
       </div>
