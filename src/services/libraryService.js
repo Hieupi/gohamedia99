@@ -175,6 +175,41 @@ export function getStorageUsage() {
     }
 }
 
+// ─── Project Folders ──────────────────────────────────────────────────────────
+
+const FOLDERS_KEY = 'goha_studio_folders'
+
+export function getFolders() {
+    try { return JSON.parse(localStorage.getItem(FOLDERS_KEY) || '[]') }
+    catch { return [] }
+}
+
+export function createFolder(name) {
+    const folders = getFolders()
+    if (folders.some(f => f.name === name)) return folders
+    folders.push({
+        id: `folder_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        name,
+        createdAt: new Date().toISOString(),
+    })
+    localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders))
+    return folders
+}
+
+export function deleteFolder(folderId) {
+    const folders = getFolders().filter(f => f.id !== folderId)
+    localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders))
+    const items = getLibraryItems().map(i =>
+        i.folderId === folderId ? { ...i, folderId: null } : i
+    )
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    return folders
+}
+
+export function getItemsByFolder(folderId) {
+    return getLibraryItems().filter(i => i.folderId === folderId)
+}
+
 // ─── Migrate from old key ─────────────────────────────────────────────────────
 
 export function migrateOldLibrary() {

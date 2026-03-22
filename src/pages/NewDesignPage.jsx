@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt } from '../services/masterPrompts'
-import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems, generateUniqueName } from '../services/libraryService'
+import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems, generateUniqueName, getFolders, createFolder } from '../services/libraryService'
 import { POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 
 // ─── Option Data (Auto = AI tự chọn tối ưu) ──────────────────────────────────
@@ -274,39 +274,66 @@ function SaveDesignModal({ imageSrc, projectName, onClose }) {
   const [type, setType] = useState('product')
   const [saving, setSaving] = useState(false)
   const [saveResult, setSaveResult] = useState(null)
+  const [folders, setFolders] = useState(getFolders())
+  const [selectedFolder, setSelectedFolder] = useState('')
+  const [newFolderName, setNewFolderName] = useState('')
+  const [showNewFolder, setShowNewFolder] = useState(false)
+
+  const handleCreateFolder = () => {
+    if (!newFolderName.trim()) return
+    const updated = createFolder(newFolderName.trim())
+    setFolders(updated)
+    const created = updated.find(f => f.name === newFolderName.trim())
+    if (created) setSelectedFolder(created.id)
+    setNewFolderName(''); setShowNewFolder(false)
+  }
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      const record = createLibraryRecord({ name: name.trim() || `DESIGN-${num}`, type, category: 'other', imageSrc })
+      const record = createLibraryRecord({ name: name.trim() || autoName, type, category: 'design', imageSrc })
+      if (selectedFolder) record.folderId = selectedFolder
       const result = await saveToLibrary(record)
       if (result.success) {
         setSaveResult('ok')
         setTimeout(() => onClose(), 1000)
-      } else {
-        setSaveResult('error')
-      }
-    } catch {
-      setSaveResult('error')
-    }
+      } else { setSaveResult('error') }
+    } catch { setSaveResult('error') }
   }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 400 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>Lưu vào Kho</h3>
-        <img src={imageSrc} alt="" style={{ width: '100%', maxHeight: 200, objectFit: 'contain', borderRadius: 'var(--r-sm)', background: '#f5f5f5', marginBottom: 12 }} />
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>💾 Lưu vào Kho</h3>
+        <img src={imageSrc} alt="" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-sm)', background: '#f5f5f5', marginBottom: 12 }} />
         <label className="select-label">Mã định danh</label>
         <input type="text" value={name} onChange={e => setName(e.target.value)} className="input-field"
-          style={{ marginBottom: 12, fontFamily: 'monospace', fontWeight: 600 }} />
-        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          style={{ marginBottom: 10, fontFamily: 'monospace', fontWeight: 600 }} />
+        <label className="select-label">Loại</label>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <button className={`toggle-pill ${type === 'product' ? 'active' : ''}`} onClick={() => setType('product')}>Sản phẩm</button>
           <button className={`toggle-pill ${type === 'model' ? 'active' : ''}`} onClick={() => setType('model')}>Người mẫu</button>
         </div>
-        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+        <label className="select-label">📁 Thư mục dự án</label>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+          <select value={selectedFolder} onChange={e => setSelectedFolder(e.target.value)} className="input-field" style={{ flex: 1 }}>
+            <option value="">— Không chọn thư mục —</option>
+            {folders.map(f => <option key={f.id} value={f.id}>📁 {f.name}</option>)}
+          </select>
+          <button className="btn btn-ghost" onClick={() => setShowNewFolder(!showNewFolder)} style={{ fontSize: 11, whiteSpace: 'nowrap' }}>+ Mới</button>
+        </div>
+        {showNewFolder && (
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            <input type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
+              placeholder="Tên thư mục mới..." className="input-field" style={{ flex: 1, fontSize: 12 }}
+              onKeyDown={e => e.key === 'Enter' && handleCreateFolder()} />
+            <button className="btn btn-primary" onClick={handleCreateFolder} style={{ fontSize: 11 }}>Tạo</button>
+          </div>
+        )}
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 14 }}>
           <button className="btn btn-ghost" onClick={onClose}>Hủy</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving || saveResult === 'ok'}>
-            {saving && !saveResult ? '⏳ Đang lưu...' : saveResult === 'ok' ? '✅ Đã lưu!' : saveResult === 'error' ? '❌ Lỗi lưu' : 'Lưu ngay'}
+            {saving && !saveResult ? '⏳ Đang lưu...' : saveResult === 'ok' ? '✅ Đã lưu!' : saveResult === 'error' ? '❌ Lỗi — thử lại' : '💾 Lưu ngay'}
           </button>
         </div>
       </div>
@@ -406,23 +433,25 @@ export default function NewDesignPage() {
       console.log('[Bot1 Identity]', extractedIdentity?.substring(0, 120))
       console.log('[Bot2 Garment]', extractedProduct?.substring(0, 120))
 
-      // STEP 3: Build 8 Master Prompts (one per shot variation)
-      // If user selected poses, cycle through them for each shot
-      const posePromptExtras = selectedPoses.length > 0
-        ? selectedPoses.map(p => `\n[POSE REFERENCE — MUST FOLLOW EXACTLY]\n${p.promptEN}\nCamera angle: ${p.cameraAngle}\nBody focus: ${p.bodyFocus}`)
-        : ['']
+      // STEP 3: Build 8 Master Prompts — CREATIVE POSE SYSTEM
+      // Poses = creative inspiration, NOT rigid copy
+      const poseInspiration = selectedPoses.length > 0
+        ? selectedPoses.map((p, i) => `\n[POSE INSPIRATION ${i + 1}/${selectedPoses.length} — Use as creative starting point, NOT exact copy]\n${p.promptEN}\nCamera angle hint: ${p.cameraAngle}\nBody focus hint: ${p.bodyFocus}`).join('\n')
+        : ''
+      const creativePoseRule = selectedPoses.length > 0 && selectedPoses.length < 8
+        ? `\n[CREATIVE DIVERSITY RULE — CRITICAL]\nUser provided ${selectedPoses.length} pose references as INSPIRATION. You MUST create 8 UNIQUE, DIVERSE shots:\n- Use references as creative starting points — vary angles, expressions, hand positions\n- INVENT completely NEW creative poses for the remaining shots:\n  • Mix camera angles: front, 3/4, profile, over-shoulder, low angle, high angle\n  • Mix body language: walking, turning, adjusting clothes, hair flip, hand on hip, arms crossed, looking over shoulder\n  • Mix expressions: confident smile, mysterious gaze, candid laugh, serious editorial, playful wink, subtle lip bite\n  • Mix framing: full body, 3/4 body, waist up, detail close-up\n- NEVER repeat the same pose/angle/expression combination\n- Each shot = a DIFFERENT moment in a fashion editorial shoot`
+        : ''
       const templateExtra = selectedTemplate ? `\nPhotography style: ${selectedTemplate.promptPrefix}` : ''
 
       const masterPrompts = SHOT_VARIATIONS.map((shotDesc, idx) => {
-        const poseExtra = posePromptExtras[idx % posePromptExtras.length]
-        const combinedUserPrompt = [prompt, poseExtra, templateExtra].filter(Boolean).join('\n')
+        const combinedUserPrompt = [prompt, poseInspiration, creativePoseRule, templateExtra].filter(Boolean).join('\n')
         return buildMasterImagePrompt({
           extractedIdentity,
           extractedProduct,
           modelType, background, pose, style, skinFilter, toneFilter,
           quality, aspect,
           userPrompt: combinedUserPrompt,
-          shotDescription: selectedPoses.length > 0 ? selectedPoses[idx % selectedPoses.length].promptEN : shotDesc,
+          shotDescription: shotDesc,
         })
       })
 
