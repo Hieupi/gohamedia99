@@ -312,18 +312,17 @@ export default function NewDesignPage() {
   const [refImages, setRefImages] = useState([])
   const [productImages, setProductImages] = useState([])
 
-  // Settings — tất cả mặc định Auto (VN DNA Gen Z)
-  const [quality, setQuality] = useState(AUTO)
-  const [aspect, setAspect] = useState(AUTO)
+  // Settings — defaults ưu tiên cho user (không phải Auto)
+  const [quality, setQuality] = useState('2K (HD)')
+  const [aspect, setAspect] = useState('9:16 Dọc (Story)')
   const [modelType, setModelType] = useState(AUTO)
   const [background, setBackground] = useState(AUTO)
   const [pose, setPose] = useState(AUTO)
   const [style, setStyle] = useState(AUTO)
-  const [skinFilter, setSkinFilter] = useState(AUTO)
-  const [toneFilter, setToneFilter] = useState(AUTO)
+  const [skinFilter, setSkinFilter] = useState('Da trắng hồng')
+  const [toneFilter, setToneFilter] = useState('Soft dreamy')
   const [prompt, setPrompt] = useState('')
   const [projectName, setProjectName] = useState('')
-  const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Results
   const [results, setResults] = useState(Array(8).fill(null))
@@ -504,87 +503,80 @@ export default function NewDesignPage() {
           <div className="design-step">
             <div className="design-step-header">
               <div className="design-step-number">3</div>
-              <div className="design-step-title">Cài đặt nâng cao</div>
-              <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 12 }}
-                onClick={() => setShowAdvanced(p => !p)}>
-                <Settings2 size={13} /> {showAdvanced ? 'Ẩn' : 'Mở rộng'}
-              </button>
+              <div className="design-step-title">Tùy chọn thiết kế</div>
             </div>
-            <div className="design-step-body" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div className="nd-settings-body">
 
               {/* Project name */}
               <div className="form-group">
-                <label className="form-label">Tên dự án / Mã video</label>
-                <input type="text" className="input-field" value={projectName}
+                <label className="nd-label">TÊN DỰ ÁN / MÃ VIDEO</label>
+                <input type="text" className="nd-input" value={projectName}
                   onChange={e => setProjectName(e.target.value)}
                   placeholder="VD: BST Xuân 2026 / VID-001" />
               </div>
 
               {/* Quality + Aspect */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="nd-row-2">
                 <div className="form-group">
-                  <label className="form-label">Chất lượng ảnh</label>
+                  <label className="nd-label">CHẤT LƯỢNG ẢNH</label>
                   <Dropdown options={QUALITY_OPTS} value={quality} onChange={setQuality} placeholder="Chọn..." />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Tỷ lệ khung hình</label>
+                  <label className="nd-label">TỶ LỆ KHUNG HÌNH</label>
                   <Dropdown options={ASPECT_OPTS} value={aspect} onChange={setAspect} placeholder="Chọn..." />
                 </div>
               </div>
 
               {/* Model + Background */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="nd-row-2">
                 <div className="form-group">
-                  <label className="form-label">Kiểu Model</label>
+                  <label className="nd-label">KIỂU MODEL</label>
                   <Dropdown options={MODEL_TYPES} value={modelType} onChange={setModelType} placeholder="Chọn kiểu model..." />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Phông nền</label>
+                  <label className="nd-label">PHÔNG NỀN</label>
                   <Dropdown options={BACKGROUNDS} value={background} onChange={setBackground} placeholder="Chọn phông nền..." />
                 </div>
               </div>
 
               {/* Pose + Style */}
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <div className="nd-row-2">
                 <div className="form-group">
-                  <label className="form-label">Tư thế</label>
+                  <label className="nd-label">TƯ THẾ</label>
                   <Dropdown options={POSES} value={pose} onChange={setPose} placeholder="Chọn..." />
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Phong cách</label>
+                  <label className="nd-label">PHONG CÁCH</label>
                   <Dropdown options={STYLES} value={style} onChange={setStyle} placeholder="Chọn..." />
                 </div>
               </div>
 
-              {/* Advanced section */}
-              {showAdvanced && (
-                <>
-                  <div className="form-group">
-                    <label className="form-label">🎨 Tone da / Skin Filter</label>
-                    <PillSelect options={SKIN_FILTERS} value={skinFilter} onChange={setSkinFilter} />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label">🌈 Tone màu / Color Filter</label>
-                    <PillSelect options={TONE_FILTERS} value={toneFilter} onChange={setToneFilter} />
-                  </div>
-                </>
-              )}
+              {/* Skin Filter — always visible */}
+              <div className="form-group">
+                <label className="nd-label">🎨 TONE DA / SKIN FILTER</label>
+                <PillSelect options={SKIN_FILTERS} value={skinFilter} onChange={setSkinFilter} />
+              </div>
+
+              {/* Tone Filter — always visible */}
+              <div className="form-group">
+                <label className="nd-label">🌈 TONE MÀU / COLOR FILTER</label>
+                <PillSelect options={TONE_FILTERS} value={toneFilter} onChange={setToneFilter} />
+              </div>
 
               {/* User prompt — luôn ưu tiên */}
               <div className="form-group">
-                <label className="form-label">📝 Mô tả thêm <span style={{ color: 'var(--brand)', fontWeight: 700 }}>(Ưu tiên cao nhất)</span></label>
-                <textarea className="form-input" style={{ height: 80, padding: '10px 14px', resize: 'vertical' }}
+                <label className="nd-label">📝 MÔ TẢ THÊM <span style={{ color: 'var(--brand)', fontWeight: 800 }}>(ƯU TIÊN CAO NHẤT)</span></label>
+                <textarea className="nd-textarea"
                   placeholder="VD: Model tóc dài, tay cầm túi, ánh sáng golden hour, zoom vào chi tiết thêu..."
                   value={prompt} onChange={e => setPrompt(e.target.value)} />
               </div>
 
               {/* Generate button */}
-              <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 4 }}
-                onClick={handleGenerate} disabled={!canGenerate}>
+              <button className="nd-generate-btn" onClick={handleGenerate} disabled={!canGenerate}>
                 {generating ? (
-                  <><Loader size={17} className="spin" /> Đang tạo 8 phân cảnh AI...</>
+                  <><Loader size={18} className="spin" /> Đang tạo 8 phân cảnh AI...</>
                 ) : (
-                  <><Sparkles size={17} /> Tạo 8 thiết kế AI</>
+                  <><Sparkles size={18} /> Tạo 8 thiết kế AI</>
                 )}
               </button>
             </div>
