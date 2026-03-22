@@ -223,7 +223,7 @@ export default function StorytellingPage() {
     const [storyContext, setStoryContext] = useState('')
 
     // Pose Library
-    const [selectedPose, setSelectedPose] = useState(null)
+    const [selectedPoses, setSelectedPoses] = useState([])
     const [poseCategory, setPoseCategory] = useState('all')
     const [poseRefImages, setPoseRefImages] = useState([])
     const [showPoseLibrary, setShowPoseLibrary] = useState(false)
@@ -299,6 +299,16 @@ export default function StorytellingPage() {
         updateScene(sceneIdx, 'pose', pose.promptEN)
         updateScene(sceneIdx, 'camera', pose.cameraAngle)
         updateScene(sceneIdx, 'emotion', 'Confident, alluring')
+    }
+
+    // Toggle pose in multi-select (max 9)
+    const togglePose = (pose) => {
+        setSelectedPoses(prev => {
+            const exists = prev.some(p => p.id === pose.id)
+            if (exists) return prev.filter(p => p.id !== pose.id)
+            if (prev.length >= 9) return prev
+            return [...prev, pose]
+        })
     }
 
     // ─── Auto-analyze images to generate 9-scene script ─────────────────────
@@ -558,11 +568,16 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                                 </div>
                                             ))}
                                             {poseRefImages.length < 3 && (
-                                                <div className="img-slot empty" onClick={() => poseRefFileRef.current?.click()}>
-                                                    <Plus size={18} style={{ color: 'var(--brand)' }} />
-                                                    <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>Pose</span>
-                                                </div>
+                                                <>
+                                                    <div className="img-slot empty" onClick={() => setShowPoseLibrary(true)} title="Chọn từ thư viện Pose">
+                                                        <Plus size={18} style={{ color: 'var(--brand)' }} />
+                                                        <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>Kho Pose</span>
+                                                    </div>
+                                                </>
                                             )}
+                                            <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={() => poseRefFileRef.current?.click()}>
+                                                <Upload size={12} /> Tải
+                                            </button>
                                             <input ref={poseRefFileRef} type="file" accept="image/*" multiple hidden
                                                 onChange={e => {
                                                     const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/')).slice(0, 3 - poseRefImages.length)
@@ -570,6 +585,23 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                                 }} />
                                         </div>
                                     </div>
+
+                                    {/* Selected poses summary */}
+                                    {selectedPoses.length > 0 && (
+                                        <div className="pose-selected-card">
+                                            <div className="pose-selected-info">
+                                                <span className="pose-selected-emoji">✅ {selectedPoses.length}/9</span>
+                                                <div>
+                                                    <div className="pose-selected-name">Đã chọn {selectedPoses.length} tư thế</div>
+                                                    <div className="pose-selected-desc">{selectedPoses.map(p => p.name).join(' • ')}</div>
+                                                </div>
+                                            </div>
+                                            <button className="btn btn-ghost" style={{ fontSize: 11, flexShrink: 0 }}
+                                                onClick={() => setSelectedPoses([])}>
+                                                <X size={12} /> Xóa hết
+                                            </button>
+                                        </div>
+                                    )}
 
                                     {/* Pose Library toggle */}
                                     <button className="pose-lib-toggle" onClick={() => setShowPoseLibrary(p => !p)}>
@@ -588,24 +620,24 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                                                 ))}
                                             </div>
                                             <div className="pose-grid">
-                                                {getPosesByCategory(poseCategory).map(p => (
-                                                    <div key={p.id}
-                                                        className={`pose-card${selectedPose?.id === p.id ? ' selected' : ''}`}
-                                                        onClick={() => setSelectedPose(selectedPose?.id === p.id ? null : p)}>
-                                                        <div className="pose-card-emoji">{p.emoji}</div>
-                                                        <div className="pose-card-name">{p.name}</div>
-                                                        <div className="pose-card-focus">{p.bodyFocus}</div>
-                                                        {selectedPose?.id === p.id && <Check size={14} className="pose-card-check" />}
-                                                    </div>
-                                                ))}
+                                                {getPosesByCategory(poseCategory).map(p => {
+                                                    const isSelected = selectedPoses.some(sp => sp.id === p.id)
+                                                    return (
+                                                        <div key={p.id}
+                                                            className={`pose-card${isSelected ? ' selected' : ''}`}
+                                                            onClick={() => togglePose(p)}>
+                                                            <img src={p.thumbnail} alt={p.name} className="pose-card-img" onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+                                                            <div className="pose-card-emoji-fallback" style={{ display: 'none' }}>{p.emoji}</div>
+                                                            <div className="pose-card-name">{p.name}</div>
+                                                            <div className="pose-card-focus">{p.bodyFocus}</div>
+                                                            {isSelected && <div className="pose-card-check">✅</div>}
+                                                        </div>
+                                                    )
+                                                })}
                                             </div>
-                                            {selectedPose && (
-                                                <div style={{ marginTop: 8, padding: '8px 10px', background: 'rgba(255,107,53,0.06)', borderRadius: 8, fontSize: 11, color: 'var(--text-muted)' }}>
-                                                    <strong style={{ color: 'var(--brand)' }}>Đã chọn: {selectedPose.emoji} {selectedPose.name}</strong>
-                                                    <br />{selectedPose.description}
-                                                    <br /><em>Click vào 1 cảnh bên phải để áp dụng pose này</em>
-                                                </div>
-                                            )}
+                                            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+                                                💡 Chọn tối đa 9 tư thế — mỗi cảnh sẽ sử dụng 1 tư thế khác nhau
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -749,19 +781,22 @@ IMPORTANT: Maintain 100% visual consistency with all other scenes — same perso
                         </div>
                     </div>
                 </>
-            )}
+            )
+            }
 
             {/* Preview */}
             {previewImg && <ImagePreviewModal imageSrc={previewImg} onClose={() => setPreviewImg(null)} />}
 
             {/* Library Picker */}
-            {libraryPicker && (
-                <LibraryPickerModal
-                    title={libraryPicker === 'ref' ? 'Chọn ảnh mẫu' : 'Chọn sản phẩm'}
-                    onClose={() => setLibraryPicker(null)}
-                    onSelect={handleLibraryPick}
-                />
-            )}
-        </div>
+            {
+                libraryPicker && (
+                    <LibraryPickerModal
+                        title={libraryPicker === 'ref' ? 'Chọn ảnh mẫu' : 'Chọn sản phẩm'}
+                        onClose={() => setLibraryPicker(null)}
+                        onSelect={handleLibraryPick}
+                    />
+                )
+            }
+        </div >
     )
 }

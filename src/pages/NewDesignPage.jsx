@@ -337,7 +337,7 @@ export default function NewDesignPage() {
   const [libraryPicker, setLibraryPicker] = useState(null)
 
   // Pose Library
-  const [selectedPose, setSelectedPose] = useState(null)
+  const [selectedPoses, setSelectedPoses] = useState([])
   const [poseCategory, setPoseCategory] = useState('all')
   const [poseRefImages, setPoseRefImages] = useState([])
   const [showPoseLibrary, setShowPoseLibrary] = useState(false)
@@ -394,21 +394,24 @@ export default function NewDesignPage() {
       console.log('[Bot2 Garment]', extractedProduct?.substring(0, 120))
 
       // STEP 3: Build 8 Master Prompts (one per shot variation)
-      // If user selected a specific pose, use it for ALL shots
-      const posePromptExtra = selectedPose ? `\n[POSE REFERENCE — MUST FOLLOW EXACTLY]\n${selectedPose.promptEN}\nCamera angle: ${selectedPose.cameraAngle}\nBody focus: ${selectedPose.bodyFocus}` : ''
+      // If user selected poses, cycle through them for each shot
+      const posePromptExtras = selectedPoses.length > 0
+        ? selectedPoses.map(p => `\n[POSE REFERENCE — MUST FOLLOW EXACTLY]\n${p.promptEN}\nCamera angle: ${p.cameraAngle}\nBody focus: ${p.bodyFocus}`)
+        : ['']
       const templateExtra = selectedTemplate ? `\nPhotography style: ${selectedTemplate.promptPrefix}` : ''
-      const combinedUserPrompt = [prompt, posePromptExtra, templateExtra].filter(Boolean).join('\n')
 
-      const masterPrompts = SHOT_VARIATIONS.map(shotDesc =>
-        buildMasterImagePrompt({
+      const masterPrompts = SHOT_VARIATIONS.map((shotDesc, idx) => {
+        const poseExtra = posePromptExtras[idx % posePromptExtras.length]
+        const combinedUserPrompt = [prompt, poseExtra, templateExtra].filter(Boolean).join('\n')
+        return buildMasterImagePrompt({
           extractedIdentity,
           extractedProduct,
           modelType, background, pose, style, skinFilter, toneFilter,
           quality, aspect,
           userPrompt: combinedUserPrompt,
-          shotDescription: selectedPose ? selectedPose.promptEN : shotDesc,
+          shotDescription: selectedPoses.length > 0 ? selectedPoses[idx % selectedPoses.length].promptEN : shotDesc,
         })
-      )
+      })
 
       // STEP 4: Generate 4 images in parallel
       const mainProductFile = productFiles[0]
@@ -532,11 +535,16 @@ export default function NewDesignPage() {
                     </div>
                   ))}
                   {poseRefImages.length < 3 && (
-                    <div className="img-slot empty" onClick={() => poseRefFileRef.current?.click()}>
-                      <Plus size={18} style={{ color: 'var(--brand)' }} />
-                      <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>Pose</span>
-                    </div>
+                    <>
+                      <div className="img-slot empty" onClick={() => setShowPoseLibrary(true)} title="Chọn từ thư viện Pose">
+                        <Plus size={18} style={{ color: 'var(--brand)' }} />
+                        <span style={{ fontSize: 8, color: 'var(--text-muted)' }}>Kho Pose</span>
+                      </div>
+                    </>
                   )}
+                  <button className="btn btn-ghost" style={{ fontSize: 11 }} onClick={() => poseRefFileRef.current?.click()}>
+                    <Upload size={12} /> Tải
+                  </button>
                   <input ref={poseRefFileRef} type="file" accept="image/*" multiple hidden
                     onChange={e => {
                       const files = Array.from(e.target.files).filter(f => f.type.startsWith('image/')).slice(0, 3 - poseRefImages.length)
@@ -545,19 +553,19 @@ export default function NewDesignPage() {
                 </div>
               </div>
 
-              {/* Selected pose display */}
-              {selectedPose && (
+              {/* Selected poses display */}
+              {selectedPoses.length > 0 && (
                 <div className="pose-selected-card">
                   <div className="pose-selected-info">
-                    <span className="pose-selected-emoji">{selectedPose.emoji}</span>
+                    <span className="pose-selected-emoji">✅ {selectedPoses.length}/9</span>
                     <div>
-                      <div className="pose-selected-name">{selectedPose.name}</div>
-                      <div className="pose-selected-desc">{selectedPose.description}</div>
+                      <div className="pose-selected-name">Đã chọn {selectedPoses.length} tư thế</div>
+                      <div className="pose-selected-desc">{selectedPoses.map(p => p.name).join(' • ')}</div>
                     </div>
                   </div>
                   <button className="btn btn-ghost" style={{ fontSize: 11, flexShrink: 0 }}
-                    onClick={() => setSelectedPose(null)}>
-                    <X size={12} /> Bỏ chọn
+                    onClick={() => setSelectedPoses([])}>
+                    <X size={12} /> Xóa hết
                   </button>
                 </div>
               )}
@@ -580,18 +588,31 @@ export default function NewDesignPage() {
                       </button>
                     ))}
                   </div>
-                  {/* Pose cards */}
+                  {/* Pose cards with images */}
                   <div className="pose-grid">
-                    {getPosesByCategory(poseCategory).map(p => (
-                      <div key={p.id}
-                        className={`pose-card${selectedPose?.id === p.id ? ' selected' : ''}`}
-                        onClick={() => setSelectedPose(selectedPose?.id === p.id ? null : p)}>
-                        <div className="pose-card-emoji">{p.emoji}</div>
-                        <div className="pose-card-name">{p.name}</div>
-                        <div className="pose-card-focus">{p.bodyFocus}</div>
-                        {selectedPose?.id === p.id && <Check size={14} className="pose-card-check" />}
-                      </div>
-                    ))}
+                    {getPosesByCategory(poseCategory).map(p => {
+                      const isSelected = selectedPoses.some(sp => sp.id === p.id)
+                      return (
+                        <div key={p.id}
+                          className={`pose-card${isSelected ? ' selected' : ''}`}
+                          onClick={() => {
+                            if (isSelected) {
+                              setSelectedPoses(prev => prev.filter(sp => sp.id !== p.id))
+                            } else if (selectedPoses.length < 9) {
+                              setSelectedPoses(prev => [...prev, p])
+                            }
+                          }}>
+                          <img src={p.thumbnail} alt={p.name} className="pose-card-img" onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+                          <div className="pose-card-emoji-fallback" style={{ display: 'none' }}>{p.emoji}</div>
+                          <div className="pose-card-name">{p.name}</div>
+                          <div className="pose-card-focus">{p.bodyFocus}</div>
+                          {isSelected && <div className="pose-card-check">✅</div>}
+                        </div>
+                      )
+                    })}
+                  </div>
+                  <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
+                    💡 Chọn tối đa 9 tư thế — mỗi ảnh đầu ra sẽ sử dụng 1 tư thế khác nhau
                   </div>
                 </div>
               )}
