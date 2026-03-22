@@ -315,7 +315,7 @@ RESPOND WITH THE EXACT INPAINTING PROMPT IN ENGLISH.`
 // ─── VIETNAMESE DNA DEFAULTS (used when all settings = Auto) ──────────────────
 export const VN_DNA_DEFAULTS = {
   modelType: 'Vietnamese Gen Z young woman (18-25), naturally beautiful, sweet and approachable',
-  skinFilter: 'Supreme Korean Glass Skin + Vietnamese Porcelain Dream: porcelain white-pink, dewy glow, subsurface scattering, micro-texture visible',
+  skinFilter: 'Korean Porcelain Glass Skin: fair white-pink porcelain base tone (Fitzpatrick Type I-II), dewy glass-skin finish with natural luminosity, soft peachy-pink blush concentrated on cheekbones and nose tip, coral-pink gradient lips with glossy center, subtle warm undertone, micro-texture visible with subsurface scattering light effect, pores minimized but naturally present, skin appears lit from within (내광피부), NO matte finish — always dewy/glowing',
   toneFilter: 'Soft dreamy golden warmth, lavender shadow tints, peachy highlights, fresh youthful Instagram aesthetic',
   style: 'High-end Vietnamese fashion lookbook, aspirational, Instagram-worthy, Gen Z sweet makeup (gradient lip tint, soft blush, sparkly eyeshadow)',
   lighting: 'Sony Alpha 5600K natural key + Korean beauty dish fill + TikTok ring light catch-lights + golden cinematic rim light',

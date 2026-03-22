@@ -35,7 +35,7 @@ const STYLES = [
   'Dạ hội/tiệc tối', 'Y2K trendy',
 ]
 const SKIN_FILTERS = [
-  AUTO, 'Da trắng hồng', 'Da trắng sáng', 'Da sứ Hàn Quốc', 'Da nâu khỏe',
+  AUTO, 'Da sứ Hàn Quốc glass skin', 'Da trắng hồng', 'Da trắng sáng', 'Da nâu khỏe',
   'Da rám nắng', 'Da olive Địa Trung Hải',
 ]
 const TONE_FILTERS = [
@@ -360,7 +360,7 @@ export default function NewDesignPage() {
   const [background, setBackground] = useState(AUTO)
   const [pose, setPose] = useState(AUTO)
   const [style, setStyle] = useState(AUTO)
-  const [skinFilter, setSkinFilter] = useState('Da trắng hồng')
+  const [skinFilter, setSkinFilter] = useState('Da sứ Hàn Quốc glass skin')
   const [toneFilter, setToneFilter] = useState('Soft dreamy')
   const [prompt, setPrompt] = useState('')
   const [projectName, setProjectName] = useState('')

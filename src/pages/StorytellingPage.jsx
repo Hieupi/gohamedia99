@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import {
     Upload, Sparkles, Download, Save, Trash2, X, Send, Plus,
     Image as ImageIcon, Loader, FolderOpen, Eye, GripVertical,
@@ -12,6 +12,14 @@ import { POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES 
 // ─── Options ──────────────────────────────────────────────────────────────────
 const QUALITY_OPTS = ['2K (HD)', '1K (SD)', '4K (Ultra)']
 const ASPECT_OPTS = ['9:16 Dọc (Story)', '4:5 Dọc (IG)', '1:1 Vuông', '16:9 Ngang', '3:4 Chân dung']
+const SKIN_OPTS = ['🤖 Auto', 'Da sứ Hàn Quốc glass skin', 'Da trắng hồng', 'Da trắng sáng', 'Da nâu khỏe', 'Da rám nắng']
+const TONE_OPTS = ['🤖 Auto', 'Soft dreamy', 'Warm vintage', 'Cool tone xanh', 'Golden hour', 'Film analog', 'Cinematic', 'Pastel nhẹ nhàng']
+
+const ST_SAVE_KEY = 'goha_storytelling_state'
+
+function loadSavedState() {
+    try { return JSON.parse(localStorage.getItem(ST_SAVE_KEY)) || {} } catch { return {} }
+}
 
 // ─── Story Templates (9 scenes each for maximum diversity) ────────────────────
 const STORY_TEMPLATES = [
@@ -237,8 +245,11 @@ export default function StorytellingPage() {
     const [showPoseLibrary, setShowPoseLibrary] = useState(false)
 
     // Settings
-    const [quality, setQuality] = useState('2K (HD)')
-    const [aspect, setAspect] = useState('9:16 Dọc (Story)')
+    const saved = loadSavedState()
+    const [quality, setQuality] = useState(saved.quality || '2K (HD)')
+    const [aspect, setAspect] = useState(saved.aspect || '9:16 Dọc (Story)')
+    const [skinFilter, setSkinFilter] = useState(saved.skinFilter || 'Da sứ Hàn Quốc glass skin')
+    const [toneFilter, setToneFilter] = useState(saved.toneFilter || 'Soft dreamy')
 
     // Auto-analyze
     const [analyzing, setAnalyzing] = useState(false)
@@ -252,6 +263,12 @@ export default function StorytellingPage() {
     // Modals
     const [previewImg, setPreviewImg] = useState(null)
     const [libraryPicker, setLibraryPicker] = useState(null)
+
+    // ─── Auto-save settings to localStorage ────────────────────────────────────
+    useEffect(() => {
+        const state = { quality, aspect, skinFilter, toneFilter, storyContext }
+        try { localStorage.setItem(ST_SAVE_KEY, JSON.stringify(state)) } catch { }
+    }, [quality, aspect, skinFilter, toneFilter, storyContext])
 
     // ─── Handlers ─────────────────────────────────────────────────────────────
 
@@ -333,25 +350,31 @@ export default function StorytellingPage() {
 
 Analyze these images carefully — model, outfit, accessories, setting, mood.
 
-=== 8 YẾU TỐ TRIỆU VIEW FORMULA ===
-Apply these 8 viral factors to create the storytelling:
-1. TIÊU ĐỀ HẤP DẪN: Suggest a catchy video title that triggers curiosity
-2. THUMBNAIL: Scene 1 must work as an eye-catching thumbnail
-3. 3 GIÂY ĐẦU CUỐN: Scene 1 = powerful HOOK (shocking image, mystery, dramatic pose)
-4. ÂM NHẠC: Note trending music style for each scene
-5. HASHTAG: Suggest 3-5 Vietnamese hashtags for the video
-6. NỘI DUNG GIỮ NGƯỜI XEM: Each scene builds anticipation for the next
-7. TÌNH HUỐNG XOAY CHUYỂN: Include a twist/surprise moment (scene 6-7)
-8. GIÁ TRỊ CHIA SẺ: Final scene must make viewers want to share
+CORE FORMULA: GIÁO DỤC + GIẢI TRÍ + KỂ CHUYỆN (Edutainment + Storytelling)
+The video must TEACH something (fashion tip, style hack, outfit idea) while ENTERTAINING and TELLING A STORY.
 
-Create EXACTLY 9 scenes for a fashion video. Each scene = 1 photo → 3-second video clip.
+=== 8 YẾU TỐ TRIỆU VIEW ===
+1. HOOK 3 GIÂY: Scene 1 = the most SHOCKING or CURIOSITY-INDUCING moment. NOT just a pretty pose. Think: unexpected action, dramatic entrance, or a "wait, what?" moment
+2. THUMBNAIL POWER: Scene 1 must make scrollers STOP — strong emotion, dramatic lighting, or unusual pose
+3. GIÁO DỤC (EDUCATION): Weave in a fashion tip — "Cách phối outfit này", "Mẹo chọn màu", "Trick tạo dáng"
+4. GIẢI TRÍ (ENTERTAINMENT): Each scene must be visually FUN — dynamic angles, playful poses, unexpected moments
+5. KỂ CHUYỆN (STORYTELLING): Build narrative: who is she? where is she going? what happens?
+6. TÌNH HUỐNG XOAY CHUYỂN (TWIST): Scene 6-7 = sudden mood/location/style shift that surprises
+7. YẾU TỐ GÂY TRANH CÃI (CONTROVERSY TRIGGER): Include ONE scene with a deliberate "imperfect" or "debatable" element — slightly unusual styling choice, controversial fashion mix, or pose that people will comment about. This triggers engagement through comments and debates.
+8. GIÁ TRỊ CHIA SẺ: Final scene = so beautiful or surprising that viewers tag friends or save the video
+
+Create EXACTLY 9 scenes. Each scene = 1 photo → 3-second video clip.
+
+Scene Structure:
+- Scene 1: HOOK — dramatic/shocking/curiosity (makes them STOP scrolling)
+- Scene 2-3: SETUP — introduce character + outfit (education element: style tip)
+- Scene 4-5: RISING ACTION — showcase from multiple angles (entertainment: dynamic)
+- Scene 6: CONTROVERSY SCENE — the "imperfect" moment that triggers debate/comments
+- Scene 7: TWIST — unexpected shift in mood/location/emotion
+- Scene 8-9: CLIMAX + FINALE — most stunning shots + memorable ending (share-worthy)
 
 Rules:
-- All 9 scenes: SAME person, SAME outfit from images
-- Scene 1: HOOK (3 giây đầu cuốn) — dramatic, unexpected, or ultra-glamorous
-- Scenes 2-5: Rising action — showcase outfit from different angles
-- Scenes 6-7: TWIST — surprise pose/location/emotion change
-- Scenes 8-9: CLIMAX + FINALE — most beautiful shot + memorable ending
+- All 9 scenes: SAME person, SAME outfit
 - Mix camera angles: front, back, side, close-up, selfie, wide, artistic
 - Each scene must feel like natural continuation of the story
 ${storyContext ? `\\nShared context: ${storyContext}` : ''}
@@ -459,8 +482,8 @@ IMPORTANT: Maintain 100% visual consistency — same person, same outfit, same c
                             background: '🤖 Auto (AI tự chọn)',
                             pose: '🤖 Auto (AI tự chọn)',
                             style: '🤖 Auto (AI tự chọn)',
-                            skinFilter: 'Da trắng hồng',
-                            toneFilter: 'Soft dreamy',
+                            skinFilter,
+                            toneFilter,
                             quality, aspect,
                             userPrompt: '',
                             shotDescription: shotDesc,
@@ -702,6 +725,32 @@ IMPORTANT: Maintain 100% visual consistency — same person, same outfit, same c
                                                         className={`pose-tpl-btn${aspect === a ? ' active' : ''}`}
                                                         onClick={() => setAspect(a)}>
                                                         {a}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="nd-row-2">
+                                        <div className="form-group">
+                                            <label className="nd-label">🎨 TONE DA / SKIN FILTER</label>
+                                            <div className="pose-templates">
+                                                {SKIN_OPTS.map(s => (
+                                                    <button key={s}
+                                                        className={`pose-tpl-btn${skinFilter === s ? ' active' : ''}`}
+                                                        onClick={() => setSkinFilter(s)}>
+                                                        {s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="nd-label">🌈 TONE MÀU / COLOR FILTER</label>
+                                            <div className="pose-templates">
+                                                {TONE_OPTS.map(t => (
+                                                    <button key={t}
+                                                        className={`pose-tpl-btn${toneFilter === t ? ' active' : ''}`}
+                                                        onClick={() => setToneFilter(t)}>
+                                                        {t}
                                                     </button>
                                                 ))}
                                             </div>
