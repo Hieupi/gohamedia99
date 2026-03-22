@@ -291,7 +291,7 @@ function SaveDesignModal({ imageSrc, projectName, onClose }) {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const record = createLibraryRecord({ name: name.trim() || autoName, type, category: 'design', imageSrc })
+      const record = createLibraryRecord({ name: name.trim() || autoName, type, category: 'design', imageSrc, source: 'design' })
       if (selectedFolder) record.folderId = selectedFolder
       const result = await saveToLibrary(record)
       if (result.success) {

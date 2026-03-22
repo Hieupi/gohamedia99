@@ -2,7 +2,7 @@
  * libraryService.js
  * ─────────────────────────────────────────────────────────────────────────────
  * Quản lý kho ảnh — thumbnail localStorage, ảnh gốc IndexedDB.
- * Hỗ trợ: thư mục dự án, subfolder, kéo thả ảnh/thư mục.
+ * Thư mục dự án, subfolder, kéo thả, source tagging.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -65,7 +65,7 @@ export function generateUniqueName({ category, description, prefix } = {}) {
     return candidate
 }
 
-// ─── Write (IndexedDB + localStorage) ─────────────────────────────────────────
+// ─── Write ────────────────────────────────────────────────────────────────────
 
 export async function saveToLibrary(record) {
     try {
@@ -93,7 +93,7 @@ export async function saveToLibrary(record) {
     }
 }
 
-// ─── Delete ───────────────────────────────────────────────────────────────────
+// ─── Delete / Like ────────────────────────────────────────────────────────────
 
 export function deleteFromLibrary(id) {
     const items = getLibraryItems().filter(i => i.id !== id)
@@ -102,22 +102,25 @@ export function deleteFromLibrary(id) {
     return items
 }
 
-// ─── Toggle Like ──────────────────────────────────────────────────────────────
-
 export function toggleLikeInLibrary(id) {
     const items = getLibraryItems().map(i => i.id === id ? { ...i, liked: !i.liked } : i)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
     return items
 }
 
-// ─── Build record ─────────────────────────────────────────────────────────────
+// ─── Record builder (with source tag) ─────────────────────────────────────────
 
-export function createLibraryRecord({ name, type, category, imageSrc }) {
+export function createLibraryRecord({ name, type, category, imageSrc, source, folderId }) {
     return {
         id: `kho-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: name || 'Không tên', type: type || 'product',
-        category: category || 'other', imageSrc,
-        liked: false, createdAt: new Date().toISOString(),
+        name: name || 'Không tên',
+        type: type || 'product',
+        category: category || 'other',
+        source: source || 'manual',  // 'design' | 'storytelling' | 'extract' | 'manual'
+        imageSrc,
+        folderId: folderId || null,
+        liked: false,
+        createdAt: new Date().toISOString(),
     }
 }
 
@@ -137,7 +140,7 @@ export function getStorageUsage() {
     return { usedMB: (total / 1024 / 1024).toFixed(2), maxMB: 5, percent: Math.round((total / (5 * 1024 * 1024)) * 100) }
 }
 
-// ═══ PROJECT FOLDERS (with subfolder + drag-drop support) ═══════════════════
+// ═══ FOLDERS ══════════════════════════════════════════════════════════════════
 
 export function getFolders() {
     try { return JSON.parse(localStorage.getItem(FOLDERS_KEY) || '[]') }
@@ -175,23 +178,18 @@ export function deleteFolder(folderId) {
     return folders
 }
 
-/** Di chuyển ảnh vào thư mục (folderId=null → gốc) */
 export function moveItemToFolder(itemId, folderId) {
-    const items = getLibraryItems().map(i =>
-        i.id === itemId ? { ...i, folderId: folderId || null } : i
-    )
+    const items = getLibraryItems().map(i => i.id === itemId ? { ...i, folderId: folderId || null } : i)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
     return items
 }
 
-/** Di chuyển thư mục vào thư mục khác (subfolder) */
 export function moveFolderInto(folderId, targetParentId) {
     if (folderId === targetParentId) return getFolders()
-    // Prevent circular nesting
     const folders = getFolders()
     let check = targetParentId
     while (check) {
-        if (check === folderId) return folders // circular!
+        if (check === folderId) return folders
         const parent = folders.find(f => f.id === check)
         check = parent?.parentId || null
     }

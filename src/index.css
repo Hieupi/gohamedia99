@@ -4001,3 +4001,22 @@ textarea {
   margin-top: 2px; cursor: pointer; padding-left: 6px;
 }
 .lib-subfolder-tag:hover { color: var(--brand); }
+
+/* Folder Cards (Explorer style) */
+.lib-folder-card {
+  position: relative; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r-md);
+  padding: 16px 12px; text-align: center;
+  background: var(--surface); transition: all 0.15s;
+}
+.lib-folder-card:hover { border-color: var(--brand); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+.lib-folder-card.drag-over { border-color: var(--brand); background: rgba(99,102,241,0.08); box-shadow: 0 0 0 2px rgba(99,102,241,0.3); }
+.lib-folder-card-icon { font-size: 32px; margin-bottom: 6px; }
+.lib-folder-card-name { font-size: 12px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lib-folder-card-count { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.lib-folder-card-del { position: absolute; top: 6px; right: 6px; border: none; background: none; font-size: 11px; color: var(--text-muted); cursor: pointer; opacity: 0; transition: opacity 0.15s; }
+.lib-folder-card:hover .lib-folder-card-del { opacity: 0.6; }
+.lib-folder-card-del:hover { opacity: 1 !important; color: #ef4444; }
+/* Breadcrumb */
+.lib-breadcrumb-btn { background: none; border: none; cursor: pointer; font-size: 12px; color: var(--text-secondary); font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+.lib-breadcrumb-btn:hover { background: var(--surface); color: var(--brand); }

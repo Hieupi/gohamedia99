@@ -638,68 +638,73 @@ export default function LibraryPage() {
         )
       }
 
-      {/* ══════════ TAB: ẢNH THÀNH PHẨM ══════════ */}
-      {
-        mainTab === 'finished' && (
+      {/* ═══ TAB: ẢNH THÀNH PHẨM (Folder Explorer) ═══ */}
+      {mainTab === 'finished' && (() => {
+        const currentFolder = activeFolder === 'all' ? null : activeFolder
+        const childFolders = folders.filter(f => (f.parentId || null) === currentFolder)
+        const finishedItems = items.filter(i => {
+          const isFinished = i.source === 'design' || i.source === 'storytelling' || i.category === 'design'
+          if (!isFinished) return false
+          if (currentFolder) return i.folderId === currentFolder
+          return !i.folderId || !folders.some(f => f.id === i.folderId)
+        })
+        const breadcrumb = []
+        let bc = currentFolder
+        while (bc) { const f = folders.find(x => x.id === bc); if (f) { breadcrumb.unshift(f); bc = f.parentId || null } else break }
+        return (
           <div>
-            <div className="lib-folder-bar">
-              <div className="lib-folder-list">
-                <button className={`lib-folder-btn${activeFolder === 'all' ? ' active' : ''}`}
-                  onClick={() => setActiveFolder('all')}>📋 Tất cả</button>
-                {folders.map(f => (
-                  <button key={f.id} className={`lib-folder-btn${activeFolder === f.id ? ' active' : ''}`}
-                    onClick={() => setActiveFolder(f.id)}>
-                    📁 {f.name}
-                    <span className="lib-folder-count">{items.filter(i => i.folderId === f.id && (i.category === 'design' || i.type === 'product')).length}</span>
-                  </button>
-                ))}
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-muted)', marginBottom: 10 }}>
+              <button className="lib-breadcrumb-btn" onClick={() => setActiveFolder('all')}>🏠 Gốc</button>
+              {breadcrumb.map(f => (<span key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}><span style={{ opacity: 0.4 }}>›</span><button className="lib-breadcrumb-btn" onClick={() => setActiveFolder(f.id)}>📁 {f.name}</button></span>))}
+            </div>
+            <div style={{ marginBottom: 12 }}>
               {showNewFolder ? (
-                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                  <input type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
-                    placeholder="Tên thư mục..." className="input-field" style={{ flex: 1, fontSize: 12, height: 32 }}
-                    onKeyDown={e => e.key === 'Enter' && handleCreateFolder()} autoFocus />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="Tên thư mục mới..." className="input-field" style={{ flex: 1, fontSize: 12, height: 32 }} onKeyDown={e => e.key === 'Enter' && handleCreateFolder()} autoFocus />
                   <button className="btn btn-primary" onClick={handleCreateFolder} style={{ fontSize: 11, height: 32 }}>Tạo</button>
                   <button className="btn btn-ghost" onClick={() => setShowNewFolder(false)} style={{ fontSize: 11, height: 32 }}>Hủy</button>
                 </div>
-              ) : (
-                <button className="lib-folder-add" onClick={() => setShowNewFolder(true)}>+ Thư mục mới</button>
-              )}
+              ) : (<button className="lib-folder-add" onClick={() => setShowNewFolder(true)}>📁 + Thư mục mới</button>)}
             </div>
-            {(() => {
-              const finishedItems = items.filter(i => {
-                if (activeFolder !== 'all' && i.folderId !== activeFolder) return false
-                return i.category === 'design' || i.type === 'product'
-              })
-              return finishedItems.length === 0 ? (
-                <div className="empty-state" style={{ minHeight: 200 }}>
-                  <ImageOff size={40} style={{ opacity: 0.2 }} />
-                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chưa có ảnh thành phẩm. Tạo ảnh ở Thiết kế mới và lưu vào kho.</p>
+            <div className="lib-grid">
+              {childFolders.map(f => (
+                <div key={f.id} className={`lib-folder-card${dragOverFolderId === f.id ? ' drag-over' : ''}`}
+                  onClick={() => setActiveFolder(f.id)} draggable
+                  onDragStart={e => handleDragStartFolder(e, f.id)}
+                  onDragOver={e => handleDragOverFolder(e, f.id)}
+                  onDragLeave={handleDragLeave}
+                  onDrop={e => handleDropOnFolder(e, f.id)}
+                  onDragEnd={handleDragEnd}>
+                  <div className="lib-folder-card-icon">📁</div>
+                  <div className="lib-folder-card-name">{f.name}</div>
+                  <div className="lib-folder-card-count">{items.filter(i => i.folderId === f.id).length} ảnh</div>
+                  <button className="lib-folder-card-del" onClick={e => { e.stopPropagation(); handleDeleteFolder(e, f.id) }}>✕</button>
                 </div>
-              ) : (
-                <div className="lib-grid">
-                  {finishedItems.map(item => (
-                    <div key={item.id} className="lib-card">
-                      <div className="lib-card-img">
-                        <img src={item.imageSrc} alt={item.name} />
-                        <div className="lib-card-overlay">
-                          <button className="lib-card-action" onClick={() => setPreview(item)}><Eye size={14} /></button>
-                          <button className="lib-card-action" onClick={() => handleDownload(item)}><Download size={14} /></button>
-                          <button className="lib-card-action" style={{ color: '#ef4444' }} onClick={e => handleDelete(e, item.id)}><Trash2 size={14} /></button>
-                        </div>
-                      </div>
-                      <div className="lib-card-info">
-                        <div className="lib-card-name">{item.name}</div>
-                        {item.folderId && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>📁 {folders.find(f => f.id === item.folderId)?.name}</span>}
-                      </div>
+              ))}
+              {finishedItems.map(item => (
+                <div key={item.id} className={`lib-card${dragItemId === item.id ? ' dragging' : ''}`}
+                  draggable onDragStart={e => handleDragStartItem(e, item.id)} onDragEnd={handleDragEnd}>
+                  <div className="lib-card-img-wrap">
+                    <img src={item.imageSrc} alt={item.name} className="lib-card-img" loading="lazy" />
+                    <div className="lib-card-overlay">
+                      <button className="lib-card-action" onClick={() => setPreview(item)}><Eye size={14} /></button>
+                      <button className="lib-card-action" onClick={() => handleDownload(item)}><Download size={14} /></button>
+                      <button className="lib-card-action danger" onClick={e => handleDelete(e, item.id)}><Trash2 size={14} /></button>
                     </div>
-                  ))}
+                  </div>
+                  <div className="lib-card-info"><div className="lib-card-name">{item.name}</div></div>
                 </div>
-              )
-            })()}
+              ))}
+            </div>
+            {childFolders.length === 0 && finishedItems.length === 0 && (
+              <div className="empty-state" style={{ minHeight: 200 }}>
+                <ImageOff size={40} style={{ opacity: 0.2 }} />
+                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>{currentFolder ? 'Thư mục trống. Kéo ảnh vào hoặc tạo thư mục con.' : 'Chưa có ảnh thành phẩm. Tạo ảnh ở Thiết kế mới → Lưu vào kho.'}</p>
+              </div>
+            )}
           </div>
         )
-      }
+      })()}
 
       {/* ══════════ TAB: VIDEO THÀNH PHẨM ══════════ */}
       {
