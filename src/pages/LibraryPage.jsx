@@ -1,12 +1,15 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff, Upload, Loader
+  Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff, Upload, Loader, Copy, Check
 } from 'lucide-react'
 import {
   getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
-  downloadImage, migrateOldLibrary, saveToLibrary, createLibraryRecord
+  downloadImage, saveToLibrary, createLibraryRecord, migrateOldLibrary
 } from '../services/libraryService'
 import { callGemini } from '../services/geminiService'
+import {
+  POSE_LIBRARY, POSE_CATEGORIES, getPosesByCategory, PROMPT_TEMPLATES
+} from '../services/poseLibrary'
 
 const CATEGORIES = ['Tất cả', 'Trang phục', 'Người mẫu', 'Phụ kiện', 'Bối cảnh', 'Bộ sưu tập']
 
@@ -29,22 +32,22 @@ function generateSmartName(nameVi, category, existingItems) {
   const prefix = CATEGORY_PREFIX[category] || 'SP'
   let baseName = (nameVi || 'Không tên').replace(/^(Áo|Quần|Đầm|Giày|Túi|Mũ)\s*/i, '').trim()
   if (baseName.length > 30) baseName = baseName.slice(0, 30).trim()
-  const fullBase = `${prefix}-${baseName}`
+  const fullBase = `${prefix} -${baseName} `
   const sameBase = existingItems.filter(i => i.name && i.name.startsWith(fullBase))
   const num = String(sameBase.length + 1).padStart(3, '0')
-  return `${fullBase}-${num}`
+  return `${fullBase} -${num} `
 }
 
 // ─── AI Analyze Prompt ────────────────────────────────────────────────────────
 
-const ANALYZE_PROMPT = `Bạn là chuyên gia thời trang. Phân tích ảnh và trả về JSON duy nhất (không markdown):
+const ANALYZE_PROMPT = `Bạn là chuyên gia thời trang.Phân tích ảnh và trả về JSON duy nhất(không markdown):
 {
   "nameVi": "Tên tiếng Việt ngắn gọn của sản phẩm/đối tượng chính",
-  "category": "top|bottom|dress|outerwear|shoes|bag|accessory|model|background",
-  "type": "product hoặc model",
-  "description": "Mô tả ngắn 1 dòng về màu sắc, chất liệu, phong cách"
+    "category": "top|bottom|dress|outerwear|shoes|bag|accessory|model|background",
+      "type": "product hoặc model",
+        "description": "Mô tả ngắn 1 dòng về màu sắc, chất liệu, phong cách"
 }
-Chỉ trả về đúng 1 đối tượng nổi bật nhất. Chỉ JSON, không text khác.`
+Chỉ trả về đúng 1 đối tượng nổi bật nhất.Chỉ JSON, không text khác.`
 
 // ─── Preview Modal ────────────────────────────────────────────────────────────
 
@@ -87,7 +90,7 @@ function UploadModal({ onClose, onSaved }) {
 
     try {
       const raw = await callGemini({ prompt: ANALYZE_PROMPT, images: [f], temperature: 0.2 })
-      const clean = raw.replace(/```json\s*/g, '').replace(/```/g, '').trim()
+      const clean = raw.replace(/```json\s * /g, '').replace(/```/g, '').trim()
       const parsed = JSON.parse(clean)
       setAiResult(parsed)
       setCategory(parsed.category || 'other')
@@ -186,9 +189,9 @@ function UploadModal({ onClose, onSaved }) {
               style={{ marginBottom: 12, fontFamily: 'monospace', fontSize: 13.5, fontWeight: 600 }} />
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-              <button className={`toggle-pill ${type === 'product' ? 'active' : ''}`}
+              <button className={`toggle - pill ${type === 'product' ? 'active' : ''} `}
                 onClick={() => setType('product')}>Sản phẩm</button>
-              <button className={`toggle-pill ${type === 'model' ? 'active' : ''}`}
+              <button className={`toggle - pill ${type === 'model' ? 'active' : ''} `}
                 onClick={() => setType('model')}>Người mẫu</button>
             </div>
           </>
@@ -215,6 +218,11 @@ export default function LibraryPage() {
   const [searchQ, setSearchQ] = useState('')
   const [preview, setPreview] = useState(null)
   const [showUpload, setShowUpload] = useState(false)
+
+  // Main tab: 'images' | 'poses' | 'prompts'
+  const [mainTab, setMainTab] = useState('images')
+  const [poseCatFilter, setPoseCatFilter] = useState('all')
+  const [copiedId, setCopiedId] = useState(null)
 
   useEffect(() => {
     migrateOldLibrary()
@@ -255,123 +263,203 @@ export default function LibraryPage() {
         <div className="lib-stats">
           <span className="lib-stat">{stats.total} ảnh</span>
           <span className="lib-stat">•</span>
-          <span className="lib-stat">{stats.products} sản phẩm</span>
+          <span className="lib-stat">{POSE_LIBRARY.length} tư thế</span>
           <span className="lib-stat">•</span>
-          <span className="lib-stat">{stats.models} mẫu</span>
+          <span className="lib-stat">{PROMPT_TEMPLATES.length} prompt</span>
         </div>
-        <button className="btn btn-primary" style={{ marginLeft: 'auto' }}
-          onClick={() => setShowUpload(true)}>
-          <Upload size={15} />
-          Tải lên & Nhập kho
-        </button>
+        {mainTab === 'images' && (
+          <button className="btn btn-primary" style={{ marginLeft: 'auto' }}
+            onClick={() => setShowUpload(true)}>
+            <Upload size={15} />
+            Tải lên & Nhập kho
+          </button>
+        )}
       </div>
 
-      {/* Toolbar */}
-      <div className="lib-toolbar">
-        <div className="lib-search">
-          <Search size={15} className="lib-search-icon" />
-          <input type="text" placeholder="Tìm kiếm..." value={searchQ}
-            onChange={e => setSearchQ(e.target.value)} className="lib-search-input" />
-        </div>
-        <div className="lib-view-toggle">
-          <button className={`lib-view-btn ${view === 'grid' ? 'active' : ''}`}
-            onClick={() => setView('grid')}><Grid size={16} /></button>
-          <button className={`lib-view-btn ${view === 'list' ? 'active' : ''}`}
-            onClick={() => setView('list')}><List size={16} /></button>
-        </div>
-      </div>
-
-      {/* Category Tabs */}
-      <div className="lib-tabs">
-        {CATEGORIES.map(cat => (
-          <button key={cat}
-            className={`lib-tab ${selectedCat === cat ? 'active' : ''}`}
-            onClick={() => setSelectedCat(cat)}>
-            {cat}
+      {/* Main Tabs: Ảnh | Kho Pose | Kho Prompt */}
+      <div className="lib-main-tabs">
+        {[{ id: 'images', label: '🖼️ Ảnh & Trang phục' }, { id: 'poses', label: `🤸 Kho Pose(${POSE_LIBRARY.length})` }, { id: 'prompts', label: `✨ Kho Prompt(${PROMPT_TEMPLATES.length})` }].map(t => (
+          <button key={t.id}
+            className={`lib - main - tab${mainTab === t.id ? ' active' : ''} `}
+            onClick={() => setMainTab(t.id)}>
+            {t.label}
           </button>
         ))}
       </div>
 
-      <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
-        {filtered.length} / {items.length} ảnh
-      </div>
+      {/* ════════════ TAB: IMAGES ════════════ */}
+      {mainTab === 'images' && (<>
 
-      {/* Empty State */}
-      {filtered.length === 0 ? (
-        <div className="empty-state" style={{ minHeight: 300 }}>
-          <ImageOff size={48} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 16 }}>
-            {items.length === 0 ? 'Thư viện trống' : 'Không tìm thấy ảnh'}
-          </h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 280, textAlign: 'center' }}>
-            {items.length === 0
-              ? 'Tách đồ hoặc tải ảnh lên để bắt đầu.'
-              : 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.'}
-          </p>
-          {items.length === 0 && (
-            <button className="btn btn-primary" style={{ marginTop: 16 }}
-              onClick={() => setShowUpload(true)}>
-              <Upload size={15} /> Tải ảnh lên
-            </button>
-          )}
+        {/* Toolbar */}
+        <div className="lib-toolbar">
+          <div className="lib-search">
+            <Search size={15} className="lib-search-icon" />
+            <input type="text" placeholder="Tìm kiếm..." value={searchQ}
+              onChange={e => setSearchQ(e.target.value)} className="lib-search-input" />
+          </div>
+          <div className="lib-view-toggle">
+            <button className={`lib - view - btn ${view === 'grid' ? 'active' : ''} `}
+              onClick={() => setView('grid')}><Grid size={16} /></button>
+            <button className={`lib - view - btn ${view === 'list' ? 'active' : ''} `}
+              onClick={() => setView('list')}><List size={16} /></button>
+          </div>
         </div>
-      ) : view === 'grid' ? (
-        <div className="lib-grid">
-          {filtered.map(item => (
-            <div key={item.id} className="lib-card">
-              <div className="lib-card-img-wrap">
-                <img src={item.imageSrc} alt={item.name} className="lib-card-img" loading="lazy" />
-                <div className="lib-card-overlay">
-                  <button className="lib-card-action" onClick={() => setPreview(item)} title="Xem">
-                    <Eye size={14} />
-                  </button>
-                  <button className="lib-card-action" onClick={() => handleDownload(item)} title="Tải xuống">
-                    <Download size={14} />
-                  </button>
-                  <button className="lib-card-action danger" onClick={(e) => handleDelete(e, item.id)} title="Xóa">
-                    <Trash2 size={14} />
+
+        {/* Category Tabs */}
+        <div className="lib-tabs">
+          {CATEGORIES.map(cat => (
+            <button key={cat}
+              className={`lib - tab ${selectedCat === cat ? 'active' : ''} `}
+              onClick={() => setSelectedCat(cat)}>
+              {cat}
+            </button>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 16 }}>
+          {filtered.length} / {items.length} ảnh
+        </div>
+
+        {/* Empty State */}
+        {filtered.length === 0 ? (
+          <div className="empty-state" style={{ minHeight: 300 }}>
+            <ImageOff size={48} style={{ color: 'var(--text-muted)', opacity: 0.3 }} />
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 16 }}>
+              {items.length === 0 ? 'Thư viện trống' : 'Không tìm thấy ảnh'}
+            </h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 280, textAlign: 'center' }}>
+              {items.length === 0
+                ? 'Tách đồ hoặc tải ảnh lên để bắt đầu.'
+                : 'Thử thay đổi bộ lọc hoặc từ khóa tìm kiếm.'}
+            </p>
+            {items.length === 0 && (
+              <button className="btn btn-primary" style={{ marginTop: 16 }}
+                onClick={() => setShowUpload(true)}>
+                <Upload size={15} /> Tải ảnh lên
+              </button>
+            )}
+          </div>
+        ) : view === 'grid' ? (
+          <div className="lib-grid">
+            {filtered.map(item => (
+              <div key={item.id} className="lib-card">
+                <div className="lib-card-img-wrap">
+                  <img src={item.imageSrc} alt={item.name} className="lib-card-img" loading="lazy" />
+                  <div className="lib-card-overlay">
+                    <button className="lib-card-action" onClick={() => setPreview(item)} title="Xem">
+                      <Eye size={14} />
+                    </button>
+                    <button className="lib-card-action" onClick={() => handleDownload(item)} title="Tải xuống">
+                      <Download size={14} />
+                    </button>
+                    <button className="lib-card-action danger" onClick={(e) => handleDelete(e, item.id)} title="Xóa">
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                  {item.type === 'model' && <span className="lib-card-badge model">Mẫu</span>}
+                </div>
+                <div className="lib-card-footer">
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="lib-card-name">{item.name}</div>
+                    <div className="lib-card-meta">
+                      {mapCategory(item.category)} • {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                    </div>
+                  </div>
+                  <button onClick={(e) => handleToggleLike(e, item.id)} className="lib-like-btn"
+                    style={{ color: item.liked ? '#ef4444' : 'var(--text-muted)' }}>
+                    <Heart size={15} fill={item.liked ? 'currentColor' : 'none'} />
                   </button>
                 </div>
-                {item.type === 'model' && <span className="lib-card-badge model">Mẫu</span>}
               </div>
-              <div className="lib-card-footer">
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div className="lib-card-name">{item.name}</div>
-                  <div className="lib-card-meta">
+            ))}
+          </div>
+        ) : (
+          <div className="lib-list">
+            {filtered.map(item => (
+              <div key={item.id} className="lib-list-row">
+                <img src={item.imageSrc} alt={item.name} className="lib-list-thumb" loading="lazy" />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
                     {mapCategory(item.category)} • {new Date(item.createdAt).toLocaleDateString('vi-VN')}
                   </div>
                 </div>
-                <button onClick={(e) => handleToggleLike(e, item.id)} className="lib-like-btn"
-                  style={{ color: item.liked ? '#ef4444' : 'var(--text-muted)' }}>
-                  <Heart size={15} fill={item.liked ? 'currentColor' : 'none'} />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="lib-list">
-          {filtered.map(item => (
-            <div key={item.id} className="lib-list-row">
-              <img src={item.imageSrc} alt={item.name} className="lib-list-thumb" loading="lazy" />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>{item.name}</div>
-                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
-                  {mapCategory(item.category)} • {new Date(item.createdAt).toLocaleDateString('vi-VN')}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button className="icon-btn" onClick={() => setPreview(item)}><Eye size={14} /></button>
+                  <button className="icon-btn" onClick={() => handleDownload(item)}><Download size={14} /></button>
+                  <button className="icon-btn" onClick={(e) => handleToggleLike(e, item.id)}
+                    style={{ color: item.liked ? '#ef4444' : undefined }}>
+                    <Heart size={14} fill={item.liked ? 'currentColor' : 'none'} />
+                  </button>
+                  <button className="icon-btn" onClick={(e) => handleDelete(e, item.id)}
+                    style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
                 </div>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                <button className="icon-btn" onClick={() => setPreview(item)}><Eye size={14} /></button>
-                <button className="icon-btn" onClick={() => handleDownload(item)}><Download size={14} /></button>
-                <button className="icon-btn" onClick={(e) => handleToggleLike(e, item.id)}
-                  style={{ color: item.liked ? '#ef4444' : undefined }}>
-                  <Heart size={14} fill={item.liked ? 'currentColor' : 'none'} />
-                </button>
-                <button className="icon-btn" onClick={(e) => handleDelete(e, item.id)}
-                  style={{ color: '#ef4444' }}><Trash2 size={14} /></button>
+            ))}
+          </div>
+        )}
+      </>)}
+
+      {/* ════════════ TAB: POSES ════════════ */}
+      {mainTab === 'poses' && (
+        <div className="lib-pose-section">
+          <div className="pose-categories" style={{ marginBottom: 16 }}>
+            {POSE_CATEGORIES.map(cat => (
+              <button key={cat.id}
+                className={`pose - cat - btn${poseCatFilter === cat.id ? ' active' : ''} `}
+                onClick={() => setPoseCatFilter(cat.id)}>
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="lib-pose-grid">
+            {getPosesByCategory(poseCatFilter).map(p => (
+              <div key={p.id} className="lib-pose-card">
+                <img src={p.thumbnail} alt={p.name} className="lib-pose-img"
+                  onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+                <div className="pose-card-emoji-fallback" style={{ display: 'none', height: 140 }}>{p.emoji}</div>
+                <div className="lib-pose-info">
+                  <div className="lib-pose-name">{p.emoji} {p.name}</div>
+                  <div className="lib-pose-desc">{p.description}</div>
+                  <div className="lib-pose-meta">
+                    <span>📷 {p.cameraAngle}</span>
+                    <span>🎯 {p.bodyFocus}</span>
+                  </div>
+                  <div className="lib-pose-prompt">
+                    <code>{p.promptEN.substring(0, 120)}...</code>
+                    <button className="btn btn-ghost" style={{ fontSize: 10, padding: '2px 6px' }}
+                      onClick={() => { navigator.clipboard.writeText(p.promptEN); setCopiedId(p.id); setTimeout(() => setCopiedId(null), 2000) }}>
+                      {copiedId === p.id ? <><Check size={10} /> Đã copy</> : <><Copy size={10} /> Copy Prompt</>}
+                    </button>
+                  </div>
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ════════════ TAB: PROMPTS ════════════ */}
+      {mainTab === 'prompts' && (
+        <div className="lib-prompt-section">
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+            Kho prompt mẫu sẵn dùng — nhấn Copy để dán vào ô prompt khi thiết kế.
+          </p>
+          <div className="lib-prompt-grid">
+            {PROMPT_TEMPLATES.map(t => (
+              <div key={t.id} className="lib-prompt-card">
+                <div className="lib-prompt-name">{t.name}</div>
+                <div className="lib-prompt-desc">{t.description}</div>
+                <div className="lib-prompt-prefix">
+                  <code>{t.promptPrefix}</code>
+                </div>
+                <button className="btn btn-primary" style={{ width: '100%', marginTop: 8, fontSize: 12 }}
+                  onClick={() => { navigator.clipboard.writeText(t.promptPrefix); setCopiedId(t.id); setTimeout(() => setCopiedId(null), 2000) }}>
+                  {copiedId === t.id ? <><Check size={12} /> Đã copy!</> : <><Copy size={12} /> Copy Prompt</>}
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
