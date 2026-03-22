@@ -4272,3 +4272,131 @@ textarea {
 [data-theme="dark"] ::-webkit-scrollbar-thumb:hover {
   background: #d058f3;
 }
+
+/* --- LIGHT THEME PREMIUM UPGRADE — Depth & Elevation ------------------- */
+
+/* Deeper shadows for 3D feel */
+[data-theme="light"] body, body:not([data-theme]) {
+  background: linear-gradient(135deg, #f8f8fa 0%, #f0f0f5 50%, #f5f3f0 100%);
+}
+
+/* Glass sidebar */
+[data-theme="light"] .sidebar, body:not([data-theme]) .sidebar {
+  background: rgba(255,255,255,0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-right: 1px solid rgba(0,0,0,0.06);
+  box-shadow: 4px 0 24px rgba(0,0,0,0.04);
+}
+
+/* Elevated cards */
+[data-theme="light"] .card, body:not([data-theme]) .card,
+[data-theme="light"] .lib-card, body:not([data-theme]) .lib-card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .card:hover, body:not([data-theme]) .card:hover,
+[data-theme="light"] .lib-card:hover, body:not([data-theme]) .lib-card:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.10), 0 2px 6px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
+  border-color: rgba(243,112,33,0.15);
+}
+
+/* Section containers depth */
+[data-theme="light"] .vp-step, body:not([data-theme]) .vp-step {
+  box-shadow: 0 2px 12px rgba(0,0,0,0.05), 0 1px 3px rgba(0,0,0,0.03);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Brand gradient accents */
+[data-theme="light"] .btn-primary, body:not([data-theme]) .btn-primary {
+  box-shadow: 0 4px 14px rgba(243,112,33,0.25), 0 1px 3px rgba(243,112,33,0.15);
+}
+
+[data-theme="light"] .btn-primary:hover, body:not([data-theme]) .btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(243,112,33,0.35), 0 2px 6px rgba(243,112,33,0.20);
+  transform: translateY(-1px);
+}
+
+/* Input field depth */
+[data-theme="light"] .input-field, body:not([data-theme]) .input-field,
+[data-theme="light"] textarea, body:not([data-theme]) textarea {
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.04);
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .input-field:focus, body:not([data-theme]) .input-field:focus,
+[data-theme="light"] textarea:focus, body:not([data-theme]) textarea:focus {
+  box-shadow: inset 0 1px 3px rgba(0,0,0,0.04), 0 0 0 3px rgba(243,112,33,0.10);
+}
+
+/* Modal glass effect */
+[data-theme="light"] .modal-content, body:not([data-theme]) .modal-content {
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15), 0 4px 16px rgba(0,0,0,0.08);
+  border: 1px solid rgba(0,0,0,0.06);
+}
+
+/* Folder cards elevation */
+[data-theme="light"] .lib-folder-card, body:not([data-theme]) .lib-folder-card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .lib-folder-card:hover, body:not([data-theme]) .lib-folder-card:hover {
+  box-shadow: 0 6px 20px rgba(243,112,33,0.12), 0 2px 6px rgba(0,0,0,0.06);
+  transform: translateY(-2px);
+}
+
+/* Tabs elevation */
+[data-theme="light"] .lib-tab.active, body:not([data-theme]) .lib-tab.active {
+  box-shadow: 0 2px 8px rgba(243,112,33,0.20);
+}
+
+[data-theme="light"] .toggle-pill.active, body:not([data-theme]) .toggle-pill.active {
+  box-shadow: 0 2px 8px rgba(243,112,33,0.25);
+}
+
+/* Sidebar active link glow */
+[data-theme="light"] .sidebar-nav-link.active, body:not([data-theme]) .sidebar-nav-link.active {
+  box-shadow: inset 3px 0 0 #F37021, 0 2px 8px rgba(243,112,33,0.08);
+}
+
+/* Folder bar glass */
+[data-theme="light"] .lib-folder-bar, body:not([data-theme]) .lib-folder-bar {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+
+/* Step number badge glow */
+[data-theme="light"] .vp-step-num, body:not([data-theme]) .vp-step-num {
+  box-shadow: 0 3px 10px rgba(243,112,33,0.30);
+}
+
+/* Storyboard card depth */
+[data-theme="light"] .vp-storyboard, body:not([data-theme]) .vp-storyboard {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.06);
+  border: 1px solid rgba(0,0,0,0.05);
+}
+
+/* Breadcrumb styling */
+[data-theme="light"] .lib-breadcrumb-btn:hover, body:not([data-theme]) .lib-breadcrumb-btn:hover {
+  background: rgba(243,112,33,0.08);
+}
+
+/* Platform buttons depth */
+[data-theme="light"] .vp-platform-btn, body:not([data-theme]) .vp-platform-btn {
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  transition: all 0.2s ease;
+}
+
+[data-theme="light"] .vp-platform-btn.active, body:not([data-theme]) .vp-platform-btn.active {
+  box-shadow: 0 4px 14px rgba(243,112,33,0.15);
+}
+
+[data-theme="light"] .vp-platform-btn:hover, body:not([data-theme]) .vp-platform-btn:hover {
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  transform: translateY(-1px);
+}
