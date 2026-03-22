@@ -372,28 +372,46 @@ export function buildMasterImagePrompt({
 
   const parts = []
   parts.push(`[SYSTEM DIRECTIVES]
-Role: High-end Commercial Fashion Photographer Director.
-Objective: Generate a photorealistic, motion-ready lookbook image.
-STRICT RULES:
-- Face & hair MUST 100% match the identity description below — NO hallucinating new faces
-- Clothing MUST 100% match the product description below — NO design changes
-- Result must look like a real photograph taken by a professional camera`)
+Role: Elite Commercial Fashion Photographer & Beauty Director.
+Objective: Generate a photorealistic, stunning lookbook image of a real fashion model wearing the specified garment.
+
+ABSOLUTE RULES (VIOLATION = FAILURE):
+1. FACE IDENTITY LOCK: The model's face MUST be an EXACT match to the reference photos provided. Copy the EXACT facial structure, eyes, nose, lips, jawline, skin texture, and hair from the reference. Do NOT generate a generic AI face. Do NOT blend or average faces. The person in the output must be RECOGNIZABLE as the same person in the reference photos.
+2. GARMENT LOCK: The clothing MUST match the product photos exactly — same material, color, cut, details. No design modifications.
+3. PHOTOREALISM: The result must look like a real photograph shot on a professional camera, NOT an AI-generated image.`)
 
   if (extractedIdentity) {
-    parts.push(`\n[IDENTITY LOCK]\n${extractedIdentity}`)
+    parts.push(`\n[IDENTITY LOCK — COPY THIS FACE EXACTLY]\nThe model in this image MUST have this EXACT appearance (copied from reference photos):\n${extractedIdentity}\nIMPORTANT: Every facial feature described above must be precisely replicated. This is the SAME PERSON as in the reference photos.`)
   }
 
   if (extractedProduct) {
-    parts.push(`\n[GARMENT LOCK]\n${extractedProduct}`)
+    parts.push(`\n[GARMENT LOCK — DRESS THE MODEL IN THIS EXACT OUTFIT]\n${extractedProduct}`)
   }
+
+  parts.push(`\n[BODY ENHANCEMENT — AUTO BEAUTY HACK]
+Apply these subtle, natural-looking body enhancements:
+- LEGS: Elongate legs to create a taller, model-like proportion (leg-to-torso ratio 1.15:1), long graceful calves
+- BUST: Natural full C-cup to D-cup bust that fits proportionally with the body frame, maintain natural breast shape with gentle cleavage shadow under clothing
+- WAIST: Slim hourglass waist creating beautiful body curves
+- HIPS: Proportional rounded hips for feminine silhouette
+- OVERALL: The body should look like a professional fashion model — tall (170cm+), graceful proportions, but still natural and not exaggerated
+All enhancements must look completely natural and realistic, not plastic or artificial.`)
+
+  parts.push(`\n[SKIN PERFECTION — VIETNAMESE PORCELAIN DREAM]
+- Skin color: Luminous porcelain white-pink (trắng hồng) — like Korean glass skin with Vietnamese warmth
+- Texture: Flawless but with subtle natural micro-texture (NOT plastic/wax doll)
+- Glow: Dewy glass-like radiance, subsurface scattering visible on forehead and cheekbones
+- Makeup: Sweet Gen Z Korean-Vietnamese style — gradient lip tint (coral/rose), soft peach blush, sparkly eyeshadow, defined but natural brows
+- Expression: Sweet, charming, approachable — appealing to BOTH female AND male viewers
+- The look should make female viewers aspire to be her, and make everyone find her naturally beautiful`)
 
   parts.push(`\n[SCENE & ART DIRECTION]`)
   parts.push(`Model Casting: ${isAuto(modelType) ? VN_DNA_DEFAULTS.modelType : modelType}`)
-  parts.push(`Background: ${isAuto(background) ? 'AI choose the most suitable background for this garment style' : background}`)
-  parts.push(`Pose & Motion: ${isAuto(pose) ? 'Natural confident pose that best showcases the garment' : pose}`)
+  parts.push(`Background: ${isAuto(background) ? 'AI choose the most suitable, aesthetically beautiful background that complements this specific garment style' : background}`)
+  parts.push(`Pose & Motion: ${isAuto(pose) ? 'Natural, confident, graceful pose that best showcases the garment while looking effortlessly beautiful' : pose}`)
   parts.push(`Overall Style: ${isAuto(style) ? VN_DNA_DEFAULTS.style : style}`)
 
-  parts.push(`\n[POST-PROCESSING]`)
+  parts.push(`\n[POST-PROCESSING & COLOR]`)
   parts.push(`Skin Aesthetic: ${isAuto(skinFilter) ? VN_DNA_DEFAULTS.skinFilter : skinFilter}`)
   parts.push(`Color Grading: ${isAuto(toneFilter) ? VN_DNA_DEFAULTS.toneFilter : toneFilter}`)
   parts.push(`Lighting: ${VN_DNA_DEFAULTS.lighting}`)

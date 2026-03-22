@@ -60,16 +60,16 @@ async function entriesToFiles(entries) {
   return Promise.all(entries.map((e, i) => entryToFile(e, `img-${i}.png`)))
 }
 
-// ─── 8 Shot Variations (Bot 5 template) ───────────────────────────────────────
+// ─── 8 Shot Variations — Diverse Professional Fashion Model Poses ─────────────
 const SHOT_VARIATIONS = [
-  'Shot 1: Full-body front-facing confident stance, slight S-curve, hands naturally at sides, garment fully visible head to toe — hero lookbook opener.',
-  'Shot 2: 3/4 angle walking toward camera, left foot forward mid-stride, hair flowing, fabric in gentle motion — dynamic catwalk.',
-  'Shot 3: Waist-up close-up, hands gently touching neckline, focus on fabric texture and design details, soft bokeh background — product detail.',
-  'Shot 4: Side angle full-body, hand on hip, weight on one leg, showing garment silhouette and drape — body contour showcase.',
-  'Shot 5: Sitting elegantly on chair or cafe setting, legs crossed, relaxed lifestyle pose — lifestyle context.',
-  'Shot 6: Gentle spin/twirl captured mid-motion, dress hem and hair flowing, joyful expression — motion energy.',
-  'Shot 7: Close-up face and upper body, genuine smile, hand touching earring or hair, eye contact with camera — emotional connection.',
-  'Shot 8: Editorial over-shoulder look-back, dramatic rim lighting, wind effect on hair and dress, cinematic wide composition — magazine-cover finale.',
+  'Shot 1 (Front Hero): Full-body front-facing, confident natural stance with slight S-curve hip shift, one hand lightly touching thigh, sweet genuine smile, camera at eye level — classic lookbook opener showing full garment.',
+  'Shot 2 (Dynamic Walk): 3/4 angle mid-stride catwalk toward camera, hair flowing with movement, fabric swaying naturally, playful confident expression, slight head tilt — energy and motion.',
+  'Shot 3 (Side Profile): Full-body pure side angle, elegant posture, chin slightly lifted, one foot forward creating long leg line, hands relaxed at sides — showcase silhouette and garment drape.',
+  'Shot 4 (Back View Turn): Model from behind, head turned 3/4 looking back over shoulder with a sweet coy smile, showing garment back design, hair cascading, camera slightly below — mysterious allure.',
+  'Shot 5 (Sitting Elegant): Sitting gracefully on stylish chair or step, legs crossed elegantly, one hand on knee, leaning slightly forward with warm inviting expression — approachable lifestyle.',
+  'Shot 6 (Playful Jump): Captured mid-air in a joyful light jump or hop, arms slightly out, hair bouncing up, dress/skirt floating, genuine laughing expression — youthful fun energy.',
+  'Shot 7 (Detail Close-up): Upper body close-up from chest to face, hands gently touching collar or earring, focus on fabric texture and skin glow, shallow depth of field bokeh — intimate product detail and beauty.',
+  'Shot 8 (Editorial Finale): Artistic wide-angle composition, gentle wind blowing hair and fabric, golden-hour rim lighting, model in a graceful flowing pose with arms slightly extended — magazine-cover cinematic finale.',
 ]
 
 // ─── Dropdown Component ───────────────────────────────────────────────────────
@@ -567,10 +567,10 @@ export default function NewDesignPage() {
           <div className="design-step" style={{ height: '100%' }}>
             <div className="design-step-header">
               <div className="design-step-number">4</div>
-              <div className="design-step-title">Kết quả ({results.filter(Boolean).length}/4)</div>
+              <div className="design-step-title">Kết quả ({results.filter(Boolean).length}/8)</div>
             </div>
             <div className="nd-results-grid">
-              {[0, 1, 2, 3].map(idx => (
+              {[0, 1, 2, 3, 4, 5, 6, 7].map(idx => (
                 <ResultCard key={idx} idx={idx}
                   imageSrc={results[idx]}
                   isLoading={loadingIdx.has(idx)}
