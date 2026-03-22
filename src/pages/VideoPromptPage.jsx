@@ -237,16 +237,31 @@ ${imageDescriptions.join('\n\n')}`
                     )}
                 </div>
                 <div className="vp-step-body">
-                    {/* Drop zone */}
+                    {/* Drop zone: PC upload */}
                     <div className="vp-dropzone"
                         onDrop={handleDrop} onDragOver={e => e.preventDefault()}
                         onClick={() => fileInputRef.current?.click()}>
                         <input ref={fileInputRef} type="file" multiple accept="image/*"
                             style={{ display: 'none' }} onChange={e => handleFiles(e.target.files)} />
                         <Upload size={28} strokeWidth={1.5} />
-                        <div>Kéo thả hoặc nhấn để upload ảnh</div>
+                        <div>Kéo thả hoặc nhấn để tải ảnh từ máy tính</div>
                         <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>Tối đa 9 ảnh — mỗi ảnh = 1 phân cảnh video</div>
                     </div>
+
+                    {/* Lấy từ Thư viện */}
+                    <button
+                        className="btn btn-ghost"
+                        onClick={(e) => { e.stopPropagation(); setShowLibPicker(true) }}
+                        style={{
+                            width: '100%', marginTop: 8, padding: '10px 0',
+                            fontSize: 13, fontWeight: 600,
+                            border: '2px dashed var(--brand)',
+                            color: 'var(--brand)', borderRadius: 'var(--r-md)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                            cursor: 'pointer',
+                        }}>
+                        <BookOpen size={16} /> 📚 Lấy ảnh từ Thư viện
+                    </button>
 
                     {/* Scene thumbnails */}
                     {scenes.length > 0 && (
