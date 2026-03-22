@@ -2383,3 +2383,36 @@ textarea {
   opacity: 0.4;
   cursor: default;
 }
+
+/* Preview button on result images */
+.nd-result-img-wrap {
+  position: relative;
+}
+
+.nd-preview-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s, background 0.2s;
+  z-index: 2;
+}
+
+.nd-result-img-wrap:hover .nd-preview-btn {
+  opacity: 1;
+}
+
+.nd-preview-btn:hover {
+  background: var(--brand);
+}

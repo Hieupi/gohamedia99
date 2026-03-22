@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import {
   Upload, Sparkles, RotateCcw, Download, Save, Trash2, ChevronDown, X,
-  Send, Plus, Image as ImageIcon, Settings2, Loader, FolderOpen, Check
+  Send, Plus, Image as ImageIcon, Settings2, Loader, FolderOpen, Check, Eye
 } from 'lucide-react'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt } from '../services/masterPrompts'
@@ -119,32 +119,32 @@ function PillSelect({ options, value, onChange }) {
 function LibraryPickerModal({ onSelect, onClose, title }) {
   const items = getLibraryItems()
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>
-          <FolderOpen size={16} style={{ verticalAlign: -2 }} /> {title || 'Chọn từ Kho Thư Viện'}
+    <div className="modal-overlay" onClick={onClose} style={{ alignItems: 'flex-start', paddingTop: 30 }}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', width: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
+        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, flexShrink: 0 }}>
+          <FolderOpen size={18} style={{ verticalAlign: -3 }} /> {title || 'Chọn từ Kho Thư Viện'}
         </h3>
         {items.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--text-muted)', fontSize: 13 }}>
+          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 14 }}>
             Kho thư viện trống. Hãy tải ảnh lên hoặc tách đồ trước.
           </div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(90px, 1fr))', gap: 10, maxHeight: 400, overflowY: 'auto', padding: '4px 0' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, overflowY: 'auto', flex: 1, padding: '4px 0' }}>
             {items.map(item => (
               <div key={item.id} onClick={() => onSelect(item)}
-                style={{ cursor: 'pointer', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '2px solid var(--border)', transition: 'border-color 0.15s' }}
-                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--brand)'}
-                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                style={{ cursor: 'pointer', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '2px solid var(--border)', transition: 'all 0.15s' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.transform = 'scale(1.03)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'scale(1)' }}>
                 <img src={item.imageSrc} alt={item.name}
                   style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }} />
-                <div style={{ padding: '4px 6px', fontSize: 10, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {item.name}
                 </div>
               </div>
             ))}
           </div>
         )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, flexShrink: 0 }}>
           <button className="btn btn-ghost" onClick={onClose}>Đóng</button>
         </div>
       </div>
@@ -173,9 +173,8 @@ function ImageSlot({ src, onRemove, onPickLibrary }) {
 
 // ─── Result Card ──────────────────────────────────────────────────────────────
 
-function ResultCard({ idx, imageSrc, isLoading, error, onSave, onDownload, onDelete, onEdit, allImages }) {
+function ResultCard({ idx, imageSrc, isLoading, error, onSave, onDownload, onDelete, onEdit, onPreview }) {
   const [chatMsg, setChatMsg] = useState('')
-  const [editing, setEditing] = useState(false)
   const refUpload = useRef()
 
   const handleQuickEdit = (label) => {
@@ -195,7 +194,12 @@ function ResultCard({ idx, imageSrc, isLoading, error, onSave, onDownload, onDel
             <span style={{ color: '#ef4444', fontSize: 12, textAlign: 'center' }}>❌ {error}</span>
           </div>
         ) : imageSrc ? (
-          <img src={imageSrc} alt={`Kết quả ${idx + 1}`} className="nd-result-img" />
+          <>
+            <img src={imageSrc} alt={`Kết quả ${idx + 1}`} className="nd-result-img" />
+            <button className="nd-preview-btn" onClick={onPreview} title="Xem phóng to">
+              <Eye size={16} />
+            </button>
+          </>
         ) : (
           <div className="nd-result-loading">
             <ImageIcon size={28} style={{ opacity: 0.2 }} />
@@ -207,6 +211,7 @@ function ResultCard({ idx, imageSrc, isLoading, error, onSave, onDownload, onDel
       {/* Actions */}
       {imageSrc && (
         <div className="nd-result-actions">
+          <button className="icon-btn" onClick={onPreview} title="Xem phóng to"><Eye size={14} /></button>
           <button className="icon-btn" onClick={onSave} title="Lưu kho"><Save size={14} /></button>
           <button className="icon-btn" onClick={onDownload} title="Tải xuống"><Download size={14} /></button>
           <button className="icon-btn" onClick={onDelete} title="Xóa"
@@ -233,6 +238,29 @@ function ResultCard({ idx, imageSrc, isLoading, error, onSave, onDownload, onDel
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Image Preview Modal (Fullscreen) ──────────────────────────────────────────
+
+function ImagePreviewModal({ imageSrc, onClose }) {
+  if (!imageSrc) return null
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999,
+      background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+      cursor: 'zoom-out'
+    }} onClick={onClose}>
+      <button onClick={onClose} style={{
+        position: 'absolute', top: 18, right: 24, background: 'rgba(255,255,255,0.15)',
+        border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
+      }}><X size={22} /></button>
+      <img src={imageSrc} alt="Preview" onClick={e => e.stopPropagation()} style={{
+        maxWidth: '92vw', maxHeight: '92vh', objectFit: 'contain',
+        borderRadius: 12, boxShadow: '0 8px 60px rgba(0,0,0,0.6)', cursor: 'default'
+      }} />
     </div>
   )
 }
@@ -305,6 +333,7 @@ export default function NewDesignPage() {
 
   // Modals
   const [saveModal, setSaveModal] = useState(null)
+  const [previewImg, setPreviewImg] = useState(null)
   const [libraryPicker, setLibraryPicker] = useState(null) // 'ref' | 'product' | null
 
   // ─── File handlers ────────────────────────────────────────────────────────
@@ -575,6 +604,7 @@ export default function NewDesignPage() {
                   imageSrc={results[idx]}
                   isLoading={loadingIdx.has(idx)}
                   error={errors[idx]}
+                  onPreview={() => setPreviewImg(results[idx])}
                   onSave={() => setSaveModal(results[idx])}
                   onDownload={() => downloadImage(results[idx], `${projectName || 'design'}-${idx + 1}`)}
                   onDelete={() => setResults(prev => { const n = [...prev]; n[idx] = null; return n })}
@@ -599,6 +629,11 @@ export default function NewDesignPage() {
           onClose={() => setLibraryPicker(null)}
           onSelect={handleLibraryPick}
         />
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImg && (
+        <ImagePreviewModal imageSrc={previewImg} onClose={() => setPreviewImg(null)} />
       )}
     </div>
   )

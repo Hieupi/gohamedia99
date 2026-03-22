@@ -419,7 +419,7 @@ Apply these body enhancements that adapt naturally to the clothing:
   parts.push(`Skin Aesthetic: ${isAuto(skinFilter) ? VN_DNA_DEFAULTS.skinFilter : skinFilter}`)
   parts.push(`Color Grading: ${isAuto(toneFilter) ? VN_DNA_DEFAULTS.toneFilter : toneFilter}`)
   parts.push(`Lighting: ${VN_DNA_DEFAULTS.lighting}`)
-  parts.push(`Camera: Shot on Sony Alpha A7IV, 85mm f/1.8 portrait lens, shallow DOF, ${quality} resolution, ISO 100`)
+  parts.push(`Camera: Shot on Sony Alpha A7IV, 85mm f/1.4 portrait lens, CRITICAL: razor-sharp focus on model's FACE and GARMENT details, heavy creamy bokeh on background (f/1.4 shallow DOF), ${quality} resolution, ISO 100`)
   parts.push(`Aspect Ratio: ${aspect}`)
 
   if (userPrompt) {
