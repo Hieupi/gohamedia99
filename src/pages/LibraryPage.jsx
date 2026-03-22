@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import {
-  Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff, Upload, Loader, Copy, Check
+  Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff, Upload, Loader, Copy, Check, FolderPlus, Film
 } from 'lucide-react'
 import {
   getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
   downloadImage, saveToLibrary, createLibraryRecord, migrateOldLibrary,
   getFolders, createFolder, deleteFolder
 } from '../services/libraryService'
+import { getOriginalImage, saveToFilesystem } from '../services/imageStorageService'
 import { callGemini } from '../services/geminiService'
 import {
   POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES, getCustomPoses, deleteCustomPose
@@ -53,16 +54,28 @@ Chỉ trả về đúng 1 đối tượng nổi bật nhất.Chỉ JSON, không 
 // ─── Preview Modal ────────────────────────────────────────────────────────────
 
 function PreviewModal({ item, onClose }) {
+  const [hdSrc, setHdSrc] = useState(null)
+  useEffect(() => {
+    if (!item) return
+    getOriginalImage(item.id).then(src => setHdSrc(src || item.imageSrc))
+  }, [item])
   if (!item) return null
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <button className="preview-close" onClick={onClose}><X size={18} /></button>
-        <img src={item.imageSrc} alt={item.name} className="preview-img" />
+        <img src={hdSrc || item.imageSrc} alt={item.name} className="preview-img" />
         <div className="preview-info">
           <h3>{item.name}</h3>
           <span className="preview-badge">{item.type === 'model' ? 'Người mẫu' : 'Sản phẩm'}</span>
           <span className="preview-date">{new Date(item.createdAt).toLocaleDateString('vi-VN')}</span>
+          {hdSrc && hdSrc !== item.imageSrc && <span className="preview-badge" style={{ background: '#10b981' }}>HD</span>}
+        </div>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button className="btn btn-primary" style={{ flex: 1, fontSize: 12 }}
+            onClick={() => downloadImage(hdSrc || item.imageSrc, item.name)}>
+            <Download size={12} /> Tải xuống HD
+          </button>
         </div>
       </div>
     </div>
@@ -312,11 +325,17 @@ export default function LibraryPage() {
         )}
       </div>
 
-      {/* Main Tabs: Ảnh | Kho Pose | Kho Prompt */}
+      {/* Main Tabs */}
       <div className="lib-main-tabs">
-        {[{ id: 'images', label: '🖼️ Ảnh & Trang phục' }, { id: 'poses', label: `🤸 Kho Pose(${POSE_LIBRARY.length})` }, { id: 'prompts', label: `✨ Kho Prompt(${PROMPT_TEMPLATES.length})` }].map(t => (
+        {[
+          { id: 'images', label: '🖼️ Ảnh & Trang phục' },
+          { id: 'finished', label: '🏆 Ảnh Thành Phẩm' },
+          { id: 'videos', label: '🎬 Video Thành Phẩm' },
+          { id: 'poses', label: `🤸 Kho Pose(${POSE_LIBRARY.length})` },
+          { id: 'prompts', label: `✨ Prompt(${PROMPT_TEMPLATES.length})` },
+        ].map(t => (
           <button key={t.id}
-            className={`lib - main - tab${mainTab === t.id ? ' active' : ''} `}
+            className={`lib-main-tab${mainTab === t.id ? ' active' : ''}`}
             onClick={() => setMainTab(t.id)}>
             {t.label}
           </button>
@@ -334,9 +353,9 @@ export default function LibraryPage() {
               onChange={e => setSearchQ(e.target.value)} className="lib-search-input" />
           </div>
           <div className="lib-view-toggle">
-            <button className={`lib - view - btn ${view === 'grid' ? 'active' : ''} `}
+            <button className={`lib-view-btn ${view === 'grid' ? 'active' : ''} `}
               onClick={() => setView('grid')}><Grid size={16} /></button>
-            <button className={`lib - view - btn ${view === 'list' ? 'active' : ''} `}
+            <button className={`lib-view-btn ${view === 'list' ? 'active' : ''} `}
               onClick={() => setView('list')}><List size={16} /></button>
           </div>
         </div>
@@ -345,7 +364,7 @@ export default function LibraryPage() {
         <div className="lib-tabs">
           {CATEGORIES.map(cat => (
             <button key={cat}
-              className={`lib - tab ${selectedCat === cat ? 'active' : ''} `}
+              className={`lib-tab ${selectedCat === cat ? 'active' : ''} `}
               onClick={() => setSelectedCat(cat)}>
               {cat}
             </button>
@@ -545,6 +564,78 @@ export default function LibraryPage() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {/* ══════════ TAB: ẢNH THÀNH PHẨM ══════════ */}
+      {mainTab === 'finished' && (
+        <div>
+          <div className="lib-folder-bar">
+            <div className="lib-folder-list">
+              <button className={`lib-folder-btn${activeFolder === 'all' ? ' active' : ''}`}
+                onClick={() => setActiveFolder('all')}>📋 Tất cả</button>
+              {folders.map(f => (
+                <button key={f.id} className={`lib-folder-btn${activeFolder === f.id ? ' active' : ''}`}
+                  onClick={() => setActiveFolder(f.id)}>
+                  📁 {f.name}
+                  <span className="lib-folder-count">{items.filter(i => i.folderId === f.id && (i.category === 'design' || i.type === 'product')).length}</span>
+                </button>
+              ))}
+            </div>
+            {showNewFolder ? (
+              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                <input type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
+                  placeholder="Tên thư mục..." className="input-field" style={{ flex: 1, fontSize: 12, height: 32 }}
+                  onKeyDown={e => e.key === 'Enter' && handleCreateFolder()} autoFocus />
+                <button className="btn btn-primary" onClick={handleCreateFolder} style={{ fontSize: 11, height: 32 }}>Tạo</button>
+                <button className="btn btn-ghost" onClick={() => setShowNewFolder(false)} style={{ fontSize: 11, height: 32 }}>Hủy</button>
+              </div>
+            ) : (
+              <button className="lib-folder-add" onClick={() => setShowNewFolder(true)}>+ Thư mục mới</button>
+            )}
+          </div>
+          {(() => {
+            const finishedItems = items.filter(i => {
+              if (activeFolder !== 'all' && i.folderId !== activeFolder) return false
+              return i.category === 'design' || i.type === 'product'
+            })
+            return finishedItems.length === 0 ? (
+              <div className="empty-state" style={{ minHeight: 200 }}>
+                <ImageOff size={40} style={{ opacity: 0.2 }} />
+                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chưa có ảnh thành phẩm. Tạo ảnh ở Thiết kế mới và lưu vào kho.</p>
+              </div>
+            ) : (
+              <div className="lib-grid">
+                {finishedItems.map(item => (
+                  <div key={item.id} className="lib-card">
+                    <div className="lib-card-img">
+                      <img src={item.imageSrc} alt={item.name} />
+                      <div className="lib-card-overlay">
+                        <button className="lib-card-action" onClick={() => setPreview(item)}><Eye size={14} /></button>
+                        <button className="lib-card-action" onClick={() => handleDownload(item)}><Download size={14} /></button>
+                        <button className="lib-card-action" style={{ color: '#ef4444' }} onClick={e => handleDelete(e, item.id)}><Trash2 size={14} /></button>
+                      </div>
+                    </div>
+                    <div className="lib-card-info">
+                      <div className="lib-card-name">{item.name}</div>
+                      {item.folderId && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>📁 {folders.find(f => f.id === item.folderId)?.name}</span>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {/* ══════════ TAB: VIDEO THÀNH PHẨM ══════════ */}
+      {mainTab === 'videos' && (
+        <div className="empty-state" style={{ minHeight: 300 }}>
+          <Film size={48} style={{ opacity: 0.2 }} />
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 16 }}>Video Thành Phẩm</h3>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 300, textAlign: 'center' }}>
+            Sắp ra mắt! Video được tạo từ tab 🎬 Video Prompt sẽ xuất hiện ở đây.
+          </p>
         </div>
       )}
 

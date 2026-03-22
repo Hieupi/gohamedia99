@@ -1,21 +1,19 @@
 /**
  * libraryService.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Quản lý kho ảnh — lưu/đọc/xóa từ localStorage + tải file xuống local.
- * FIX: Tự động resize ảnh trước khi lưu để tránh tràn localStorage (5MB limit)
+ * Quản lý kho ảnh — thumbnail lưu localStorage, ảnh gốc lưu IndexedDB.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
+import { saveOriginalImage, deleteOriginalImage } from './imageStorageService'
+
 const STORAGE_KEY = 'goha_studio_library'
 
-// ─── Resize Helper (tránh tràn localStorage) ──────────────────────────────────
+// ─── Resize Helper ────────────────────────────────────────────────────────────
 
 export function resizeForStorage(dataUrl, maxSize = 400) {
     return new Promise((resolve) => {
-        if (!dataUrl || !dataUrl.startsWith('data:')) {
-            resolve(dataUrl)
-            return
-        }
+        if (!dataUrl || !dataUrl.startsWith('data:')) { resolve(dataUrl); return }
         const img = new Image()
         img.onload = () => {
             try {
@@ -28,9 +26,7 @@ export function resizeForStorage(dataUrl, maxSize = 400) {
                 canvas.width = w; canvas.height = h
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h)
                 resolve(canvas.toDataURL('image/jpeg', 0.65))
-            } catch {
-                resolve(dataUrl)
-            }
+            } catch { resolve(dataUrl) }
         }
         img.onerror = () => resolve(dataUrl)
         img.src = dataUrl
@@ -40,11 +36,8 @@ export function resizeForStorage(dataUrl, maxSize = 400) {
 // ─── Read ─────────────────────────────────────────────────────────────────────
 
 export function getLibraryItems() {
-    try {
-        return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')
-    } catch {
-        return []
-    }
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]') }
+    catch { return [] }
 }
 
 // ─── Smart Unique Name Generator ──────────────────────────────────────────────
@@ -55,16 +48,10 @@ const CATEGORY_PREFIXES = {
     background: 'NỀN', other: 'SP', design: 'DESIGN', pose: 'POSE',
 }
 
-/**
- * Tạo tên unique: PREFIX-MôTả-HHmm-xx
- * VD: ÁO-Sơmi-1523-a7, ĐẦM-Dạhội-1524-k3, DESIGN-Lookbook-1525-m9
- */
 export function generateUniqueName({ category, description, prefix } = {}) {
     const existing = getLibraryItems()
     const p = prefix || CATEGORY_PREFIXES[category] || 'SP'
-    let desc = (description || '')
-        .replace(/^(Áo|Quần|Đầm|Giày|Túi|Mũ|Váy)\s*/i, '')
-        .trim()
+    let desc = (description || '').replace(/^(Áo|Quần|Đầm|Giày|Túi|Mũ|Váy)\s*/i, '').trim()
     if (desc.length > 20) desc = desc.slice(0, 20).trim()
     if (!desc) desc = p === 'DESIGN' ? 'Mới' : 'Item'
     const now = new Date()
@@ -79,12 +66,14 @@ export function generateUniqueName({ category, description, prefix } = {}) {
     return candidate
 }
 
-// ─── Write (có resize + try/catch) ────────────────────────────────────────────
+// ─── Write (IndexedDB cho ảnh gốc + localStorage cho thumbnail) ───────────────
 
 export async function saveToLibrary(record) {
     try {
-        // Resize ảnh trước khi lưu (400px max → ~20-40KB thay vì 2-5MB)
+        // 1) Lưu ảnh GỐC vào IndexedDB (full quality cho preview)
         if (record.imageSrc && record.imageSrc.startsWith('data:')) {
+            await saveOriginalImage(record.id, record.imageSrc)
+            // 2) Resize xuống thumbnail cho localStorage
             record.imageSrc = await resizeForStorage(record.imageSrc, 400)
         }
 
@@ -100,7 +89,6 @@ export async function saveToLibrary(record) {
         return { success: true, items }
     } catch (err) {
         console.error('saveToLibrary error:', err)
-        // Nếu vẫn tràn, thử resize nhỏ hơn nữa
         if (err.name === 'QuotaExceededError' || err.code === 22) {
             try {
                 record.imageSrc = await resizeForStorage(record.imageSrc, 200)
@@ -121,6 +109,7 @@ export async function saveToLibrary(record) {
 export function deleteFromLibrary(id) {
     const items = getLibraryItems().filter(i => i.id !== id)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    deleteOriginalImage(id) // Xóa ảnh gốc khỏi IndexedDB
     return items
 }
 
@@ -134,7 +123,7 @@ export function toggleLikeInLibrary(id) {
     return items
 }
 
-// ─── Build record from garment extraction ─────────────────────────────────────
+// ─── Build record ─────────────────────────────────────────────────────────────
 
 export function createLibraryRecord({ name, type, category, imageSrc }) {
     return {
@@ -148,7 +137,7 @@ export function createLibraryRecord({ name, type, category, imageSrc }) {
     }
 }
 
-// ─── Download ảnh ra file ─────────────────────────────────────────────────────
+// ─── Download ─────────────────────────────────────────────────────────────────
 
 export function downloadImage(dataUrl, fileName) {
     const a = document.createElement('a')
@@ -159,20 +148,14 @@ export function downloadImage(dataUrl, fileName) {
     document.body.removeChild(a)
 }
 
-// ─── Storage usage info ───────────────────────────────────────────────────────
+// ─── Storage usage ────────────────────────────────────────────────────────────
 
 export function getStorageUsage() {
     let total = 0
     for (let key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) {
-            total += localStorage[key].length * 2
-        }
+        if (localStorage.hasOwnProperty(key)) total += localStorage[key].length * 2
     }
-    return {
-        usedMB: (total / 1024 / 1024).toFixed(2),
-        maxMB: 5,
-        percent: Math.round((total / (5 * 1024 * 1024)) * 100)
-    }
+    return { usedMB: (total / 1024 / 1024).toFixed(2), maxMB: 5, percent: Math.round((total / (5 * 1024 * 1024)) * 100) }
 }
 
 // ─── Project Folders ──────────────────────────────────────────────────────────
@@ -210,7 +193,7 @@ export function getItemsByFolder(folderId) {
     return getLibraryItems().filter(i => i.folderId === folderId)
 }
 
-// ─── Migrate from old key ─────────────────────────────────────────────────────
+// ─── Migrate ──────────────────────────────────────────────────────────────────
 
 export function migrateOldLibrary() {
     const oldKey = 'fashionStudio_library'
