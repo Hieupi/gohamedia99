@@ -60,12 +60,16 @@ async function entriesToFiles(entries) {
   return Promise.all(entries.map((e, i) => entryToFile(e, `img-${i}.png`)))
 }
 
-// ─── 4 Shot Variations (Bot 5 template) ───────────────────────────────────────
+// ─── 8 Shot Variations (Bot 5 template) ───────────────────────────────────────
 const SHOT_VARIATIONS = [
-  'Full-body front-facing confident stance, slight S-curve, hands naturally at sides, garment fully visible head to toe — hero lookbook shot.',
-  '3/4 angle walking toward camera, left foot forward mid-stride, hair flowing, fabric in gentle motion — dynamic transition angle.',
-  'Waist-up close-up, hands gently touching neckline, focus on fabric texture and design details, soft bokeh background — product detail showcase.',
-  'Editorial over-shoulder look-back, dramatic rim lighting, wind effect on hair and dress, cinematic wide composition — magazine-cover finale.',
+  'Shot 1: Full-body front-facing confident stance, slight S-curve, hands naturally at sides, garment fully visible head to toe — hero lookbook opener.',
+  'Shot 2: 3/4 angle walking toward camera, left foot forward mid-stride, hair flowing, fabric in gentle motion — dynamic catwalk.',
+  'Shot 3: Waist-up close-up, hands gently touching neckline, focus on fabric texture and design details, soft bokeh background — product detail.',
+  'Shot 4: Side angle full-body, hand on hip, weight on one leg, showing garment silhouette and drape — body contour showcase.',
+  'Shot 5: Sitting elegantly on chair or cafe setting, legs crossed, relaxed lifestyle pose — lifestyle context.',
+  'Shot 6: Gentle spin/twirl captured mid-motion, dress hem and hair flowing, joyful expression — motion energy.',
+  'Shot 7: Close-up face and upper body, genuine smile, hand touching earring or hair, eye contact with camera — emotional connection.',
+  'Shot 8: Editorial over-shoulder look-back, dramatic rim lighting, wind effect on hair and dress, cinematic wide composition — magazine-cover finale.',
 ]
 
 // ─── Dropdown Component ───────────────────────────────────────────────────────
@@ -294,7 +298,7 @@ export default function NewDesignPage() {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Results
-  const [results, setResults] = useState([null, null, null, null])
+  const [results, setResults] = useState(Array(8).fill(null))
   const [loadingIdx, setLoadingIdx] = useState(new Set())
   const [errors, setErrors] = useState({})
   const [generating, setGenerating] = useState(false)
@@ -327,14 +331,14 @@ export default function NewDesignPage() {
   }
 
 
-  // ─── 🤖 MULTI-BOT PIPELINE: Generate 4 images ─────────────────────────────
+  // ─── 🤖 MULTI-BOT PIPELINE: Generate 8 images ─────────────────────────────
 
   const handleGenerate = async () => {
     if (productImages.length === 0) return
     setGenerating(true)
     setErrors({})
-    setResults([null, null, null, null])
-    setLoadingIdx(new Set([0, 1, 2, 3]))
+    setResults(Array(8).fill(null))
+    setLoadingIdx(new Set([0, 1, 2, 3, 4, 5, 6, 7]))
 
     try {
       // STEP 1: Convert all images to Files
@@ -549,9 +553,9 @@ export default function NewDesignPage() {
               <button className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 4 }}
                 onClick={handleGenerate} disabled={!canGenerate}>
                 {generating ? (
-                  <><Loader size={17} className="spin" /> Đang tạo 4 ảnh AI...</>
+                  <><Loader size={17} className="spin" /> Đang tạo 8 phân cảnh AI...</>
                 ) : (
-                  <><Sparkles size={17} /> Tạo 4 thiết kế AI</>
+                  <><Sparkles size={17} /> Tạo 8 thiết kế AI</>
                 )}
               </button>
             </div>
