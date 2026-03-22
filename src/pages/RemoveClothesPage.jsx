@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react'
-import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle } from 'lucide-react'
+import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle, Users } from 'lucide-react'
 import { detectObjects, generateGarmentImage } from '../services/geminiService'
 import { getPrompt } from '../services/masterPrompts'
 import { getApiKeys } from '../services/apiKeyService'
@@ -266,7 +266,7 @@ function ItemToggleRow({ item, isOn, onToggle }) {
 
 // ─── Result Card ──────────────────────────────────────────────────────────────
 
-function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload }) {
+function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, onSavePose }) {
   return (
     <div className="result-card">
       <div className="result-card-img">
@@ -298,9 +298,91 @@ function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload })
         {imageSrc && (
           <div className="result-card-actions">
             <button onClick={onSave} title="Lưu vào Kho" className="icon-btn"><Save size={14} /></button>
+            <button onClick={onSavePose} title="Lưu làm Pose tham chiếu" className="icon-btn" style={{ color: 'var(--brand)' }}><Users size={14} /></button>
             <button onClick={onDownload} title="Tải xuống" className="icon-btn"><Download size={14} /></button>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Save Pose Modal ──────────────────────────────────────────────────────────
+
+function SavePoseModal({ item, imageSrc, onClose }) {
+  const [poseName, setPoseName] = useState(item?.nameVi ? `Pose - ${item.nameVi}` : 'Pose tùy chỉnh')
+  const [poseDesc, setPoseDesc] = useState('')
+  const [bodyFocus, setBodyFocus] = useState('Toàn thân')
+  const [saved, setSaved] = useState(false)
+
+  const handleSavePose = () => {
+    const customPose = {
+      id: `custom_${Date.now()}`,
+      name: poseName,
+      emoji: '📌',
+      thumbnail: imageSrc,
+      category: 'custom',
+      description: poseDesc || poseName,
+      bodyFocus,
+      cameraAngle: 'Custom reference',
+      promptEN: `Custom pose reference: ${poseName}. ${poseDesc}. Body focus: ${bodyFocus}.`,
+      isCustom: true,
+      createdAt: new Date().toISOString(),
+    }
+    // Save to localStorage
+    const existing = JSON.parse(localStorage.getItem('goha_custom_poses') || '[]')
+    existing.push(customPose)
+    localStorage.setItem('goha_custom_poses', JSON.stringify(existing))
+    setSaved(true)
+    setTimeout(() => onClose(), 1200)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
+        <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
+          🤸 Lưu làm Pose tham chiếu
+        </h3>
+
+        <div style={{ display: 'flex', gap: 14, marginBottom: 14 }}>
+          {imageSrc && (
+            <img src={imageSrc} alt={poseName}
+              style={{ width: 80, height: 100, objectFit: 'cover', borderRadius: 'var(--r-sm)', background: '#f5f5f5' }} />
+          )}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <div>
+              <label className="select-label" style={{ display: 'block', marginBottom: 4 }}>Tên tư thế</label>
+              <input type="text" value={poseName} onChange={e => setPoseName(e.target.value)}
+                className="input-field" style={{ fontSize: 13 }} />
+            </div>
+            <div>
+              <label className="select-label" style={{ display: 'block', marginBottom: 4 }}>Mô tả</label>
+              <input type="text" value={poseDesc} onChange={e => setPoseDesc(e.target.value)}
+                placeholder="VD: Tay chống hông, nghiêng đầu..."
+                className="input-field" style={{ fontSize: 12 }} />
+            </div>
+          </div>
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <label className="select-label" style={{ display: 'block', marginBottom: 4 }}>Focus cơ thể</label>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {['Toàn thân', 'Thân trên', 'Chân dài', 'Mông + eo', 'Gương mặt', 'Tay + vai'].map(f => (
+              <button key={f}
+                className={`toggle-pill ${bodyFocus === f ? 'active' : ''}`}
+                onClick={() => setBodyFocus(f)}>
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
+          <button className="btn btn-ghost" onClick={onClose}>Hủy</button>
+          <button className="btn btn-primary" onClick={handleSavePose} disabled={!poseName.trim() || saved}>
+            {saved ? '✅ Đã lưu!' : '🤸 Lưu Pose'}
+          </button>
+        </div>
       </div>
     </div>
   )
@@ -332,6 +414,7 @@ export default function RemoveClothesPage() {
 
   // Modal
   const [saveModalItem, setSaveModalItem] = useState(null)
+  const [savePoseItem, setSavePoseItem] = useState(null)
   const [error, setError] = useState(null)
 
   // ─── File Handlers ──────────────────────────────────────────────────────
@@ -608,6 +691,7 @@ export default function RemoveClothesPage() {
                   isLoading={generatingIds.has(item.id)}
                   errorMsg={itemErrors[item.id] || null}
                   onSave={() => setSaveModalItem({ item, imageSrc: generatedImages[item.id] })}
+                  onSavePose={() => setSavePoseItem({ item, imageSrc: generatedImages[item.id] })}
                   onDownload={() => downloadImage(generatedImages[item.id], item.nameVi)} />
               ))}
             </div>
@@ -633,6 +717,10 @@ export default function RemoveClothesPage() {
           productName={productName}
           onClose={() => setSaveModalItem(null)}
           onSave={(record) => console.log('Saved:', record)} />
+      )}
+      {savePoseItem && (
+        <SavePoseModal item={savePoseItem.item} imageSrc={savePoseItem.imageSrc}
+          onClose={() => setSavePoseItem(null)} />
       )}
     </div>
   )
