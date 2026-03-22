@@ -6,6 +6,7 @@ import HomePage from './pages/HomePage'
 import NewDesignPage from './pages/NewDesignPage'
 import RemoveClothesPage from './pages/RemoveClothesPage'
 import StorytellingPage from './pages/StorytellingPage'
+import VideoPromptPage from './pages/VideoPromptPage'
 import LibraryPage from './pages/LibraryPage'
 import AdminPage from './pages/AdminPage'
 import SettingsPage from './pages/SettingsPage'
@@ -38,6 +39,7 @@ export default function App() {
         <Route path="home" element={<HomePage />} />
         <Route path="new-design" element={<NewDesignPage />} />
         <Route path="storytelling" element={<StorytellingPage />} />
+        <Route path="video-prompt" element={<VideoPromptPage />} />
         <Route path="remove-clothes" element={<RemoveClothesPage />} />
         <Route path="library" element={<LibraryPage />} />
         <Route path="admin" element={<AdminPage />} />
