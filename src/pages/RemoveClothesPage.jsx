@@ -36,12 +36,18 @@ function buildItemPrompt(item, productName, quality, aspect) {
   if (item.category === 'model') {
     return `Looking at the reference image, isolate and recreate the PERSON/MODEL only.
 
-Extract the person completely from the background. Recreate them on a PURE WHITE background (#FFFFFF).
-Keep exact same pose, expression, hair, skin tone, and all clothing they are wearing.
-Photorealistic studio quality, soft even lighting, ${res} resolution, aspect ratio ${aspect}.
+CRITICAL RULES FOR MODEL EXTRACTION:
+1. REMOVE ALL PRODUCTS, ITEMS, ACCESSORIES from the model's hands — hands must be EMPTY and posing naturally
+2. Place model on PURE WHITE background (#FFFFFF)
+3. Model MUST be FULL BODY — head to toe, no cropping. If the source image is cropped (missing legs/feet), EXTEND and regenerate the full body naturally
+4. Face must be looking STRAIGHT AT THE CAMERA (front-facing)
+5. If the model's pose, hands, or fingers look unnatural or ugly, FIX THEM — make hands look natural and beautiful
+6. Keep exact same clothing, hair color, skin tone, body proportions
+7. Photorealistic studio quality, soft even lighting, slight shadow under feet
+8. Resolution: ${res}, aspect ratio ${aspect}
 ${productName ? `Collection: "${productName}"` : ''}
 
-Generate the isolated person on white background now.`
+Generate the clean isolated full-body model on pure white background now.`
   }
 
   if (item.category === 'background') {
@@ -161,6 +167,7 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
         type,
         category: item?.category || 'other',
         imageSrc,
+        source: 'extract',
       })
       const result = await saveToLibrary(record)
       if (result.success) {
@@ -174,6 +181,8 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
     } catch (err) {
       console.error('Save error:', err)
       setSaveResult('error')
+    } finally {
+      setSaving(false)
     }
   }
 
