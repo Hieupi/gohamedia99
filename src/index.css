@@ -3553,3 +3553,349 @@ textarea {
 .vp-platform-info li {
   margin-bottom: 4px;
 }
+
+/* ─── Step layout ──────────────────────────────────────────────────────────── */
+.vp-step {
+  margin-bottom: 20px;
+}
+
+.vp-step-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.vp-step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--brand);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.vp-step-body {
+  padding: 16px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
+}
+
+/* ─── Dropzone ─────────────────────────────────────────────────────────────── */
+.vp-dropzone {
+  border: 2px dashed var(--border);
+  border-radius: var(--r-lg);
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.15s;
+  color: var(--text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.vp-dropzone:hover {
+  border-color: var(--brand);
+  background: var(--brand-05);
+  color: var(--brand);
+}
+
+/* ─── Scene thumbnails ─────────────────────────────────────────────────────── */
+.vp-scene-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.vp-scene-thumb {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  aspect-ratio: 3/4;
+  border: 2px solid var(--border);
+}
+
+.vp-scene-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vp-scene-num {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 20px;
+  height: 20px;
+  background: var(--brand);
+  color: #fff;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.vp-scene-remove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 20px;
+  height: 20px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.vp-scene-thumb:hover .vp-scene-remove {
+  opacity: 1;
+}
+
+.vp-scene-add {
+  border: 2px dashed var(--border);
+  border-radius: var(--r-md);
+  aspect-ratio: 3/4;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: all 0.15s;
+}
+
+.vp-scene-add:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ─── Storyboard result ────────────────────────────────────────────────────── */
+.vp-storyboard {
+  margin-top: 16px;
+}
+
+.vp-storyboard-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.vp-storyboard-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.vp-sb-scene {
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  margin-bottom: 8px;
+  overflow: hidden;
+  transition: box-shadow 0.15s;
+}
+
+.vp-sb-scene:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.vp-sb-scene-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  background: var(--surface);
+  transition: background 0.12s;
+}
+
+.vp-sb-scene-header:hover {
+  background: var(--brand-05);
+}
+
+.vp-sb-scene-num {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--brand);
+  background: var(--brand-08);
+  padding: 2px 8px;
+  border-radius: var(--r-full);
+}
+
+.vp-sb-scene-title {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.vp-sb-scene-duration {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.vp-sb-scene-mini {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border);
+}
+
+.vp-sb-thumb {
+  width: 48px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+
+.vp-sb-mini-info {
+  flex: 1;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.vp-sb-scene-detail {
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.vp-sb-field {
+  font-size: 12px;
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.vp-sb-field strong {
+  color: var(--text-primary);
+}
+
+.vp-sb-field p {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+}
+
+.vp-sb-prompt {
+  margin-top: 10px;
+  padding: 10px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+}
+
+.vp-sb-prompt code {
+  display: block;
+  font-family: 'SF Mono', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-top: 6px;
+}
+
+.vp-sb-raw {
+  padding: 12px;
+}
+
+.vp-sb-raw pre {
+  font-family: 'SF Mono', monospace;
+  font-size: 11px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-primary);
+  background: var(--surface);
+  padding: 12px;
+  border-radius: var(--r-md);
+}
+
+.vp-director-notes {
+  margin-top: 12px;
+  padding: 12px;
+  background: var(--brand-05);
+  border: 1px solid var(--brand-25);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.vp-director-notes strong {
+  color: var(--brand);
+}
+
+/* ─── Chat interface ───────────────────────────────────────────────────────── */
+.vp-chat-messages {
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.vp-chat-msg {
+  display: flex;
+}
+
+.vp-chat-msg.user {
+  justify-content: flex-end;
+}
+
+.vp-chat-msg.assistant {
+  justify-content: flex-start;
+}
+
+.vp-chat-bubble {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.vp-chat-msg.user .vp-chat-bubble {
+  background: var(--brand);
+  color: #fff;
+  border-bottom-right-radius: 4px;
+}
+
+.vp-chat-msg.assistant .vp-chat-bubble {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  border-bottom-left-radius: 4px;
+}
+
+.vp-chat-input-row {
+  display: flex;
+  gap: 8px;
+}
