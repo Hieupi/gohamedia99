@@ -1,11 +1,12 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import {
-  Home, Wand2, Scissors, Image, Shield, Settings, LogOut, Phone
+  Home, Wand2, Scissors, Image, Shield, Settings, LogOut, Phone, BookOpen
 } from 'lucide-react'
 
 const NAV_ITEMS = [
   { path: '/home', label: 'Trang chủ', icon: Home },
   { path: '/new-design', label: 'Thiết kế mới', icon: Wand2 },
+  { path: '/storytelling', label: 'Storytelling', icon: BookOpen },
   { path: '/remove-clothes', label: 'Tách đồ áo', icon: Scissors },
   { path: '/library', label: 'Thư viện', icon: Image },
   { path: '/admin', label: 'Quản trị', icon: Shield },
