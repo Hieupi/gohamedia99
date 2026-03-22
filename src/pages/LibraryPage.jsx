@@ -5,7 +5,7 @@ import {
 import {
   getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
   downloadImage, saveToLibrary, createLibraryRecord, migrateOldLibrary,
-  getFolders, createFolder, deleteFolder
+  getFolders, createFolder, deleteFolder, moveItemToFolder, moveFolderInto
 } from '../services/libraryService'
 import { getOriginalImage, saveToFilesystem } from '../services/imageStorageService'
 import { callGemini } from '../services/geminiService'
@@ -254,6 +254,11 @@ export default function LibraryPage() {
   const [newFolderName, setNewFolderName] = useState('')
   const [showNewFolder, setShowNewFolder] = useState(false)
 
+  // Drag & Drop state
+  const [dragItemId, setDragItemId] = useState(null)
+  const [dragFolderId, setDragFolderId] = useState(null)
+  const [dragOverFolderId, setDragOverFolderId] = useState(null)
+
   const handleCreateFolder = () => {
     if (!newFolderName.trim()) return
     const updated = createFolder(newFolderName.trim())
@@ -270,6 +275,48 @@ export default function LibraryPage() {
     setFolders(updated)
     setActiveFolder('all')
     setItems(getLibraryItems())
+  }
+
+  // ─── Drag & Drop handlers ────────────────────────────────────────────
+  const handleDragStartItem = (e, itemId) => {
+    setDragItemId(itemId); setDragFolderId(null)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `item:${itemId}`)
+  }
+  const handleDragStartFolder = (e, folderId) => {
+    setDragFolderId(folderId); setDragItemId(null)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', `folder:${folderId}`)
+  }
+  const handleDragOverFolder = (e, folderId) => {
+    e.preventDefault(); e.dataTransfer.dropEffect = 'move'
+    setDragOverFolderId(folderId)
+  }
+  const handleDragLeave = () => setDragOverFolderId(null)
+  const handleDropOnFolder = (e, targetFolderId) => {
+    e.preventDefault(); setDragOverFolderId(null)
+    if (dragItemId) {
+      const updated = moveItemToFolder(dragItemId, targetFolderId)
+      setItems(updated)
+    } else if (dragFolderId && dragFolderId !== targetFolderId) {
+      const updated = moveFolderInto(dragFolderId, targetFolderId)
+      setFolders(updated)
+    }
+    setDragItemId(null); setDragFolderId(null)
+  }
+  const handleDropOnRoot = (e) => {
+    e.preventDefault(); setDragOverFolderId(null)
+    if (dragItemId) {
+      const updated = moveItemToFolder(dragItemId, null)
+      setItems(updated)
+    } else if (dragFolderId) {
+      const updated = moveFolderInto(dragFolderId, null)
+      setFolders(updated)
+    }
+    setDragItemId(null); setDragFolderId(null)
+  }
+  const handleDragEnd = () => {
+    setDragItemId(null); setDragFolderId(null); setDragOverFolderId(null)
   }
 
   useEffect(() => {
@@ -374,14 +421,30 @@ export default function LibraryPage() {
         {/* Folder Bar */}
         <div className="lib-folder-bar">
           <div className="lib-folder-list">
-            <button className={`lib-folder-btn${activeFolder === 'all' ? ' active' : ''}`}
-              onClick={() => setActiveFolder('all')}>📋 Tất cả</button>
-            {folders.map(f => (
-              <button key={f.id} className={`lib-folder-btn${activeFolder === f.id ? ' active' : ''}`}
-                onClick={() => setActiveFolder(f.id)}>
+            <button className={`lib-folder-btn${activeFolder === 'all' ? ' active' : ''}${dragOverFolderId === 'root' ? ' drag-over' : ''}`}
+              onClick={() => setActiveFolder('all')}
+              onDragOver={e => { e.preventDefault(); setDragOverFolderId('root') }}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDropOnRoot}>📋 Tất cả</button>
+            {folders.filter(f => !f.parentId).map(f => (
+              <button key={f.id}
+                className={`lib-folder-btn${activeFolder === f.id ? ' active' : ''}${dragOverFolderId === f.id ? ' drag-over' : ''}`}
+                onClick={() => setActiveFolder(f.id)}
+                draggable
+                onDragStart={e => handleDragStartFolder(e, f.id)}
+                onDragOver={e => handleDragOverFolder(e, f.id)}
+                onDragLeave={handleDragLeave}
+                onDrop={e => handleDropOnFolder(e, f.id)}
+                onDragEnd={handleDragEnd}>
                 📁 {f.name}
                 <span className="lib-folder-count">{items.filter(i => i.folderId === f.id).length}</span>
                 <span className="lib-folder-del" onClick={e => handleDeleteFolder(e, f.id)}>✕</span>
+                {/* Subfolders */}
+                {folders.filter(sf => sf.parentId === f.id).map(sf => (
+                  <span key={sf.id} className="lib-subfolder-tag" onClick={e => { e.stopPropagation(); setActiveFolder(sf.id) }}>
+                    └ {sf.name} ({items.filter(i => i.folderId === sf.id).length})
+                  </span>
+                ))}
               </button>
             ))}
           </div>
@@ -425,7 +488,10 @@ export default function LibraryPage() {
         ) : view === 'grid' ? (
           <div className="lib-grid">
             {filtered.map(item => (
-              <div key={item.id} className="lib-card">
+              <div key={item.id} className={`lib-card${dragItemId === item.id ? ' dragging' : ''}`}
+                draggable
+                onDragStart={e => handleDragStartItem(e, item.id)}
+                onDragEnd={handleDragEnd}>
                 <div className="lib-card-img-wrap">
                   <img src={item.imageSrc} alt={item.name} className="lib-card-img" loading="lazy" />
                   <div className="lib-card-overlay">
@@ -480,173 +546,184 @@ export default function LibraryPage() {
               </div>
             ))}
           </div>
-        )}
+        )
+        }
       </>)}
 
       {/* ════════════ TAB: POSES ════════════ */}
-      {mainTab === 'poses' && (
-        <div className="lib-pose-section">
-          <div className="pose-categories" style={{ marginBottom: 16 }}>
-            {POSE_CATEGORIES.map(cat => (
-              <button key={cat.id}
-                className={`pose-cat-btn${poseCatFilter === cat.id ? ' active' : ''}`}
-                onClick={() => setPoseCatFilter(cat.id)}>
-                {cat.label}
-                {cat.id === 'custom' && getCustomPoses().length > 0 && (
-                  <span style={{ marginLeft: 4, fontSize: 10, background: 'var(--brand)', color: '#fff', borderRadius: 99, padding: '1px 5px' }}>
-                    {getCustomPoses().length}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="lib-pose-grid">
-            {getAllPosesByCategory(poseCatFilter).map(p => (
-              <div key={p.id} className="lib-pose-card">
-                <img src={p.thumbnail} alt={p.name} className="lib-pose-img"
-                  onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
-                <div className="pose-card-emoji-fallback" style={{ display: 'none', height: 140 }}>{p.emoji}</div>
-                <div className="lib-pose-info">
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <div className="lib-pose-name">{p.emoji} {p.name}</div>
-                    {p.isCustom && (
-                      <button className="btn btn-ghost" style={{ fontSize: 10, padding: '2px 6px', color: '#ef4444' }}
-                        onClick={() => { deleteCustomPose(p.id); setPoseCatFilter(prev => prev) /* force re-render */; window.location.reload() }}
-                        title="Xóa pose tự tạo">
-                        🗑️ Xóa
-                      </button>
-                    )}
-                  </div>
-                  <div className="lib-pose-desc">{p.description}</div>
-                  <div className="lib-pose-meta">
-                    <span>📷 {p.cameraAngle}</span>
-                    <span>🎯 {p.bodyFocus}</span>
-                    {p.isCustom && <span>📌 Pose tự tạo</span>}
-                  </div>
-                  <div className="lib-pose-prompt">
-                    <code>{p.promptEN.substring(0, 120)}...</code>
-                    <button className="btn btn-ghost" style={{ fontSize: 10, padding: '2px 6px' }}
-                      onClick={() => { navigator.clipboard.writeText(p.promptEN); setCopiedId(p.id); setTimeout(() => setCopiedId(null), 2000) }}>
-                      {copiedId === p.id ? <><Check size={10} /> Đã copy</> : <><Copy size={10} /> Copy Prompt</>}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {getAllPosesByCategory(poseCatFilter).length === 0 && (
-              <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
-                <p style={{ fontSize: 14 }}>Chưa có pose nào trong mục này.</p>
-                <p style={{ fontSize: 12, marginTop: 4 }}>Vào tab <strong>Tách đồ áo</strong> → lưu ảnh với type <strong>Pose</strong> để tạo pose tùy chỉnh.</p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ════════════ TAB: PROMPTS ════════════ */}
-      {mainTab === 'prompts' && (
-        <div className="lib-prompt-section">
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
-            Kho prompt mẫu sẵn dùng — nhấn Copy để dán vào ô prompt khi thiết kế.
-          </p>
-          <div className="lib-prompt-grid">
-            {PROMPT_TEMPLATES.map(t => (
-              <div key={t.id} className="lib-prompt-card">
-                <div className="lib-prompt-name">{t.name}</div>
-                <div className="lib-prompt-desc">{t.description}</div>
-                <div className="lib-prompt-prefix">
-                  <code>{t.promptPrefix}</code>
-                </div>
-                <button className="btn btn-primary" style={{ width: '100%', marginTop: 8, fontSize: 12 }}
-                  onClick={() => { navigator.clipboard.writeText(t.promptPrefix); setCopiedId(t.id); setTimeout(() => setCopiedId(null), 2000) }}>
-                  {copiedId === t.id ? <><Check size={12} /> Đã copy!</> : <><Copy size={12} /> Copy Prompt</>}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ══════════ TAB: ẢNH THÀNH PHẨM ══════════ */}
-      {mainTab === 'finished' && (
-        <div>
-          <div className="lib-folder-bar">
-            <div className="lib-folder-list">
-              <button className={`lib-folder-btn${activeFolder === 'all' ? ' active' : ''}`}
-                onClick={() => setActiveFolder('all')}>📋 Tất cả</button>
-              {folders.map(f => (
-                <button key={f.id} className={`lib-folder-btn${activeFolder === f.id ? ' active' : ''}`}
-                  onClick={() => setActiveFolder(f.id)}>
-                  📁 {f.name}
-                  <span className="lib-folder-count">{items.filter(i => i.folderId === f.id && (i.category === 'design' || i.type === 'product')).length}</span>
+      {
+        mainTab === 'poses' && (
+          <div className="lib-pose-section">
+            <div className="pose-categories" style={{ marginBottom: 16 }}>
+              {POSE_CATEGORIES.map(cat => (
+                <button key={cat.id}
+                  className={`pose-cat-btn${poseCatFilter === cat.id ? ' active' : ''}`}
+                  onClick={() => setPoseCatFilter(cat.id)}>
+                  {cat.label}
+                  {cat.id === 'custom' && getCustomPoses().length > 0 && (
+                    <span style={{ marginLeft: 4, fontSize: 10, background: 'var(--brand)', color: '#fff', borderRadius: 99, padding: '1px 5px' }}>
+                      {getCustomPoses().length}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
-            {showNewFolder ? (
-              <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
-                <input type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
-                  placeholder="Tên thư mục..." className="input-field" style={{ flex: 1, fontSize: 12, height: 32 }}
-                  onKeyDown={e => e.key === 'Enter' && handleCreateFolder()} autoFocus />
-                <button className="btn btn-primary" onClick={handleCreateFolder} style={{ fontSize: 11, height: 32 }}>Tạo</button>
-                <button className="btn btn-ghost" onClick={() => setShowNewFolder(false)} style={{ fontSize: 11, height: 32 }}>Hủy</button>
-              </div>
-            ) : (
-              <button className="lib-folder-add" onClick={() => setShowNewFolder(true)}>+ Thư mục mới</button>
-            )}
-          </div>
-          {(() => {
-            const finishedItems = items.filter(i => {
-              if (activeFolder !== 'all' && i.folderId !== activeFolder) return false
-              return i.category === 'design' || i.type === 'product'
-            })
-            return finishedItems.length === 0 ? (
-              <div className="empty-state" style={{ minHeight: 200 }}>
-                <ImageOff size={40} style={{ opacity: 0.2 }} />
-                <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chưa có ảnh thành phẩm. Tạo ảnh ở Thiết kế mới và lưu vào kho.</p>
-              </div>
-            ) : (
-              <div className="lib-grid">
-                {finishedItems.map(item => (
-                  <div key={item.id} className="lib-card">
-                    <div className="lib-card-img">
-                      <img src={item.imageSrc} alt={item.name} />
-                      <div className="lib-card-overlay">
-                        <button className="lib-card-action" onClick={() => setPreview(item)}><Eye size={14} /></button>
-                        <button className="lib-card-action" onClick={() => handleDownload(item)}><Download size={14} /></button>
-                        <button className="lib-card-action" style={{ color: '#ef4444' }} onClick={e => handleDelete(e, item.id)}><Trash2 size={14} /></button>
-                      </div>
+            <div className="lib-pose-grid">
+              {getAllPosesByCategory(poseCatFilter).map(p => (
+                <div key={p.id} className="lib-pose-card">
+                  <img src={p.thumbnail} alt={p.name} className="lib-pose-img"
+                    onError={e => { e.target.style.display = 'none'; e.target.nextSibling.style.display = 'flex' }} />
+                  <div className="pose-card-emoji-fallback" style={{ display: 'none', height: 140 }}>{p.emoji}</div>
+                  <div className="lib-pose-info">
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <div className="lib-pose-name">{p.emoji} {p.name}</div>
+                      {p.isCustom && (
+                        <button className="btn btn-ghost" style={{ fontSize: 10, padding: '2px 6px', color: '#ef4444' }}
+                          onClick={() => { deleteCustomPose(p.id); setPoseCatFilter(prev => prev) /* force re-render */; window.location.reload() }}
+                          title="Xóa pose tự tạo">
+                          🗑️ Xóa
+                        </button>
+                      )}
                     </div>
-                    <div className="lib-card-info">
-                      <div className="lib-card-name">{item.name}</div>
-                      {item.folderId && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>📁 {folders.find(f => f.id === item.folderId)?.name}</span>}
+                    <div className="lib-pose-desc">{p.description}</div>
+                    <div className="lib-pose-meta">
+                      <span>📷 {p.cameraAngle}</span>
+                      <span>🎯 {p.bodyFocus}</span>
+                      {p.isCustom && <span>📌 Pose tự tạo</span>}
+                    </div>
+                    <div className="lib-pose-prompt">
+                      <code>{p.promptEN.substring(0, 120)}...</code>
+                      <button className="btn btn-ghost" style={{ fontSize: 10, padding: '2px 6px' }}
+                        onClick={() => { navigator.clipboard.writeText(p.promptEN); setCopiedId(p.id); setTimeout(() => setCopiedId(null), 2000) }}>
+                        {copiedId === p.id ? <><Check size={10} /> Đã copy</> : <><Copy size={10} /> Copy Prompt</>}
+                      </button>
                     </div>
                   </div>
+                </div>
+              ))}
+              {getAllPosesByCategory(poseCatFilter).length === 0 && (
+                <div style={{ gridColumn: '1 / -1', textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>
+                  <p style={{ fontSize: 14 }}>Chưa có pose nào trong mục này.</p>
+                  <p style={{ fontSize: 12, marginTop: 4 }}>Vào tab <strong>Tách đồ áo</strong> → lưu ảnh với type <strong>Pose</strong> để tạo pose tùy chỉnh.</p>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      }
+
+      {/* ════════════ TAB: PROMPTS ════════════ */}
+      {
+        mainTab === 'prompts' && (
+          <div className="lib-prompt-section">
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16 }}>
+              Kho prompt mẫu sẵn dùng — nhấn Copy để dán vào ô prompt khi thiết kế.
+            </p>
+            <div className="lib-prompt-grid">
+              {PROMPT_TEMPLATES.map(t => (
+                <div key={t.id} className="lib-prompt-card">
+                  <div className="lib-prompt-name">{t.name}</div>
+                  <div className="lib-prompt-desc">{t.description}</div>
+                  <div className="lib-prompt-prefix">
+                    <code>{t.promptPrefix}</code>
+                  </div>
+                  <button className="btn btn-primary" style={{ width: '100%', marginTop: 8, fontSize: 12 }}
+                    onClick={() => { navigator.clipboard.writeText(t.promptPrefix); setCopiedId(t.id); setTimeout(() => setCopiedId(null), 2000) }}>
+                    {copiedId === t.id ? <><Check size={12} /> Đã copy!</> : <><Copy size={12} /> Copy Prompt</>}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      }
+
+      {/* ══════════ TAB: ẢNH THÀNH PHẨM ══════════ */}
+      {
+        mainTab === 'finished' && (
+          <div>
+            <div className="lib-folder-bar">
+              <div className="lib-folder-list">
+                <button className={`lib-folder-btn${activeFolder === 'all' ? ' active' : ''}`}
+                  onClick={() => setActiveFolder('all')}>📋 Tất cả</button>
+                {folders.map(f => (
+                  <button key={f.id} className={`lib-folder-btn${activeFolder === f.id ? ' active' : ''}`}
+                    onClick={() => setActiveFolder(f.id)}>
+                    📁 {f.name}
+                    <span className="lib-folder-count">{items.filter(i => i.folderId === f.id && (i.category === 'design' || i.type === 'product')).length}</span>
+                  </button>
                 ))}
               </div>
-            )
-          })()}
-        </div>
-      )}
+              {showNewFolder ? (
+                <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+                  <input type="text" value={newFolderName} onChange={e => setNewFolderName(e.target.value)}
+                    placeholder="Tên thư mục..." className="input-field" style={{ flex: 1, fontSize: 12, height: 32 }}
+                    onKeyDown={e => e.key === 'Enter' && handleCreateFolder()} autoFocus />
+                  <button className="btn btn-primary" onClick={handleCreateFolder} style={{ fontSize: 11, height: 32 }}>Tạo</button>
+                  <button className="btn btn-ghost" onClick={() => setShowNewFolder(false)} style={{ fontSize: 11, height: 32 }}>Hủy</button>
+                </div>
+              ) : (
+                <button className="lib-folder-add" onClick={() => setShowNewFolder(true)}>+ Thư mục mới</button>
+              )}
+            </div>
+            {(() => {
+              const finishedItems = items.filter(i => {
+                if (activeFolder !== 'all' && i.folderId !== activeFolder) return false
+                return i.category === 'design' || i.type === 'product'
+              })
+              return finishedItems.length === 0 ? (
+                <div className="empty-state" style={{ minHeight: 200 }}>
+                  <ImageOff size={40} style={{ opacity: 0.2 }} />
+                  <p style={{ color: 'var(--text-muted)', fontSize: 13 }}>Chưa có ảnh thành phẩm. Tạo ảnh ở Thiết kế mới và lưu vào kho.</p>
+                </div>
+              ) : (
+                <div className="lib-grid">
+                  {finishedItems.map(item => (
+                    <div key={item.id} className="lib-card">
+                      <div className="lib-card-img">
+                        <img src={item.imageSrc} alt={item.name} />
+                        <div className="lib-card-overlay">
+                          <button className="lib-card-action" onClick={() => setPreview(item)}><Eye size={14} /></button>
+                          <button className="lib-card-action" onClick={() => handleDownload(item)}><Download size={14} /></button>
+                          <button className="lib-card-action" style={{ color: '#ef4444' }} onClick={e => handleDelete(e, item.id)}><Trash2 size={14} /></button>
+                        </div>
+                      </div>
+                      <div className="lib-card-info">
+                        <div className="lib-card-name">{item.name}</div>
+                        {item.folderId && <span style={{ fontSize: 9, color: 'var(--text-muted)' }}>📁 {folders.find(f => f.id === item.folderId)?.name}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
+          </div>
+        )
+      }
 
       {/* ══════════ TAB: VIDEO THÀNH PHẨM ══════════ */}
-      {mainTab === 'videos' && (
-        <div className="empty-state" style={{ minHeight: 300 }}>
-          <Film size={48} style={{ opacity: 0.2 }} />
-          <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 16 }}>Video Thành Phẩm</h3>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 300, textAlign: 'center' }}>
-            Sắp ra mắt! Video được tạo từ tab 🎬 Video Prompt sẽ xuất hiện ở đây.
-          </p>
-        </div>
-      )}
+      {
+        mainTab === 'videos' && (
+          <div className="empty-state" style={{ minHeight: 300 }}>
+            <Film size={48} style={{ opacity: 0.2 }} />
+            <h3 style={{ fontSize: 16, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 16 }}>Video Thành Phẩm</h3>
+            <p style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 300, textAlign: 'center' }}>
+              Sắp ra mắt! Video được tạo từ tab 🎬 Video Prompt sẽ xuất hiện ở đây.
+            </p>
+          </div>
+        )
+      }
 
       <PreviewModal item={preview} onClose={() => setPreview(null)} />
 
-      {showUpload && (
-        <UploadModal
-          onClose={() => setShowUpload(false)}
-          onSaved={() => setItems(getLibraryItems())}
-        />
-      )}
-    </div>
+      {
+        showUpload && (
+          <UploadModal
+            onClose={() => setShowUpload(false)}
+            onSaved={() => setItems(getLibraryItems())}
+          />
+        )
+      }
+    </div >
   )
 }

@@ -3986,3 +3986,18 @@ textarea {
   border-color: var(--brand);
   color: var(--brand);
 }
+/* Drag and Drop feedback */
+.lib-folder-btn.drag-over {
+  border-color: var(--brand) !important;
+  background: rgba(99,102,241,0.12) !important;
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.3);
+  transform: scale(1.05);
+}
+.lib-card.dragging { opacity: 0.4; transform: scale(0.95); border: 2px dashed var(--brand); }
+.lib-card[draggable="true"] { cursor: grab; }
+.lib-card[draggable="true"]:active { cursor: grabbing; }
+.lib-subfolder-tag {
+  display: block; width: 100%; font-size: 9px; color: var(--text-muted);
+  margin-top: 2px; cursor: pointer; padding-left: 6px;
+}
+.lib-subfolder-tag:hover { color: var(--brand); }

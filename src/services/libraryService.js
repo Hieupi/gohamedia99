@@ -1,15 +1,17 @@
 /**
  * libraryService.js
  * ─────────────────────────────────────────────────────────────────────────────
- * Quản lý kho ảnh — thumbnail lưu localStorage, ảnh gốc lưu IndexedDB.
+ * Quản lý kho ảnh — thumbnail localStorage, ảnh gốc IndexedDB.
+ * Hỗ trợ: thư mục dự án, subfolder, kéo thả ảnh/thư mục.
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
 import { saveOriginalImage, deleteOriginalImage } from './imageStorageService'
 
 const STORAGE_KEY = 'goha_studio_library'
+const FOLDERS_KEY = 'goha_studio_folders'
 
-// ─── Resize Helper ────────────────────────────────────────────────────────────
+// ─── Resize ───────────────────────────────────────────────────────────────────
 
 export function resizeForStorage(dataUrl, maxSize = 400) {
     return new Promise((resolve) => {
@@ -40,7 +42,7 @@ export function getLibraryItems() {
     catch { return [] }
 }
 
-// ─── Smart Unique Name Generator ──────────────────────────────────────────────
+// ─── Smart Name ───────────────────────────────────────────────────────────────
 
 const CATEGORY_PREFIXES = {
     top: 'ÁO', bottom: 'QUẦN', dress: 'ĐẦM', outerwear: 'KHOÁC',
@@ -59,32 +61,22 @@ export function generateUniqueName({ category, description, prefix } = {}) {
     const rand = Math.random().toString(36).slice(2, 4)
     let candidate = `${p}-${desc}-${time}${rand}`
     let attempt = 0
-    while (existing.some(i => i.name === candidate)) {
-        attempt++
-        candidate = `${p}-${desc}-${time}${rand}${attempt}`
-    }
+    while (existing.some(i => i.name === candidate)) { attempt++; candidate = `${p}-${desc}-${time}${rand}${attempt}` }
     return candidate
 }
 
-// ─── Write (IndexedDB cho ảnh gốc + localStorage cho thumbnail) ───────────────
+// ─── Write (IndexedDB + localStorage) ─────────────────────────────────────────
 
 export async function saveToLibrary(record) {
     try {
-        // 1) Lưu ảnh GỐC vào IndexedDB (full quality cho preview)
         if (record.imageSrc && record.imageSrc.startsWith('data:')) {
             await saveOriginalImage(record.id, record.imageSrc)
-            // 2) Resize xuống thumbnail cho localStorage
             record.imageSrc = await resizeForStorage(record.imageSrc, 400)
         }
-
         const items = getLibraryItems()
         const exists = items.findIndex(i => i.id === record.id)
-        if (exists >= 0) {
-            items[exists] = { ...items[exists], ...record }
-        } else {
-            items.unshift(record)
-        }
-
+        if (exists >= 0) { items[exists] = { ...items[exists], ...record } }
+        else { items.unshift(record) }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
         return { success: true, items }
     } catch (err) {
@@ -92,13 +84,10 @@ export async function saveToLibrary(record) {
         if (err.name === 'QuotaExceededError' || err.code === 22) {
             try {
                 record.imageSrc = await resizeForStorage(record.imageSrc, 200)
-                const items = getLibraryItems()
-                items.unshift(record)
+                const items = getLibraryItems(); items.unshift(record)
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
                 return { success: true, items }
-            } catch {
-                return { success: false, error: 'Bộ nhớ localStorage đã đầy. Hãy xóa bớt ảnh trong Thư viện.' }
-            }
+            } catch { return { success: false, error: 'localStorage đã đầy.' } }
         }
         return { success: false, error: err.message }
     }
@@ -109,16 +98,14 @@ export async function saveToLibrary(record) {
 export function deleteFromLibrary(id) {
     const items = getLibraryItems().filter(i => i.id !== id)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-    deleteOriginalImage(id) // Xóa ảnh gốc khỏi IndexedDB
+    deleteOriginalImage(id)
     return items
 }
 
 // ─── Toggle Like ──────────────────────────────────────────────────────────────
 
 export function toggleLikeInLibrary(id) {
-    const items = getLibraryItems().map(i =>
-        i.id === id ? { ...i, liked: !i.liked } : i
-    )
+    const items = getLibraryItems().map(i => i.id === id ? { ...i, liked: !i.liked } : i)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
     return items
 }
@@ -128,12 +115,9 @@ export function toggleLikeInLibrary(id) {
 export function createLibraryRecord({ name, type, category, imageSrc }) {
     return {
         id: `kho-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        name: name || 'Không tên',
-        type: type || 'product',
-        category: category || 'other',
-        imageSrc,
-        liked: false,
-        createdAt: new Date().toISOString(),
+        name: name || 'Không tên', type: type || 'product',
+        category: category || 'other', imageSrc,
+        liked: false, createdAt: new Date().toISOString(),
     }
 }
 
@@ -141,38 +125,31 @@ export function createLibraryRecord({ name, type, category, imageSrc }) {
 
 export function downloadImage(dataUrl, fileName) {
     const a = document.createElement('a')
-    a.href = dataUrl
-    a.download = `${fileName || 'goha-studio'}-${Date.now()}.png`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
+    a.href = dataUrl; a.download = `${fileName || 'goha-studio'}-${Date.now()}.png`
+    document.body.appendChild(a); a.click(); document.body.removeChild(a)
 }
 
-// ─── Storage usage ────────────────────────────────────────────────────────────
+// ─── Storage ──────────────────────────────────────────────────────────────────
 
 export function getStorageUsage() {
     let total = 0
-    for (let key in localStorage) {
-        if (localStorage.hasOwnProperty(key)) total += localStorage[key].length * 2
-    }
+    for (let key in localStorage) { if (localStorage.hasOwnProperty(key)) total += localStorage[key].length * 2 }
     return { usedMB: (total / 1024 / 1024).toFixed(2), maxMB: 5, percent: Math.round((total / (5 * 1024 * 1024)) * 100) }
 }
 
-// ─── Project Folders ──────────────────────────────────────────────────────────
-
-const FOLDERS_KEY = 'goha_studio_folders'
+// ═══ PROJECT FOLDERS (with subfolder + drag-drop support) ═══════════════════
 
 export function getFolders() {
     try { return JSON.parse(localStorage.getItem(FOLDERS_KEY) || '[]') }
     catch { return [] }
 }
 
-export function createFolder(name) {
+export function createFolder(name, parentId = null) {
     const folders = getFolders()
-    if (folders.some(f => f.name === name)) return folders
+    if (folders.some(f => f.name === name && f.parentId === parentId)) return folders
     folders.push({
         id: `folder_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-        name,
+        name, parentId,
         createdAt: new Date().toISOString(),
     })
     localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders))
@@ -180,13 +157,47 @@ export function createFolder(name) {
 }
 
 export function deleteFolder(folderId) {
-    const folders = getFolders().filter(f => f.id !== folderId)
+    const allFolders = getFolders()
+    const toDelete = new Set([folderId])
+    let changed = true
+    while (changed) {
+        changed = false
+        allFolders.forEach(f => {
+            if (f.parentId && toDelete.has(f.parentId) && !toDelete.has(f.id)) {
+                toDelete.add(f.id); changed = true
+            }
+        })
+    }
+    const folders = allFolders.filter(f => !toDelete.has(f.id))
     localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders))
-    const items = getLibraryItems().map(i =>
-        i.folderId === folderId ? { ...i, folderId: null } : i
-    )
+    const items = getLibraryItems().map(i => toDelete.has(i.folderId) ? { ...i, folderId: null } : i)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
     return folders
+}
+
+/** Di chuyển ảnh vào thư mục (folderId=null → gốc) */
+export function moveItemToFolder(itemId, folderId) {
+    const items = getLibraryItems().map(i =>
+        i.id === itemId ? { ...i, folderId: folderId || null } : i
+    )
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    return items
+}
+
+/** Di chuyển thư mục vào thư mục khác (subfolder) */
+export function moveFolderInto(folderId, targetParentId) {
+    if (folderId === targetParentId) return getFolders()
+    // Prevent circular nesting
+    const folders = getFolders()
+    let check = targetParentId
+    while (check) {
+        if (check === folderId) return folders // circular!
+        const parent = folders.find(f => f.id === check)
+        check = parent?.parentId || null
+    }
+    const updated = folders.map(f => f.id === folderId ? { ...f, parentId: targetParentId || null } : f)
+    localStorage.setItem(FOLDERS_KEY, JSON.stringify(updated))
+    return updated
 }
 
 export function getItemsByFolder(folderId) {
@@ -202,9 +213,7 @@ export function migrateOldLibrary() {
         try {
             const oldItems = JSON.parse(old)
             const current = getLibraryItems()
-            if (current.length === 0 && oldItems.length > 0) {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(oldItems))
-            }
+            if (current.length === 0 && oldItems.length > 0) localStorage.setItem(STORAGE_KEY, JSON.stringify(oldItems))
             localStorage.removeItem(oldKey)
         } catch { /* ignore */ }
     }
