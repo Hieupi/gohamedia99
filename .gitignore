@@ -5,3 +5,4 @@ dist/
 .DS_Store
 Thumbs.db
 *.mp4
+public/kho/
