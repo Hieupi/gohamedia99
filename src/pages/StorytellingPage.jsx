@@ -2,17 +2,24 @@ import { useState, useRef, useEffect } from 'react'
 import {
     Upload, Sparkles, Download, Save, Trash2, X, Send, Plus,
     Image as ImageIcon, Loader, FolderOpen, Eye, GripVertical,
-    ChevronDown, Film, BookOpen, PlusCircle, Check
+    ChevronDown, Film, BookOpen, PlusCircle, Check, RotateCcw
 } from 'lucide-react'
+import SeoAeoPanel from '../components/SeoAeoPanel'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt, VN_DNA_DEFAULTS } from '../services/masterPrompts'
 import { downloadImage, getLibraryItems, saveToLibrary, createLibraryRecord, generateUniqueName } from '../services/libraryService'
 import { POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
+import {
+    CAMERA_PRESETS, MAKEUP_STYLES, SKIN_PRESETS, KOL_COMBOS,
+    findPreset, applyCombo, DEFAULT_KOL_CONFIG,
+} from '../services/kolPresets'
 
 // ─── Options ──────────────────────────────────────────────────────────────────
 const QUALITY_OPTS = ['2K (HD)', '1K (SD)', '4K (Ultra)']
 const ASPECT_OPTS = ['9:16 Dọc (Story)', '4:5 Dọc (IG)', '1:1 Vuông', '16:9 Ngang', '3:4 Chân dung']
-const SKIN_OPTS = ['🤖 Auto', 'Da sứ Hàn Quốc glass skin', 'Da trắng hồng', 'Da trắng sáng', 'Da nâu khỏe', 'Da rám nắng']
+const SKIN_OPTS = SKIN_PRESETS.map(p => p.name)
+const CAMERA_OPTS = CAMERA_PRESETS.map(p => p.name)
+const MAKEUP_OPTS = MAKEUP_STYLES.map(p => p.name)
 const TONE_OPTS = ['🤖 Auto', 'Soft dreamy', 'Warm vintage', 'Cool tone xanh', 'Golden hour', 'Film analog', 'Cinematic', 'Pastel nhẹ nhàng']
 
 const ST_SAVE_KEY = 'goha_storytelling_state'
@@ -95,9 +102,18 @@ const STORY_TEMPLATES = [
     },
 ]
 
-// ─── Scene Card Component ─────────────────────────────────────────────────────
+// ─── Scene Card Component (with Retry + Chat Edit) ────────────────────────────
 
-function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemove, onSave, onDownload, isCustom }) {
+const SCENE_QUICK_EDITS = [
+    '✨ Da trắng hơn', '💋 Môi căng mọng', '👀 Mắt to sáng',
+    '🌟 Sắc nét hơn', '📸 Nổi sản phẩm', '🔆 Tăng sáng',
+]
+
+function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemove, onSave, onDownload, isCustom, onRetry, onEdit, onGenerateSingle }) {
+    const [chatMsg, setChatMsg] = useState('')
+    const isBlackImage = imageSrc && !error && !isLoading && imageSrc.length < 500
+    const isReviewMode = !imageSrc && !isLoading && !error // ★ Review mode: script ready, no image yet
+
     return (
         <div className="st-scene-card">
             <div className="st-scene-header">
@@ -114,9 +130,128 @@ function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemo
                         <Loader size={24} className="spin" style={{ color: 'var(--brand)' }} />
                         <span>Đang tạo cảnh {index + 1}...</span>
                     </div>
+                ) : isReviewMode && scene.pose ? (
+                    /* ═══ REVIEW MODE ═══ Script ready, show description + generate button */
+                    <div className="st-scene-placeholder" style={{ justifyContent: 'flex-start', padding: '10px 8px', gap: 6 }}>
+                        <div style={{ fontSize: 11, color: 'var(--text-secondary)', lineHeight: 1.4, textAlign: 'left', width: '100%' }}>
+                            <div style={{ marginBottom: 4 }}>
+                                <strong style={{ color: 'var(--text-primary)', fontSize: 10 }}>📐 Pose:</strong>{' '}
+                                <span style={{ fontSize: 10 }}>{scene.pose?.substring(0, 80)}{scene.pose?.length > 80 ? '...' : ''}</span>
+                            </div>
+                            <div style={{ marginBottom: 4 }}>
+                                <strong style={{ color: 'var(--text-primary)', fontSize: 10 }}>🎥 Camera:</strong>{' '}
+                                <span style={{ fontSize: 10 }}>{scene.camera}</span>
+                            </div>
+                            <div>
+                                <strong style={{ color: 'var(--text-primary)', fontSize: 10 }}>😊 Cảm xúc:</strong>{' '}
+                                <span style={{ fontSize: 10 }}>{scene.emotion}</span>
+                            </div>
+                        </div>
+
+                        {/* Per-scene generate button */}
+                        {onGenerateSingle && (
+                            <button onClick={onGenerateSingle} style={{
+                                width: '100%', background: 'linear-gradient(135deg, var(--brand), #ff8a50)', color: '#fff',
+                                border: 'none', borderRadius: 8, padding: '7px 0', cursor: 'pointer', fontSize: 11,
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, fontWeight: 700,
+                                marginTop: 4
+                            }}>
+                                <Sparkles size={13} /> Tạo ảnh cảnh này
+                            </button>
+                        )}
+
+                        {/* Edit chat for review */}
+                        {onEdit && (
+                            <div style={{ width: '100%', marginTop: 4 }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 3, justifyContent: 'center' }}>
+                                    {['🎬 Hook mạnh hơn', '📐 Đổi góc quay', '🔄 Đổi tư thế'].map(q => (
+                                        <button key={q} onClick={() => onEdit(q.replace(/^[^\s]+\s/, ''))}
+                                            style={{ fontSize: 9, padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                                            {q}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    <input type="text" value={chatMsg} onChange={e => setChatMsg(e.target.value)}
+                                        placeholder="Sửa kịch bản cảnh này..."
+                                        style={{ flex: 1, fontSize: 11, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-card)', outline: 'none', color: 'var(--text-primary)' }}
+                                        onKeyDown={e => { if (e.key === 'Enter' && chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }} />
+                                    <button disabled={!chatMsg.trim()}
+                                        onClick={() => { if (chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }}
+                                        style={{ background: chatMsg.trim() ? 'var(--brand)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: chatMsg.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}>
+                                        <Send size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 ) : error ? (
                     <div className="st-scene-placeholder">
-                        <span style={{ color: '#ef4444', fontSize: 12 }}>❌ {error}</span>
+                        <span style={{ color: '#ef4444', fontSize: 12, textAlign: 'center' }}>❌ {error}</span>
+                        <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+                            {onRetry && (
+                                <button onClick={onRetry} style={{
+                                    background: 'var(--brand)', color: '#fff', border: 'none',
+                                    borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 11,
+                                    display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600
+                                }}>
+                                    <RotateCcw size={12} /> Tạo lại
+                                </button>
+                            )}
+                        </div>
+                        {onEdit && (
+                            <div style={{ width: '100%', marginTop: 8, padding: '0 4px' }}>
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 4, justifyContent: 'center' }}>
+                                    {['😇 Giảm hở hang', '👗 Thêm áo khoác', '🌿 Pose nhẹ nhàng hơn'].map(q => (
+                                        <button key={q} onClick={() => onEdit(q.replace(/^[^\s]+\s/, ''))}
+                                            style={{ fontSize: 9, padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                                            {q}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    <input type="text" value={chatMsg} onChange={e => setChatMsg(e.target.value)}
+                                        placeholder="Sửa kịch bản cảnh này..."
+                                        style={{ flex: 1, fontSize: 11, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-card)', outline: 'none', color: 'var(--text-primary)' }}
+                                        onKeyDown={e => { if (e.key === 'Enter' && chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }} />
+                                    <button disabled={!chatMsg.trim()}
+                                        onClick={() => { if (chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }}
+                                        style={{ background: chatMsg.trim() ? 'var(--brand)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: chatMsg.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}>
+                                        <Send size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                ) : isBlackImage ? (
+                    <div className="st-scene-placeholder">
+                        <span style={{ color: '#f59e0b', fontSize: 12, textAlign: 'center' }}>⚠️ Ảnh bị lỗi (đen/trống)</span>
+                        <div style={{ display: 'flex', gap: 4, marginTop: 8 }}>
+                            {onRetry && (
+                                <button onClick={onRetry} style={{
+                                    background: 'var(--brand)', color: '#fff', border: 'none',
+                                    borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 11,
+                                    display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600
+                                }}>
+                                    <RotateCcw size={12} /> Tạo lại
+                                </button>
+                            )}
+                        </div>
+                        {onEdit && (
+                            <div style={{ width: '100%', marginTop: 6, padding: '0 4px' }}>
+                                <div style={{ display: 'flex', gap: 4 }}>
+                                    <input type="text" value={chatMsg} onChange={e => setChatMsg(e.target.value)}
+                                        placeholder="Sửa kịch bản..."
+                                        style={{ flex: 1, fontSize: 11, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-card)', outline: 'none', color: 'var(--text-primary)' }}
+                                        onKeyDown={e => { if (e.key === 'Enter' && chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }} />
+                                    <button disabled={!chatMsg.trim()}
+                                        onClick={() => { if (chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }}
+                                        style={{ background: chatMsg.trim() ? 'var(--brand)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: chatMsg.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}>
+                                        <Send size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 ) : imageSrc ? (
                     <img src={imageSrc} alt={scene.title} className="st-scene-img" />
@@ -127,8 +262,10 @@ function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemo
                     </div>
                 )}
             </div>
-            {imageSrc && (
-                <div style={{ display: 'flex', gap: 4, padding: '4px 6px', justifyContent: 'center', background: 'var(--bg-elevated)', borderRadius: '0 0 8px 8px' }}>
+
+            {/* Action buttons */}
+            {imageSrc && !isBlackImage && (
+                <div style={{ display: 'flex', gap: 4, padding: '4px 6px', justifyContent: 'center', background: 'var(--bg-elevated)', flexWrap: 'wrap' }}>
                     <button onClick={onPreview} title="Xem phóng to" style={{ background: 'var(--brand)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Eye size={12} /> Xem
                     </button>
@@ -138,8 +275,39 @@ function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemo
                     <button onClick={onDownload} title="Tải xuống" style={{ background: '#3b82f6', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Download size={12} /> Tải
                     </button>
+                    {onRetry && (
+                        <button onClick={onRetry} title="Tạo lại cảnh này" style={{ background: '#8b5cf6', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 3 }}>
+                            <RotateCcw size={12} /> Lại
+                        </button>
+                    )}
                 </div>
             )}
+
+            {/* Chat Edit area — appears when image exists */}
+            {imageSrc && !isBlackImage && onEdit && (
+                <div style={{ padding: '4px 6px 6px', background: 'var(--bg-elevated)', borderRadius: '0 0 8px 8px' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginBottom: 4 }}>
+                        {SCENE_QUICK_EDITS.map(q => (
+                            <button key={q} onClick={() => onEdit(q.replace(/^[^\s]+\s/, ''))}
+                                style={{ fontSize: 9, padding: '2px 6px', border: '1px solid var(--border)', borderRadius: 12, background: 'var(--bg-card)', cursor: 'pointer', color: 'var(--text-primary)', whiteSpace: 'nowrap' }}>
+                                {q}
+                            </button>
+                        ))}
+                    </div>
+                    <div style={{ display: 'flex', gap: 4 }}>
+                        <input type="text" value={chatMsg} onChange={e => setChatMsg(e.target.value)}
+                            placeholder="Yêu cầu chỉnh sửa ảnh..."
+                            style={{ flex: 1, fontSize: 11, padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6, background: 'var(--bg-card)', outline: 'none', color: 'var(--text-primary)' }}
+                            onKeyDown={e => { if (e.key === 'Enter' && chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }} />
+                        <button disabled={!chatMsg.trim()}
+                            onClick={() => { if (chatMsg.trim()) { onEdit(chatMsg); setChatMsg('') } }}
+                            style={{ background: chatMsg.trim() ? 'var(--brand)' : 'var(--border)', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 8px', cursor: chatMsg.trim() ? 'pointer' : 'default', display: 'flex', alignItems: 'center' }}>
+                            <Send size={12} />
+                        </button>
+                    </div>
+                </div>
+            )}
+
             <div className="st-scene-meta">
                 <div><strong>Pose:</strong> {scene.pose?.substring(0, 60)}...</div>
                 <div><strong>Cảm xúc:</strong> {scene.emotion}</div>
@@ -155,16 +323,17 @@ function ImagePreviewModal({ imageSrc, onClose }) {
     return (
         <div style={{
             position: 'fixed', inset: 0, zIndex: 9999,
-            background: 'rgba(0,0,0,0.92)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(0,0,0,0.92)', display: 'flex',
+            alignItems: 'center', justifyContent: 'center',
             cursor: 'zoom-out'
         }} onClick={onClose}>
             <button onClick={onClose} style={{
-                position: 'absolute', top: 18, right: 24, background: 'rgba(255,255,255,0.15)',
+                position: 'fixed', top: 18, right: 24, background: 'rgba(255,255,255,0.15)',
                 border: 'none', borderRadius: '50%', width: 40, height: 40, cursor: 'pointer',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
+                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', zIndex: 10000
             }}><X size={22} /></button>
             <img src={imageSrc} alt="Preview" onClick={e => e.stopPropagation()} style={{
-                maxWidth: '92vw', maxHeight: '92vh', objectFit: 'contain',
+                maxWidth: '92vw', maxHeight: '90vh', objectFit: 'contain',
                 borderRadius: 12, boxShadow: '0 8px 60px rgba(0,0,0,0.6)', cursor: 'default'
             }} />
         </div>
@@ -176,7 +345,7 @@ function ImagePreviewModal({ imageSrc, onClose }) {
 function LibraryPickerModal({ onSelect, onClose, title }) {
     const items = getLibraryItems()
     return (
-        <div className="modal-overlay" onClick={onClose} style={{ alignItems: 'flex-start', paddingTop: 30 }}>
+        <div className="modal-overlay" onClick={onClose}>
             <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', width: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
                 <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, flexShrink: 0 }}>
                     <FolderOpen size={18} style={{ verticalAlign: -3 }} /> {title || 'Chọn từ Kho Thư Viện'}
@@ -248,11 +417,21 @@ export default function StorytellingPage() {
     const saved = loadSavedState()
     const [quality, setQuality] = useState(saved.quality || '2K (HD)')
     const [aspect, setAspect] = useState(saved.aspect || '9:16 Dọc (Story)')
-    const [skinFilter, setSkinFilter] = useState(saved.skinFilter || 'Da sứ Hàn Quốc glass skin')
+    const [skinFilter, setSkinFilter] = useState(saved.skinFilter || findPreset(SKIN_PRESETS, DEFAULT_KOL_CONFIG.skinPreset).name)
     const [toneFilter, setToneFilter] = useState(saved.toneFilter || 'Soft dreamy')
+    const [cameraPreset, setCameraPreset] = useState(findPreset(CAMERA_PRESETS, DEFAULT_KOL_CONFIG.cameraPreset).name)
+    const [makeupStyle, setMakeupStyle] = useState(findPreset(MAKEUP_STYLES, DEFAULT_KOL_CONFIG.makeupStyle).name)
+    const [selectedCombo, setSelectedCombo] = useState(null)
 
     // Auto-analyze
     const [analyzing, setAnalyzing] = useState(false)
+
+    // ─── 3-Phase Workflow: idle → scripting → review → generating ──────────
+    // 'idle'       = no script yet
+    // 'scripting'  = AI generating script
+    // 'review'     = script ready, user can review/edit before generating images
+    // 'generating' = images being generated
+    const [scriptPhase, setScriptPhase] = useState('idle')
 
     // Generation
     const [results, setResults] = useState({})
@@ -263,6 +442,9 @@ export default function StorytellingPage() {
     // Modals
     const [previewImg, setPreviewImg] = useState(null)
     const [libraryPicker, setLibraryPicker] = useState(null)
+
+    // Cached analysis for retry/edit (avoid re-analyzing)
+    const lastAnalysisRef = useRef({ extractedIdentity: '', extractedProduct: '', refFiles: [], productFiles: [] })
 
     // ─── Auto-save settings to localStorage ────────────────────────────────────
     useEffect(() => {
@@ -277,6 +459,7 @@ export default function StorytellingPage() {
         setScenes([...tpl.scenes])
         setResults({})
         setErrors({})
+        if (tpl.scenes.length > 0) setScriptPhase('review')
     }
 
     const addScene = () => {
@@ -416,7 +599,8 @@ Return ONLY the JSON array, no markdown, no explanation.`
                     emotion: s.emotion || 'Natural'
                 }))
                 setScenes(newScenes)
-                console.log('[Auto-analyze] Generated', newScenes.length, 'scenes')
+                setScriptPhase('review') // → Go to review phase, NOT image generation
+                console.log('[Auto-analyze] Generated', newScenes.length, 'scenes — entering review phase')
             }
         } catch (err) {
             console.error('[Auto-analyze error]', err)
@@ -425,11 +609,35 @@ Return ONLY the JSON array, no markdown, no explanation.`
         setAnalyzing(false)
     }
 
+    // ─── Helper: Build shot description for a scene ──────────────────────────
+
+    const buildSceneShotDesc = (scene, idx, totalScenes, extractedIdentity) => {
+        return `STORYTELLING SCENE ${idx + 1} of ${totalScenes}: "${scene.title}"
+THIS IS SCENE ${idx + 1} IN A CONTINUOUS STORY. This scene happens IMMEDIATELY AFTER scene ${idx} and BEFORE scene ${idx + 2}.
+Pose & Action: ${scene.pose}
+Camera Angle: ${scene.camera || 'Professional fashion photography angle'}
+Emotion & Expression: ${scene.emotion}
+${storyContext ? `Shared Story Context: ${storyContext}` : ''}
+
+=== DNA LOCK ===
+FACE: SAME face shape, eyes, nose, lips, jawline, makeup, eyebrows
+BODY: SAME breast size, waist, hip, shoulder width, height, weight
+HAIR: SAME color, length, style, bangs
+OUTFIT: SAME clothes, fabric color, pattern, shoes
+PROP: If bicycle appears, SAME model/basket/color in ALL scenes. If umbrella, SAME umbrella.
+TIME: SAME time of day, lighting direction, shadow angle, weather
+LOCATION: SAME area style, architecture, color palette
+${extractedIdentity ? `\nIdentity DNA: ${extractedIdentity}` : ''}
+
+Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
+    }
+
     // ─── Generate ALL scenes ──────────────────────────────────────────────────
 
     const handleGenerateAll = async () => {
         if (productImages.length === 0 || scenes.length === 0) return
         setGenerating(true)
+        setScriptPhase('generating')
         setErrors({})
         setResults({})
         const allIdx = new Set(scenes.map((_, i) => i))
@@ -450,30 +658,20 @@ Return ONLY the JSON array, no markdown, no explanation.`
             console.log('[Story Bot1]', extractedIdentity?.substring(0, 100))
             console.log('[Story Bot2]', extractedProduct?.substring(0, 100))
 
+            // Cache for retry/edit
+            lastAnalysisRef.current = { extractedIdentity, extractedProduct, refFiles, productFiles }
+
             const mainFile = productFiles[0]
 
             // Generate each scene
             const tasks = scenes.map((scene, idx) =>
                 (async () => {
                     try {
-                        const shotDesc = `STORYTELLING SCENE ${idx + 1} of ${scenes.length}: "${scene.title}"
-THIS IS SCENE ${idx + 1} IN A CONTINUOUS STORY. This scene happens IMMEDIATELY AFTER scene ${idx} and BEFORE scene ${idx + 2}.
-Pose & Action: ${scene.pose}
-Camera Angle: ${scene.camera || 'Professional fashion photography angle'}
-Emotion & Expression: ${scene.emotion}
-${storyContext ? `Shared Story Context: ${storyContext}` : ''}
+                        const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, extractedIdentity)
 
-=== DNA LOCK ===
-FACE: SAME face shape, eyes, nose, lips, jawline, makeup, eyebrows
-BODY: SAME breast size, waist, hip, shoulder width, height, weight
-HAIR: SAME color, length, style, bangs
-OUTFIT: SAME clothes, fabric color, pattern, shoes
-PROP: If bicycle appears, SAME model/basket/color in ALL scenes. If umbrella, SAME umbrella.
-TIME: SAME time of day, lighting direction, shadow angle, weather
-LOCATION: SAME area style, architecture, color palette
-${extractedIdentity ? `\nIdentity DNA: ${extractedIdentity}` : ''}
-
-Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
+                        const camPreset = CAMERA_PRESETS.find(p => p.name === cameraPreset)
+                        const mkpPreset = MAKEUP_STYLES.find(p => p.name === makeupStyle)
+                        const sknPreset = SKIN_PRESETS.find(p => p.name === skinFilter)
 
                         const prompt = buildMasterImagePrompt({
                             extractedIdentity,
@@ -482,14 +680,20 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
                             background: '🤖 Auto (AI tự chọn)',
                             pose: '🤖 Auto (AI tự chọn)',
                             style: '🤖 Auto (AI tự chọn)',
-                            skinFilter,
+                            skinFilter: sknPreset?.prompt || skinFilter,
                             toneFilter,
                             quality, aspect,
                             userPrompt: '',
                             shotDescription: shotDesc,
+                            cameraPreset: camPreset?.prompt || '',
+                            makeupStyle: mkpPreset?.prompt || '',
+                            referenceImages: refFiles,
                         })
 
-                        const result = await generateGarmentImage(mainFile, prompt, { quality, aspect })
+                        const result = await generateGarmentImage(mainFile, prompt, {
+                            quality, aspect,
+                            referenceFiles: refFiles,  // ★ Send face references to AI
+                        })
                         const dataUrl = `data:${result.mimeType};base64,${result.base64}`
                         setResults(prev => ({ ...prev, [idx]: dataUrl }))
                     } catch (err) {
@@ -507,6 +711,181 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
             setLoadingSet(new Set())
         }
         setGenerating(false)
+    }
+
+    // ─── Generate SINGLE scene image ──────────────────────────────────────────
+    const handleGenerateSingle = async (idx) => {
+        if (productImages.length === 0 || !scenes[idx]) return
+
+        setLoadingSet(prev => new Set(prev).add(idx))
+        setErrors(prev => { const n = { ...prev }; delete n[idx]; return n })
+
+        try {
+            let { extractedIdentity, extractedProduct, refFiles, productFiles } = lastAnalysisRef.current
+
+            // If no cached analysis, run Bot1 + Bot2
+            if (!extractedIdentity && !extractedProduct) {
+                productFiles = await entriesToFiles(productImages)
+                refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+
+                const [id, prod] = await Promise.all([
+                    refFiles.length > 0
+                        ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFiles })
+                        : Promise.resolve(''),
+                    callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFiles }),
+                ])
+                extractedIdentity = id
+                extractedProduct = prod
+                lastAnalysisRef.current = { extractedIdentity, extractedProduct, refFiles, productFiles }
+            }
+
+            const scene = scenes[idx]
+            const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, extractedIdentity)
+
+            const camPreset = CAMERA_PRESETS.find(p => p.name === cameraPreset)
+            const mkpPreset = MAKEUP_STYLES.find(p => p.name === makeupStyle)
+            const sknPreset = SKIN_PRESETS.find(p => p.name === skinFilter)
+
+            const prompt = buildMasterImagePrompt({
+                extractedIdentity,
+                extractedProduct,
+                modelType: '🤖 Auto (AI tự chọn)',
+                background: '🤖 Auto (AI tự chọn)',
+                pose: '🤖 Auto (AI tự chọn)',
+                style: '🤖 Auto (AI tự chọn)',
+                skinFilter: sknPreset?.prompt || skinFilter,
+                toneFilter,
+                quality, aspect,
+                userPrompt: '',
+                shotDescription: shotDesc,
+                cameraPreset: camPreset?.prompt || '',
+                makeupStyle: mkpPreset?.prompt || '',
+                referenceImages: refFiles,
+            })
+
+            const mainFile = productFiles[0]
+            const result = await generateGarmentImage(mainFile, prompt, {
+                quality, aspect,
+                referenceFiles: refFiles,
+            })
+            const dataUrl = `data:${result.mimeType};base64,${result.base64}`
+            setResults(prev => ({ ...prev, [idx]: dataUrl }))
+        } catch (err) {
+            console.error(`[Single Scene ${idx}]`, err)
+            setErrors(prev => ({ ...prev, [idx]: err.message }))
+        }
+        setLoadingSet(prev => { const n = new Set(prev); n.delete(idx); return n })
+    }
+
+    // ─── Retry single scene ───────────────────────────────────────────────────
+
+    const handleRetryScene = async (idx) => {
+        const { extractedIdentity, extractedProduct, refFiles } = lastAnalysisRef.current
+        if (!extractedProduct && productImages.length === 0) return
+
+        setLoadingSet(prev => { const n = new Set(prev); n.add(idx); return n })
+        setErrors(prev => { const n = { ...prev }; delete n[idx]; return n })
+
+        try {
+            let prodFiles = lastAnalysisRef.current.productFiles
+            let identity = extractedIdentity
+            let product = extractedProduct
+            let rFiles = refFiles
+
+            // Re-analyze if no cached data
+            if (!product) {
+                prodFiles = await entriesToFiles(productImages)
+                rFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+                const [id, pd] = await Promise.all([
+                    rFiles.length > 0 ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: rFiles }) : Promise.resolve(''),
+                    callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: prodFiles }),
+                ])
+                identity = id; product = pd
+                lastAnalysisRef.current = { extractedIdentity: identity, extractedProduct: product, refFiles: rFiles, productFiles: prodFiles }
+            }
+
+            const scene = scenes[idx]
+            const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, identity)
+            const camP = CAMERA_PRESETS.find(p => p.name === cameraPreset)
+            const mkP = MAKEUP_STYLES.find(p => p.name === makeupStyle)
+            const skP = SKIN_PRESETS.find(p => p.name === skinFilter)
+
+            const prompt = buildMasterImagePrompt({
+                extractedIdentity: identity, extractedProduct: product,
+                modelType: '🤖 Auto (AI tự chọn)', background: '🤖 Auto (AI tự chọn)',
+                pose: '🤖 Auto (AI tự chọn)', style: '🤖 Auto (AI tự chọn)',
+                skinFilter: skP?.prompt || skinFilter, toneFilter, quality, aspect,
+                userPrompt: '', shotDescription: shotDesc,
+                cameraPreset: camP?.prompt || '', makeupStyle: mkP?.prompt || '',
+                referenceImages: rFiles,
+            })
+
+            const result = await generateGarmentImage(prodFiles[0], prompt, {
+                quality, aspect, referenceFiles: rFiles,
+            })
+            const dataUrl = `data:${result.mimeType};base64,${result.base64}`
+            setResults(prev => ({ ...prev, [idx]: dataUrl }))
+        } catch (err) {
+            console.error(`[Retry Scene ${idx}]`, err)
+            setErrors(prev => ({ ...prev, [idx]: err.message }))
+        }
+        setLoadingSet(prev => { const n = new Set(prev); n.delete(idx); return n })
+    }
+
+    // ─── Edit single scene with user instruction ──────────────────────────────
+
+    const handleEditScene = async (idx, editInstruction) => {
+        const { extractedIdentity, extractedProduct, refFiles } = lastAnalysisRef.current
+        if (!extractedProduct && productImages.length === 0) return
+
+        setLoadingSet(prev => { const n = new Set(prev); n.add(idx); return n })
+        setErrors(prev => { const n = { ...prev }; delete n[idx]; return n })
+
+        try {
+            let prodFiles = lastAnalysisRef.current.productFiles
+            let identity = extractedIdentity
+            let product = extractedProduct
+            let rFiles = refFiles
+
+            if (!product) {
+                prodFiles = await entriesToFiles(productImages)
+                rFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+                const [id, pd] = await Promise.all([
+                    rFiles.length > 0 ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: rFiles }) : Promise.resolve(''),
+                    callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: prodFiles }),
+                ])
+                identity = id; product = pd
+                lastAnalysisRef.current = { extractedIdentity: identity, extractedProduct: product, refFiles: rFiles, productFiles: prodFiles }
+            }
+
+            const scene = scenes[idx]
+            const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, identity)
+            const camP = CAMERA_PRESETS.find(p => p.name === cameraPreset)
+            const mkP = MAKEUP_STYLES.find(p => p.name === makeupStyle)
+            const skP = SKIN_PRESETS.find(p => p.name === skinFilter)
+
+            const editSuffix = `\n[USER EDIT INSTRUCTION — HIGHEST PRIORITY]\n${editInstruction}\nApply this edit while keeping the SAME face identity, outfit, and scene composition.`
+
+            const prompt = buildMasterImagePrompt({
+                extractedIdentity: identity, extractedProduct: product,
+                modelType: '🤖 Auto (AI tự chọn)', background: '🤖 Auto (AI tự chọn)',
+                pose: '🤖 Auto (AI tự chọn)', style: '🤖 Auto (AI tự chọn)',
+                skinFilter: skP?.prompt || skinFilter, toneFilter, quality, aspect,
+                userPrompt: editSuffix, shotDescription: shotDesc,
+                cameraPreset: camP?.prompt || '', makeupStyle: mkP?.prompt || '',
+                referenceImages: rFiles,
+            })
+
+            const result = await generateGarmentImage(prodFiles[0], prompt, {
+                quality, aspect, referenceFiles: rFiles,
+            })
+            const dataUrl = `data:${result.mimeType};base64,${result.base64}`
+            setResults(prev => ({ ...prev, [idx]: dataUrl }))
+        } catch (err) {
+            console.error(`[Edit Scene ${idx}]`, err)
+            setErrors(prev => ({ ...prev, [idx]: err.message }))
+        }
+        setLoadingSet(prev => { const n = new Set(prev); n.delete(idx); return n })
     }
 
     const canGenerate = productImages.length > 0 && scenes.length > 0 && !generating
@@ -732,19 +1111,72 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
                                     </div>
                                     <div className="nd-row-2">
                                         <div className="form-group">
-                                            <label className="nd-label">🎨 TONE DA / SKIN FILTER</label>
+                                            <label className="nd-label">🎯 KOL COMBO</label>
+                                            <div className="pose-templates">
+                                                {KOL_COMBOS.map(combo => (
+                                                    <button key={combo.id}
+                                                        className={`pose-tpl-btn${selectedCombo === combo.id ? ' active' : ''}`}
+                                                        title={combo.description}
+                                                        onClick={() => {
+                                                            if (selectedCombo === combo.id) {
+                                                                setSelectedCombo(null)
+                                                            } else {
+                                                                setSelectedCombo(combo.id)
+                                                                const applied = applyCombo(combo.id)
+                                                                if (applied) {
+                                                                    setCameraPreset(findPreset(CAMERA_PRESETS, applied.cameraPreset).name)
+                                                                    setSkinFilter(findPreset(SKIN_PRESETS, applied.skinPreset).name)
+                                                                    setMakeupStyle(findPreset(MAKEUP_STYLES, applied.makeupStyle).name)
+                                                                }
+                                                            }
+                                                        }}>
+                                                        {combo.emoji} {combo.name.replace(/^[^—]+— /, '')}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="nd-row-2">
+                                        <div className="form-group">
+                                            <label className="nd-label">📷 CAMERA</label>
+                                            <div className="pose-templates">
+                                                {CAMERA_OPTS.map(c => (
+                                                    <button key={c}
+                                                        className={`pose-tpl-btn${cameraPreset === c ? ' active' : ''}`}
+                                                        onClick={() => { setCameraPreset(c); setSelectedCombo(null) }}>
+                                                        {c}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="form-group">
+                                            <label className="nd-label">💄 MAKEUP</label>
+                                            <div className="pose-templates">
+                                                {MAKEUP_OPTS.map(m => (
+                                                    <button key={m}
+                                                        className={`pose-tpl-btn${makeupStyle === m ? ' active' : ''}`}
+                                                        onClick={() => { setMakeupStyle(m); setSelectedCombo(null) }}>
+                                                        {m}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="nd-row-2">
+                                        <div className="form-group">
+                                            <label className="nd-label">🎨 TONE DA</label>
                                             <div className="pose-templates">
                                                 {SKIN_OPTS.map(s => (
                                                     <button key={s}
                                                         className={`pose-tpl-btn${skinFilter === s ? ' active' : ''}`}
-                                                        onClick={() => setSkinFilter(s)}>
+                                                        onClick={() => { setSkinFilter(s); setSelectedCombo(null) }}>
                                                         {s}
                                                     </button>
                                                 ))}
                                             </div>
                                         </div>
                                         <div className="form-group">
-                                            <label className="nd-label">🌈 TONE MÀU / COLOR FILTER</label>
+                                            <label className="nd-label">🌈 TONE MÀU</label>
                                             <div className="pose-templates">
                                                 {TONE_OPTS.map(t => (
                                                     <button key={t}
@@ -789,14 +1221,33 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
                                 </div>
                             </div>
 
-                            {/* Generate button */}
-                            <button className="nd-generate-btn" onClick={handleGenerateAll} disabled={!canGenerate}>
-                                {generating ? (
-                                    <><Loader size={18} className="spin" /> Đang tạo {scenes.length} phân cảnh...</>
-                                ) : (
-                                    <><Sparkles size={18} /> Tạo {scenes.length} cảnh × 3s = {totalDuration}s video</>
-                                )}
-                            </button>
+                            {/* Generate buttons — phase-aware */}
+                            {scriptPhase === 'review' && scenes.length > 0 ? (
+                                /* ═══ PHASE 3: Review complete → show "Generate All" button ═══ */
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    <button className="nd-generate-btn" onClick={handleGenerateAll}
+                                        disabled={!canGenerate || generating}
+                                        style={{ background: generating ? undefined : 'linear-gradient(135deg, #10b981, #059669)' }}>
+                                        {generating ? (
+                                            <><Loader size={18} className="spin" /> Đang tạo {scenes.length} cảnh...</>
+                                        ) : (
+                                            <><Sparkles size={18} /> 🚀 Tạo TẤT CẢ {scenes.length} ảnh cùng lúc</>
+                                        )}
+                                    </button>
+                                    <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
+                                        💡 Hoặc bấm <strong>"📸 Tạo ảnh cảnh này"</strong> trên từng phân cảnh bên phải để chạy từng ảnh một.
+                                    </p>
+                                </div>
+                            ) : (
+                                /* ═══ PHASE 1: No script yet → show original generate button ═══ */
+                                <button className="nd-generate-btn" onClick={handleGenerateAll} disabled={!canGenerate}>
+                                    {generating ? (
+                                        <><Loader size={18} className="spin" /> Đang tạo {scenes.length} phân cảnh...</>
+                                    ) : (
+                                        <><Sparkles size={18} /> Tạo {scenes.length} cảnh × 3s = {totalDuration}s video</>
+                                    )}
+                                </button>
+                            )}
                         </div>
 
                         {/* ═══ RIGHT: Scene Timeline ═══ */}
@@ -841,6 +1292,9 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
                                             if (!results[idx]) return
                                             downloadImage(results[idx], `Story-Scene-${idx + 1}-${scene.title}.png`)
                                         }}
+                                        onRetry={() => handleRetryScene(idx)}
+                                        onEdit={(msg) => handleEditScene(idx, msg)}
+                                        onGenerateSingle={() => handleGenerateSingle(idx)}
                                         isCustom={isCustom}
                                     />
                                 ))}
@@ -881,6 +1335,13 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
                 </>
             )
             }
+
+            {/* ═══ SEO & AEO Panel ═══ */}
+            <SeoAeoPanel
+                images={Object.values(results)}
+                productContext={lastAnalysisRef.current?.extractedProduct || ''}
+                shotDescriptions={scenes.map(s => ({ title: s.title, shotDesc: s.pose, category: 'setup' }))}
+            />
 
             {/* Preview */}
             {previewImg && <ImagePreviewModal imageSrc={previewImg} onClose={() => setPreviewImg(null)} />}

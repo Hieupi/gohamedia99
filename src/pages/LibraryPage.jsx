@@ -4,7 +4,7 @@ import {
 } from 'lucide-react'
 import {
   getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
-  downloadImage, saveToLibrary, createLibraryRecord, migrateOldLibrary,
+  downloadImage, downloadHDImage, saveToLibrary, createLibraryRecord, migrateOldLibrary,
   getFolders, createFolder, deleteFolder, moveItemToFolder, moveFolderInto
 } from '../services/libraryService'
 import { getOriginalImage, saveToFilesystem } from '../services/imageStorageService'
@@ -73,7 +73,7 @@ function PreviewModal({ item, onClose }) {
         </div>
         <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
           <button className="btn btn-primary" style={{ flex: 1, fontSize: 12 }}
-            onClick={() => downloadImage(hdSrc || item.imageSrc, item.name)}>
+            onClick={() => downloadHDImage(item.id, item.imageSrc, item.name)}>
             <Download size={12} /> Tải xuống HD
           </button>
         </div>
@@ -95,16 +95,27 @@ function UploadModal({ onClose, onSaved }) {
   const [category, setCategory] = useState('other')
   const [saving, setSaving] = useState(false)
 
+  const readFileAsBase64 = (file) => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = reject
+      reader.readAsDataURL(file)
+    })
+  }
+
   const handleFile = async (f) => {
     if (!f || !f.type.startsWith('image/')) return
     setFile(f)
-    setPreviewUrl(URL.createObjectURL(f))
+    // Đọc file thành base64 thay vì objectURL (objectURL bị mất khi reload)
+    const base64 = await readFileAsBase64(f)
+    setPreviewUrl(base64)
     setAnalyzing(true)
     setAiResult(null)
 
     try {
       const raw = await callGemini({ prompt: ANALYZE_PROMPT, images: [f], temperature: 0.2 })
-      const clean = raw.replace(/```json\s * /g, '').replace(/```/g, '').trim()
+      const clean = raw.replace(/```json\s*/g, '').replace(/```/g, '').trim()
       const parsed = JSON.parse(clean)
       setAiResult(parsed)
       setCategory(parsed.category || 'other')
@@ -213,9 +224,9 @@ function UploadModal({ onClose, onSaved }) {
               style={{ marginBottom: 12, fontFamily: 'monospace', fontSize: 13.5, fontWeight: 600 }} />
 
             <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
-              <button className={`toggle - pill ${type === 'product' ? 'active' : ''} `}
+              <button className={`toggle-pill ${type === 'product' ? 'active' : ''}`}
                 onClick={() => setType('product')}>Sản phẩm</button>
-              <button className={`toggle - pill ${type === 'model' ? 'active' : ''} `}
+              <button className={`toggle-pill ${type === 'model' ? 'active' : ''}`}
                 onClick={() => setType('model')}>Người mẫu</button>
             </div>
           </>
@@ -337,7 +348,7 @@ export default function LibraryPage() {
     setItems(updated)
   }
 
-  const handleDownload = (item) => downloadImage(item.imageSrc, item.name)
+  const handleDownload = (item) => downloadHDImage(item.id, item.imageSrc, item.name)
 
   const filtered = items.filter(item => {
     if (selectedCat !== 'Tất cả' && mapCategory(item.category) !== selectedCat) return false
@@ -400,9 +411,9 @@ export default function LibraryPage() {
               onChange={e => setSearchQ(e.target.value)} className="lib-search-input" />
           </div>
           <div className="lib-view-toggle">
-            <button className={`lib-view-btn ${view === 'grid' ? 'active' : ''} `}
+            <button className={`lib-view-btn ${view === 'grid' ? 'active' : ''}`}
               onClick={() => setView('grid')}><Grid size={16} /></button>
-            <button className={`lib-view-btn ${view === 'list' ? 'active' : ''} `}
+            <button className={`lib-view-btn ${view === 'list' ? 'active' : ''}`}
               onClick={() => setView('list')}><List size={16} /></button>
           </div>
         </div>
@@ -411,7 +422,7 @@ export default function LibraryPage() {
         <div className="lib-tabs">
           {CATEGORIES.map(cat => (
             <button key={cat}
-              className={`lib-tab ${selectedCat === cat ? 'active' : ''} `}
+              className={`lib-tab ${selectedCat === cat ? 'active' : ''}`}
               onClick={() => setSelectedCat(cat)}>
               {cat}
             </button>

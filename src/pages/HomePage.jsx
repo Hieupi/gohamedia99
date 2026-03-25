@@ -1,18 +1,21 @@
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, Image, Clock, ArrowRight, Zap, Star } from 'lucide-react'
-
-// Placeholder fashion images using picsum
-const RECENT = [
-  { id: 1, src: 'https://picsum.photos/seed/fashion1/300/450', name: 'Áo đầm trắng', date: '20/3/2025' },
-  { id: 2, src: 'https://picsum.photos/seed/fashion2/300/450', name: 'Áo thun basic', date: '19/3/2025' },
-  { id: 3, src: 'https://picsum.photos/seed/fashion3/300/450', name: 'Đầm hoa nhí', date: '18/3/2025' },
-  { id: 4, src: 'https://picsum.photos/seed/fashion4/300/450', name: 'Áo khoác denim', date: '17/3/2025' },
-  { id: 5, src: 'https://picsum.photos/seed/fashion5/300/450', name: 'Váy midi', date: '16/3/2025' },
-  { id: 6, src: 'https://picsum.photos/seed/fashion6/300/450', name: 'Set đồ công sở', date: '15/3/2025' },
-]
+import { Sparkles, Image, Clock, ArrowRight, Zap, Star, ImageOff } from 'lucide-react'
+import { getLibraryItems } from '../services/libraryService'
 
 export default function HomePage() {
   const navigate = useNavigate()
+  const [recentItems, setRecentItems] = useState([])
+
+  useEffect(() => {
+    const items = getLibraryItems()
+    // Lấy 6 ảnh gần nhất từ Library thực tế
+    const sorted = items
+      .filter(i => i.imageSrc)
+      .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      .slice(0, 6)
+    setRecentItems(sorted)
+  }, [])
 
   return (
     <div className="fade-in">
@@ -58,17 +61,17 @@ export default function HomePage() {
           </div>
         </div>
 
-        <div className="quick-card">
+        <div className="quick-card" onClick={() => navigate('/storytelling')}>
           <div className="quick-card-icon-wrap orange">
             <Clock />
           </div>
           <div>
-            <div className="quick-card-label">Lịch sử</div>
-            <div className="quick-card-desc">Xem các thiết kế trước</div>
+            <div className="quick-card-label">Storytelling</div>
+            <div className="quick-card-desc">Kể chuyện bằng hình ảnh</div>
           </div>
         </div>
 
-        <div className="quick-card">
+        <div className="quick-card" onClick={() => navigate('/library')}>
           <div className="quick-card-icon-wrap orange">
             <Star />
           </div>
@@ -79,32 +82,52 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Recent Designs */}
+      {/* Recent Designs — dữ liệu thực từ Library */}
       <div>
         <div className="section-header">
           <div className="section-title">
             <Clock />
             Thiết kế gần đây
           </div>
-          <span className="section-link">Xem tất cả →</span>
+          <span className="section-link" onClick={() => navigate('/library')} style={{ cursor: 'pointer' }}>
+            Xem tất cả →
+          </span>
         </div>
-        <div className="image-grid">
-          {RECENT.map(item => (
-            <div key={item.id} className="image-card">
-              <img
-                className="image-card-thumb"
-                src={item.src}
-                alt={item.name}
-                loading="lazy"
-                onError={e => { e.currentTarget.style.display = 'none' }}
-              />
-              <div className="image-card-info">
-                <div className="image-card-name">{item.name}</div>
-                <div className="image-card-date">{item.date}</div>
+
+        {recentItems.length > 0 ? (
+          <div className="image-grid">
+            {recentItems.map(item => (
+              <div key={item.id} className="image-card" onClick={() => navigate('/library')} style={{ cursor: 'pointer' }}>
+                <img
+                  className="image-card-thumb"
+                  src={item.imageSrc}
+                  alt={item.name}
+                  loading="lazy"
+                  onError={e => { e.currentTarget.style.display = 'none' }}
+                />
+                <div className="image-card-info">
+                  <div className="image-card-name">{item.name}</div>
+                  <div className="image-card-date">{new Date(item.createdAt).toLocaleDateString('vi-VN')}</div>
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        ) : (
+          <div className="empty-state" style={{ minHeight: 200, marginTop: 12 }}>
+            <ImageOff size={40} style={{ color: 'var(--text-muted)', opacity: 0.25 }} />
+            <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-secondary)', marginTop: 12 }}>
+              Chưa có thiết kế nào
+            </p>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>
+              Bắt đầu bằng cách tải ảnh lên Thư viện hoặc Tạo thiết kế mới.
+            </p>
+            <button className="btn btn-primary" style={{ marginTop: 14 }}
+              onClick={() => navigate('/new-design')}>
+              <Sparkles size={14} />
+              Thiết kế ngay
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )

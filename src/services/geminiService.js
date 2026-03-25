@@ -148,29 +148,56 @@ export async function analyzeGarments(imageFile, masterPrompt) {
 }
 
 /**
- * Tạo ảnh sản phẩm tách đồ bằng Gemini Image Gen.
- * Gửi ảnh gốc + prompt mô tả item → nhận lại ảnh base64.
+ * Tạo ảnh bằng Gemini Image Gen.
+ * Gửi ảnh tham chiếu (nếu có) + ảnh sản phẩm + prompt → nhận lại ảnh base64.
  *
- * @param {File}    imageFile  — Ảnh gốc (reference)
- * @param {string}  itemPrompt — Prompt mô tả item cần tách
+ * ★ CRITICAL: Reference images go FIRST so AI sees the face identity before anything else.
+ *
+ * @param {File}    imageFile       — Ảnh sản phẩm chính
+ * @param {string}  itemPrompt      — Prompt mô tả
  * @param {object}  opts
- * @param {string}  opts.quality  — '1K'|'2K'|'4K'
- * @param {string}  opts.aspect   — '1:1'|'16:9'|'9:16'|'3:4'|'2:3'
+ * @param {string}  opts.quality    — '1K'|'2K'|'4K'
+ * @param {string}  opts.aspect     — '1:1'|'16:9'|'9:16'|'3:4'|'2:3'
+ * @param {File[]}  opts.referenceFiles — Ảnh mẫu tham chiếu khuôn mặt (gửi trước product)
  * @returns {Promise<{base64: string, mimeType: string}>}
  */
 export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
   const apiKey = getNextApiKey()
   if (!apiKey) throw new Error('Chưa có API key.')
 
+  // Map quality to API imageSize — handles all formats:
+  // '2K' (RemoveClothes), '2K (HD)' (NewDesign/Storytelling), '4K (Ultra)' etc
+  const rawQuality = opts.quality || '2K'
+  const sizeMatch = rawQuality.match(/([124]K)/i)
+  const apiImageSize = sizeMatch ? sizeMatch[1].toUpperCase() : '2K'
+
+  // Normalize aspect ratio format (e.g. "9:16 Dọc (Story)" → "9:16")
+  const rawAspect = opts.aspect || '1:1'
+  const apiAspectRatio = rawAspect.match(/\d+:\d+/)?.[0] || '1:1'
+
+  // ★ Build image parts: REFERENCE FACES FIRST, then product image
+  // This order is critical — AI prioritizes early images for identity
+  const imageParts = []
+
+  // Add reference face images FIRST (img1, img2...) for identity lock
+  const refFiles = opts.referenceFiles || []
+  for (const refFile of refFiles) {
+    const refBase64 = await fileToBase64(refFile)
+    const refMime = getMimeType(refFile)
+    imageParts.push({ inline_data: { mime_type: refMime, data: refBase64 } })
+  }
+
+  // Add product image AFTER references
   const base64Img = await fileToBase64(imageFile)
   const mime = getMimeType(imageFile)
+  imageParts.push({ inline_data: { mime_type: mime, data: base64Img } })
 
-  // Gemini Image Gen: IMAGE phải trước TEXT
+  // Gemini Image Gen: IMAGEs before TEXT
   const body = {
     contents: [{
       role: 'user',
       parts: [
-        { inline_data: { mime_type: mime, data: base64Img } },
+        ...imageParts,
         { text: itemPrompt },
       ],
     }],
@@ -178,12 +205,18 @@ export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
       temperature: 0.4,
       maxOutputTokens: 8192,
       responseModalities: ['TEXT', 'IMAGE'],
+      // ★ CRITICAL: imageConfig controls actual output resolution
+      // Without this, API defaults to 1K (1024px)
+      imageConfig: {
+        imageSize: apiImageSize,
+        aspectRatio: apiAspectRatio,
+      },
     },
   }
 
   const url = `${BASE_URL}/${MODEL_IMAGE}:generateContent?key=${apiKey}`
 
-  console.log('[GarmentGen] Calling model:', MODEL_IMAGE, '| prompt length:', itemPrompt.length)
+  console.log('[GarmentGen] Calling model:', MODEL_IMAGE, '| imageSize:', apiImageSize, '| aspectRatio:', apiAspectRatio, '| prompt length:', itemPrompt.length)
 
   const res = await fetch(url, {
     method: 'POST',

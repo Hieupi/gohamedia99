@@ -7,13 +7,14 @@
  */
 
 import { saveOriginalImage, deleteOriginalImage } from './imageStorageService'
+import { saveToDownloadFolder, saveToKhoFolder } from './fileSaveService'
 
 const STORAGE_KEY = 'goha_studio_library'
 const FOLDERS_KEY = 'goha_studio_folders'
 
 // ─── Resize ───────────────────────────────────────────────────────────────────
 
-export function resizeForStorage(dataUrl, maxSize = 400) {
+export function resizeForStorage(dataUrl, maxSize = 800) {
     return new Promise((resolve) => {
         if (!dataUrl || !dataUrl.startsWith('data:')) { resolve(dataUrl); return }
         const img = new Image()
@@ -27,7 +28,7 @@ export function resizeForStorage(dataUrl, maxSize = 400) {
                 }
                 canvas.width = w; canvas.height = h
                 canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-                resolve(canvas.toDataURL('image/jpeg', 0.65))
+                resolve(canvas.toDataURL('image/jpeg', 0.82))
             } catch { resolve(dataUrl) }
         }
         img.onerror = () => resolve(dataUrl)
@@ -68,22 +69,32 @@ export function generateUniqueName({ category, description, prefix } = {}) {
 // ─── Write ────────────────────────────────────────────────────────────────────
 
 export async function saveToLibrary(record) {
+    // Giữ bản gốc để lưu vào Kho disk
+    const originalSrc = record.imageSrc
     try {
         if (record.imageSrc && record.imageSrc.startsWith('data:')) {
             await saveOriginalImage(record.id, record.imageSrc)
-            record.imageSrc = await resizeForStorage(record.imageSrc, 400)
+            record.imageSrc = await resizeForStorage(record.imageSrc, 800)
         }
         const items = getLibraryItems()
         const exists = items.findIndex(i => i.id === record.id)
         if (exists >= 0) { items[exists] = { ...items[exists], ...record } }
         else { items.unshift(record) }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+
+        // ★ Auto-save bản gốc vào public/kho
+        if (originalSrc && originalSrc.startsWith('data:')) {
+            saveToKhoFolder(originalSrc, record.name || record.id).catch(err =>
+                console.warn('[saveToLibrary] Kho disk save failed:', err.message)
+            )
+        }
+
         return { success: true, items }
     } catch (err) {
         console.error('saveToLibrary error:', err)
         if (err.name === 'QuotaExceededError' || err.code === 22) {
             try {
-                record.imageSrc = await resizeForStorage(record.imageSrc, 200)
+                record.imageSrc = await resizeForStorage(record.imageSrc, 400)
                 const items = getLibraryItems(); items.unshift(record)
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
                 return { success: true, items }
@@ -127,9 +138,41 @@ export function createLibraryRecord({ name, type, category, imageSrc, source, fo
 // ─── Download ─────────────────────────────────────────────────────────────────
 
 export function downloadImage(dataUrl, fileName) {
+    const fullName = `${fileName || 'goha-studio'}-${Date.now()}.png`
     const a = document.createElement('a')
-    a.href = dataUrl; a.download = `${fileName || 'goha-studio'}-${Date.now()}.png`
+    a.href = dataUrl; a.download = fullName
     document.body.appendChild(a); a.click(); document.body.removeChild(a)
+
+    // ★ Auto-save vào thư mục Download cố định
+    saveToDownloadFolder(dataUrl, fullName).catch(err =>
+        console.warn('[downloadImage] Disk save failed:', err.message)
+    )
+}
+
+/**
+ * Download ảnh chất lượng HD gốc từ IndexedDB.
+ * Nếu IndexedDB không có, fallback sang thumbnail trong localStorage.
+ * ★ Tự động lưu vào thư mục Download cố định.
+ */
+export async function downloadHDImage(itemId, itemImageSrc, fileName) {
+    try {
+        const { getOriginalImage } = await import('./imageStorageService')
+        const hdSrc = await getOriginalImage(itemId)
+        const src = hdSrc || itemImageSrc
+        const fullName = `${fileName || 'goha-studio'}-${Date.now()}.png`
+
+        // Browser download
+        const a = document.createElement('a')
+        a.href = src; a.download = fullName
+        document.body.appendChild(a); a.click(); document.body.removeChild(a)
+
+        // ★ Auto-save vào thư mục Download cố định
+        saveToDownloadFolder(src, fullName).catch(err =>
+            console.warn('[downloadHDImage] Disk save failed:', err.message)
+        )
+    } catch {
+        downloadImage(itemImageSrc, fileName)
+    }
 }
 
 // ─── Storage ──────────────────────────────────────────────────────────────────

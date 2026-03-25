@@ -3,10 +3,6 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import AppLayout from './components/AppLayout'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
-import NewDesignPage from './pages/NewDesignPage'
-import RemoveClothesPage from './pages/RemoveClothesPage'
-import StorytellingPage from './pages/StorytellingPage'
-import VideoPromptPage from './pages/VideoPromptPage'
 import LibraryPage from './pages/LibraryPage'
 import AdminPage from './pages/AdminPage'
 import SettingsPage from './pages/SettingsPage'
@@ -37,10 +33,7 @@ export default function App() {
       <Route path="/" element={<AppLayout user={user} onLogout={logout} />}>
         <Route index element={<Navigate to="/home" replace />} />
         <Route path="home" element={<HomePage />} />
-        <Route path="new-design" element={<NewDesignPage />} />
-        <Route path="storytelling" element={<StorytellingPage />} />
-        <Route path="video-prompt" element={<VideoPromptPage />} />
-        <Route path="remove-clothes" element={<RemoveClothesPage />} />
+        {/* NewDesign, Storytelling, VideoPrompt, RemoveClothes → keep-alive in AppLayout */}
         <Route path="library" element={<LibraryPage />} />
         <Route path="admin" element={<AdminPage />} />
         <Route path="settings" element={<SettingsPage user={user} />} />

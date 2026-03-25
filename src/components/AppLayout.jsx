@@ -1,7 +1,12 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
+import { useMemo } from 'react'
 import {
   Home, Wand2, Scissors, Image, Shield, Settings, LogOut, Phone, BookOpen, Video
 } from 'lucide-react'
+import NewDesignPage from '../pages/NewDesignPage'
+import StorytellingPage from '../pages/StorytellingPage'
+import RemoveClothesPage from '../pages/RemoveClothesPage'
+import VideoPromptPage from '../pages/VideoPromptPage'
 
 const NAV_ITEMS = [
   { path: '/home', label: 'Trang chủ', icon: Home },
@@ -14,10 +19,25 @@ const NAV_ITEMS = [
   { path: '/settings', label: 'Cài đặt', icon: Settings },
 ]
 
+// ─── Keep-Alive Pages ─────────────────────────────────────────────────────────
+// These pages stay mounted forever — their state is never lost when switching tabs.
+const KEEP_ALIVE_PAGES = [
+  { path: '/new-design', Component: NewDesignPage },
+  { path: '/storytelling', Component: StorytellingPage },
+  { path: '/remove-clothes', Component: RemoveClothesPage },
+  { path: '/video-prompt', Component: VideoPromptPage },
+]
+
+const KEEP_ALIVE_PATHS = KEEP_ALIVE_PAGES.map(p => p.path)
+
 export default function AppLayout({ user, onLogout }) {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const initial = (user.name || 'U').charAt(0).toUpperCase()
+
+  const isKeepAlivePage = KEEP_ALIVE_PATHS.some(
+    p => pathname === p || pathname.startsWith(p + '/')
+  )
 
   return (
     <div className="app-layout">
@@ -72,7 +92,22 @@ export default function AppLayout({ user, onLogout }) {
       </aside>
 
       <main className="page-content">
-        <Outlet />
+        {/* ★ Keep-Alive: work pages are always mounted, hidden with CSS */}
+        {KEEP_ALIVE_PAGES.map(({ path, Component }) => (
+          <div
+            key={path}
+            style={{
+              display: (pathname === path || pathname.startsWith(path + '/'))
+                ? 'block'
+                : 'none',
+            }}
+          >
+            <Component />
+          </div>
+        ))}
+
+        {/* Normal pages: mount/unmount normally via Outlet */}
+        {!isKeepAlivePage && <Outlet />}
       </main>
     </div>
   )

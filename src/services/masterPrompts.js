@@ -183,31 +183,35 @@ OUTPUT FORMAT:
 ALWAYS optimize for purchase conversion and video-ready motion.`
 
 // ─── BOT 4: AESTHETICS & FILTER SPECIALIST ────────────────────────────────────
-const BOT4_AESTHETICS_SPECIALIST = `You are an elite Color Grading & Skin Retouching Specialist with 20+ years experience in Korea's top beauty photography studios.
+const BOT4_AESTHETICS_SPECIALIST = `You are an elite Skin & Light Realism Specialist with 20+ years experience shooting real commercial fashion photography for Vietnamese and Korean brands.
 
-MISSION: Define the precise skin aesthetic, color grading, and lighting setup based on user settings or Auto defaults.
+MISSION: Define the precise skin aesthetic, color grading, and lighting setup. The result must look like a REAL PHOTOGRAPH — not an AI-generated, over-filtered, or plastic-looking image.
 
-DEFAULT AUTO STACK (Vietnamese Porcelain Dream Sweetness):
-- Skin: Supreme Korean Glass Skin + Vietnamese Porcelain Dream Sweetness
-  * Porcelain white-pink base with peach undertone
-  * Subsurface scattering visible (translucent skin glow)
-  * Micro pores visible but refined (realism, not plastic)
-  * Dewy glass-like radiance on forehead, nose bridge, cheekbones
+DEFAULT AUTO STACK (Vietnamese Natural Beauty):
+- Skin: Bright Pale Natural Skin
+  * Bright pale clean skin, luminous but natural
+  * Subtle pink undertone, NO yellow tint, NO orange cast
+  * Visible natural skin texture — real pores, subtle variations
+  * NO plastic effect, NO over-smoothing, NO wax-doll look
+  * Soft variation in skin tone across face and body (natural)
+  * Light catches on skin highlights (forehead, cheekbones, nose bridge) creating gentle luminosity
 - Lighting Stack:
-  * Key: Sony Alpha natural sunlight simulation (warm 5600K)
-  * Fill: Korean beauty dish (soft diffused, reduces shadows by 60%)
-  * Accent: TikTok ring light catch-light in eyes (circular reflection)
-  * Rim: Cinematic hair rim light (golden edge separation)
-- Color Grading LUT:
-  * Base: Soft dreamy pastel with warm golden undertone
-  * Shadows: subtle lavender-cyan tint
-  * Highlights: peachy warm glow
-  * Overall: Fresh, youthful, aspirational Instagram aesthetic
+  * Soft natural daylight — clean, directional, NOT flat
+  * Gentle shadow shaping on face for depth and dimension
+  * Clean neutral white balance (no heavy color cast)
+  * Subtle highlights on face and skin, natural depth
+  * Catch-light in eyes (small natural window reflection)
+- Color Grading:
+  * Clean neutral tones, slight warmth for skin
+  * NO heavy filters, NO Instagram presets
+  * Natural color rendering that preserves fabric true-color
+  * Subtle contrast for depth without crushing shadows
+  * Overall: clean, fresh, real photography feel
 
 OUTPUT FORMAT:
-[SKIN_AESTHETIC] = "Supreme Korean Glass Skin with Vietnamese porcelain-pink base, dewy subsurface scattering, refined micro-texture..."
-[COLOR_GRADING] = "Soft dreamy golden-hour warmth, lavender shadow tints, peachy highlight glow..."
-[LIGHTING_SETUP] = "Sony Alpha 5600K key + beauty dish fill + ring light catch-lights + golden rim..."
+[SKIN_AESTHETIC] = "Bright pale luminous skin with subtle pink undertone, visible natural texture, no plastic effect, realistic variation..."
+[COLOR_GRADING] = "Clean neutral tones with slight warmth, natural color rendering, soft contrast..."
+[LIGHTING_SETUP] = "Soft natural directional daylight, gentle shadow shaping, neutral white balance, natural catch-lights..."
 
 RESPOND WITH ALL THREE OUTPUTS.`
 
@@ -313,12 +317,15 @@ For CUSTOM CHAT commands, interpret the user's Vietnamese text and translate int
 RESPOND WITH THE EXACT INPAINTING PROMPT IN ENGLISH.`
 
 // ─── VIETNAMESE DNA DEFAULTS (used when all settings = Auto) ──────────────────
+// Updated with KOL-validated presets: Canon R5 II + Babe Cute milky white skin
 export const VN_DNA_DEFAULTS = {
-  modelType: 'Vietnamese Gen Z young woman (18-25), naturally beautiful, sweet and approachable',
-  skinFilter: 'Korean Porcelain Glass Skin: fair white-pink porcelain base tone (Fitzpatrick Type I-II), dewy glass-skin finish with natural luminosity, soft peachy-pink blush concentrated on cheekbones and nose tip, coral-pink gradient lips with glossy center, subtle warm undertone, micro-texture visible with subsurface scattering light effect, pores minimized but naturally present, skin appears lit from within (내광피부), NO matte finish — always dewy/glowing',
-  toneFilter: 'Soft dreamy golden warmth, lavender shadow tints, peachy highlights, fresh youthful Instagram aesthetic',
-  style: 'High-end Vietnamese fashion lookbook, aspirational, Instagram-worthy, Gen Z sweet makeup (gradient lip tint, soft blush, sparkly eyeshadow)',
-  lighting: 'Sony Alpha 5600K natural key + Korean beauty dish fill + TikTok ring light catch-lights + golden cinematic rim light',
+  modelType: 'a young naturally beautiful woman, sweet approachable expression, soft confident gaze, round baby face with V-line chin, large bright expressive eyes, plump heart-shaped lips',
+  skinFilter: 'fair milk-white skin, cool pink undertone, brightness 87/100 — bright milky white with warm healthy youthful living quality. Very subtle natural rosy warmth on cheeks only. ALL exposed skin matching fair white. NO yellow NO tan. Fine micro skin texture: barely-visible pores on nose, soft peach fuzz on jawline catching light, tiny beauty mark, natural dewy moisture on cheekbone peaks and nose tip',
+  makeupFilter: 'babe cute doll makeup — ultra dewy glass skin base with natural healthy glow, very soft barely-there natural pink warmth on cheeks, vivid fresh coral-pink juicy glossy lips, lightest pink-champagne shimmer on lids, minimal thin brown line, soft curled wispy natural lashes, fluffy natural warm-brown eyebrows',
+  toneFilter: 'clean neutral tones with slight warmth for skin, natural color rendering, soft contrast for depth, fresh and real photography feel',
+  style: 'High-end fashion lookbook, natural beauty, aspirational yet authentic, real photography aesthetic',
+  lighting: 'soft even beauty lighting, ring light style with cool neutral fill 5800K creating flattering near-shadowless illumination, circular catchlight in eyes, soft fill eliminating harsh shadows',
+  camera: 'ultra photorealistic Canon EOS R5 Mark II, Canon RF 85mm f/1.2L USM at f/1.2, ISO 100, Canon color science with natural skin smoothing and healthy pink skin rendering, tack-sharp focus on eyes and lips, creamy f/1.2 bokeh',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -366,74 +373,118 @@ export function buildMasterImagePrompt({
   aspect = '9:16',
   userPrompt = '',
   shotDescription = '',
+  referenceImages = [],
+  productImages = [],
+  // ── KOL Preset params (NEW) ──
+  cameraPreset = '',
+  makeupStyle = '',
 }) {
   const AUTO = '🤖 Auto (AI tự chọn)'
   const isAuto = (v) => !v || v === AUTO
 
   const parts = []
-  parts.push(`[SYSTEM DIRECTIVES]
-Role: Elite Commercial Fashion Photographer & Beauty Director.
-Objective: Generate a photorealistic, stunning lookbook image of a real fashion model wearing the specified garment.
 
-ABSOLUTE RULES (VIOLATION = FAILURE):
-1. FACE IDENTITY LOCK: The model's face MUST be an EXACT match to the reference photos provided. Copy the EXACT facial structure, eyes, nose, lips, jawline, skin texture, and hair from the reference. Do NOT generate a generic AI face. Do NOT blend or average faces. The person in the output must be RECOGNIZABLE as the same person in the reference photos.
-2. GARMENT LOCK: The clothing MUST match the product photos exactly — same material, color, cut, details. No design modifications.
-3. PHOTOREALISM: The result must look like a real photograph shot on a professional camera, NOT an AI-generated image.`)
-
+  // ── LAYER 1: IDENTITY LOCK (HIGHEST PRIORITY) ─────────────────────────
+  // ★ This MUST be the very first instruction the AI sees
+  if (referenceImages.length > 0) {
+    parts.push(`[ABSOLUTE IDENTITY LOCK — NON-NEGOTIABLE]
+The FIRST ${referenceImages.length} image(s) attached are REFERENCE PHOTOS of the EXACT person who MUST appear in the generated image.
+You MUST replicate this person's face with 100% accuracy:
+- SAME exact face shape, jawline, chin structure
+- SAME exact eyes (shape, size, spacing, double/single eyelid)
+- SAME exact nose (bridge height, tip shape, nostril width)
+- SAME exact lips (thickness, shape, proportions)
+- SAME exact eyebrows (shape, thickness, arch)
+- SAME hairstyle, hair color, hair length, bangs
+- SAME skin tone and complexion
+This is a FACE CLONE operation — the generated face must be INDISTINGUISHABLE from the reference photos.
+Do NOT create a new face. Do NOT modify any facial feature. Do NOT "improve" or "beautify" the face.
+Treat the reference face as a LOCKED TEMPLATE that cannot be altered in any way.`)
+  }
   if (extractedIdentity) {
-    parts.push(`\n[IDENTITY LOCK — COPY THIS FACE EXACTLY]\nThe model in this image MUST have this EXACT appearance (copied from reference photos):\n${extractedIdentity}\nIMPORTANT: Every facial feature described above must be precisely replicated. This is the SAME PERSON as in the reference photos.`)
+    parts.push(`\n[FACIAL DNA SPECIFICATION]\n${extractedIdentity}\nEvery single facial feature described above must be precisely replicated — this is the SAME PERSON as in the reference photos.`)
   }
 
+  // ── LAYER 2: SKIN REFERENCE ─────────────────────────────────────────────
+  if (productImages.length > 1) {
+    parts.push(`\napply the skin tone and color rendering from @img2 only, bright pale clean skin, no yellow tint, do not copy its face`)
+  }
+
+  // ── LAYER 3: CAMERA & OPTICS (KOL-enhanced) ─────────────────────────────
+  const qualityMap = {
+    '1K SD': 'standard definition',
+    '2K HD': 'high definition',
+    '4K Ultra': 'ultra high definition 4K',
+  }
+  // Use KOL camera preset if provided, otherwise default
+  const cameraDesc = cameraPreset || VN_DNA_DEFAULTS.camera
+  parts.push(`\n${cameraDesc}`)
+
+  // ── LAYER 4: SUBJECT + POSE ─────────────────────────────────────────────
+  const modelDesc = isAuto(modelType) ? VN_DNA_DEFAULTS.modelType : modelType
+  const poseDesc = isAuto(pose) ? 'natural relaxed pose, soft confident gaze, slight head tilt' : pose
+  const bgDesc = isAuto(background) ? 'a clean, aesthetically beautiful setting that complements this specific garment' : background
+
+  parts.push(`\n${modelDesc}, ${poseDesc}, in ${bgDesc}`)
+
+  // ── LAYER 5: FOCUS BEHAVIOR ─────────────────────────────────────────────
+  parts.push(`\nfocus behavior: face and upper body critically sharp, eyes in perfect focus, background smoothly blurred into creamy bokeh`)
+
+  // ── LAYER 6: SUBJECT PRIORITY ───────────────────────────────────────────
+  parts.push(`\nsubject priority: the human subject is the brightest and sharpest area, clearly separated from background`)
+
+  // ── LAYER 7: LIGHTING ───────────────────────────────────────────────────
+  const lightingDesc = isAuto(toneFilter)
+    ? VN_DNA_DEFAULTS.lighting
+    : `lighting adjusted for ${toneFilter} mood`
+  parts.push(`\nlighting: ${lightingDesc}`)
+
+  // ── LAYER 8: BODY ───────────────────────────────────────────────────────
+  parts.push(`\nbody: slim feminine figure, softly defined curves, slender waist, rounded hips, long elegant legs, realistic and balanced anatomy, professional model proportions`)
+
+  // ── LAYER 9: GARMENT LOCK ───────────────────────────────────────────────
   if (extractedProduct) {
-    parts.push(`\n[GARMENT LOCK — DRESS THE MODEL IN THIS EXACT OUTFIT]\n${extractedProduct}`)
+    parts.push(`\noutfit: ${extractedProduct}`)
+  }
+  const styleDesc = isAuto(style) ? VN_DNA_DEFAULTS.style : style
+  parts.push(`overall style: ${styleDesc}`)
+
+  // ── LAYER 10: SKIN (KOL-enhanced) ───────────────────────────────────────
+  const skinDesc = isAuto(skinFilter) ? VN_DNA_DEFAULTS.skinFilter : skinFilter
+  parts.push(`\nskin: ${skinDesc}`)
+
+  // ── LAYER 10B: MAKEUP (NEW) ─────────────────────────────────────────────
+  const makeupDesc = makeupStyle || VN_DNA_DEFAULTS.makeupFilter
+  if (makeupDesc) {
+    parts.push(`\nmakeup: ${makeupDesc}`)
   }
 
-  parts.push(`\n[BODY ENHANCEMENT — BEAUTY BODY SCULPTING]
-Apply these body enhancements that adapt naturally to the clothing:
+  // ── LAYER 11: ENVIRONMENT ───────────────────────────────────────────────
+  if (!isAuto(background)) {
+    parts.push(`\nenvironment: ${background}, softly blurred background for depth`)
+  }
 
-- BUST: Enhance the bust to a natural D-cup size with full, rounded and voluptuous yet natural volume, forming tasteful and pronounced cleavage. The chest looks tight, firm, perky and visually stunning in a perfectly proportioned, sensual manner — elegant, attractive and never oversized or unnatural. IMPORTANT: Adapt bust presentation to the garment type — if the outfit has a high neckline or is modest, show the bust volume through fabric stretch and shape rather than exposed cleavage. If the outfit has a low neckline, show natural alluring cleavage. SIGNATURE DETAIL: A small, elegant beauty mark (nốt ruồi son) on the upper chest/décolletage area — adds charm and uniqueness.
+  // ── LAYER 12: REALISM ───────────────────────────────────────────────────
+  parts.push(`\nrealism: natural asymmetry, realistic pose tension, authentic fabric behavior, photographic realism, ${qualityMap[quality] || 'high definition'} resolution`)
+  parts.push(`aspect ratio: ${aspect}`)
 
-- BUTT & THIGHS (GYM BODY): Full, round, lifted bubble-butt with athletic toned volume like a fitness model. Thighs are thick, sculpted and powerful yet feminine — the kind that looks incredible in any outfit. The butt and thigh area is the most visually magnetic part of the body, drawing eyes naturally. Think Brazilian gym goddess meets Korean beauty. The curves should be the most eye-catching, attractive feature — beautifully shaped, never vulgar or disproportionate.
-
-- CROTCH AREA (CRITICAL FOR TIGHT CLOTHING): When wearing tight shorts, leggings, or form-fitting bottoms, render the crotch/groin area with anatomically correct fabric contour. The fabric should naturally follow and define the body's Y-shaped crease at the junction of inner thighs, creating visible and realistic fabric tension lines. The center seam should be visible and naturally following body contours. This is a hallmark of professional fitness/sportswear photography — the fabric hugs every curve authentically like real gym wear photos.
-
-- LEGS: Elongate legs to create tall model proportions (leg-to-torso ratio 1.15:1), long graceful calves, totaling 170cm+ height appearance.
-
-- WAIST: Slim hourglass waist creating dramatic body curves contrast with bust and hips.
-
-- OVERALL: Professional fashion model body — tall, curvy, athletic-toned but soft and feminine. Every enhancement must look 100% natural and realistic, as if the model simply has an incredible body naturally.`)
-
-  parts.push(`\n[SKIN PERFECTION — VIETNAMESE PORCELAIN DREAM]
-- Skin color: Porcelain white sweet (trắng ngọt lịm) — luminous milky-white with subtle pink undertone, like fresh cream with a kiss of rose
-- Texture: Silky smooth, flawless but with subtle natural micro-texture (NOT plastic/wax doll), light catches on skin creating soft highlight zones
-- Glow: Dewy glass-like radiance, subsurface scattering visible on forehead, cheekbones, and shoulders. Skin looks like it's lit from within
-- Makeup: Sweet Gen Z Korean-Vietnamese style — gradient lip tint (coral/rose), soft peach blush, sparkly eyeshadow, defined but natural brows
-- Body skin: Even porcelain tone across entire body — arms, legs, chest all match the face's luminous quality
-- Expression: Sweet, charming, approachable — appealing to BOTH female AND male viewers
-- Hair: Long, dark, with voluminous soft waves (sóng to bồng bềnh), healthy lustrous shine
-- The look should make female viewers aspire to be her, and make everyone find her naturally beautiful`)
-
-
-  parts.push(`\n[SCENE & ART DIRECTION]`)
-  parts.push(`Model Casting: ${isAuto(modelType) ? VN_DNA_DEFAULTS.modelType : modelType}`)
-  parts.push(`Background: ${isAuto(background) ? 'AI choose the most suitable, aesthetically beautiful background that complements this specific garment style' : background}`)
-  parts.push(`Pose & Motion: ${isAuto(pose) ? 'Natural, confident, graceful pose that best showcases the garment while looking effortlessly beautiful' : pose}`)
-  parts.push(`Overall Style: ${isAuto(style) ? VN_DNA_DEFAULTS.style : style}`)
-
-  parts.push(`\n[POST-PROCESSING & COLOR]`)
-  parts.push(`Skin Aesthetic: ${isAuto(skinFilter) ? VN_DNA_DEFAULTS.skinFilter : skinFilter}`)
-  parts.push(`Color Grading: ${isAuto(toneFilter) ? VN_DNA_DEFAULTS.toneFilter : toneFilter}`)
-  parts.push(`Lighting: ${VN_DNA_DEFAULTS.lighting}`)
-  parts.push(`Camera: Shot on Sony Alpha A7IV, 85mm f/1.4 portrait lens, CRITICAL: razor-sharp focus on model's FACE and GARMENT details, heavy creamy bokeh on background (f/1.4 shallow DOF), ${quality} resolution, ISO 100`)
-  parts.push(`Aspect Ratio: ${aspect}`)
-
+  // ── USER OVERRIDES (HIGHEST PRIORITY) ───────────────────────────────────
   if (userPrompt) {
-    parts.push(`\n[USER OVERRIDES — HIGHEST PRIORITY]\nCRITICAL: The following user request OVERRIDES all stylistic settings above:\n${userPrompt}`)
+    parts.push(`\n${userPrompt}`)
   }
 
+  // ── SHOT VARIATION ──────────────────────────────────────────────────────
   if (shotDescription) {
-    parts.push(`\n[OUTPUT VARIATION]\n${shotDescription}`)
+    parts.push(`\ncomposition: ${shotDescription}`)
   }
+
+  // ── IDENTITY REINFORCEMENT (placed near end to prevent drift) ─────
+  if (referenceImages.length > 0 || extractedIdentity) {
+    parts.push(`\n[CRITICAL IDENTITY REMINDER — FINAL CHECK]\nBefore generating: verify the face matches the reference photos EXACTLY. Same face shape, same eyes, same nose, same lips, same jawline. This person's identity is LOCKED and UNCHANGEABLE across all shots. If the face looks different from the reference — the output is WRONG.`)
+  }
+
+  // ── NEGATIVE PROMPT ─────────────────────────────────────────────────────
+  parts.push(`\nnegative: identity change, different face, new face, modified facial features, different person, face swap, plastic skin, over-smoothing, CGI, flat lighting, blurry face, focus on background, yellow skin, orange skin cast, heavy blush, wax doll, airbrushed, cartoon, illustration, deformed hands, tan skin, warm golden skin`)
 
   return parts.join('\n')
 }
