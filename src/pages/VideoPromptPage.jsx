@@ -8,7 +8,7 @@ import { callGemini } from '../services/geminiService'
 import { getApiKeys } from '../services/apiKeyService'
 import { getLibraryItems, getFolders } from '../services/libraryService'
 import { getOriginalImage } from '../services/imageStorageService'
-
+import Portal from '../components/Portal'
 export default function VideoPromptPage() {
     // ─── State ───
     const [platform, setPlatform] = useState('kling')
@@ -103,13 +103,14 @@ ${imageDescriptions.join('\n\n')}`
             // Parse JSON from result
             let parsed = null
             try {
-                const jsonMatch = result.match(/```json\s*([\s\S]*?)```/)
+                const cleanedResult = result.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+                const jsonMatch = cleanedResult.match(/```json\s*([\s\S]*?)```/)
                 if (jsonMatch) {
                     parsed = JSON.parse(jsonMatch[1])
                 } else {
                     // Try direct JSON parse
-                    const cleanResult = result.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '')
-                    parsed = JSON.parse(cleanResult)
+                    const extractJson = cleanedResult.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '')
+                    parsed = JSON.parse(extractJson)
                 }
             } catch {
                 // couldn't parse JSON, keep raw text
@@ -143,8 +144,13 @@ ${imageDescriptions.join('\n\n')}`
 
             let parsed = null
             try {
-                const jsonMatch = result.match(/```json\s*([\s\S]*?)```/)
+                const cleanedResult = result.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+                const jsonMatch = cleanedResult.match(/```json\s*([\s\S]*?)```/)
                 if (jsonMatch) parsed = JSON.parse(jsonMatch[1])
+                else {
+                    const extractJson = cleanedResult.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '')
+                    parsed = JSON.parse(extractJson)
+                }
             } catch { /* ignore */ }
 
             if (parsed) {
@@ -440,11 +446,13 @@ ${imageDescriptions.join('\n\n')}`
 
             {/* Library Picker Modal */}
             {showLibPicker && (
-                <LibraryPickerModal
-                    maxPick={9 - scenes.length}
-                    onPick={addFromLibrary}
-                    onClose={() => setShowLibPicker(false)}
-                />
+                <Portal>
+                    <LibraryPickerModal
+                        maxPick={9 - scenes.length}
+                        onPick={addFromLibrary}
+                        onClose={() => setShowLibPicker(false)}
+                    />
+                </Portal>
             )}
         </div>
     )
@@ -474,7 +482,7 @@ function LibraryPickerModal({ maxPick, onPick, onClose }) {
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
             <div className="modal-content" onClick={e => e.stopPropagation()}
                 style={{ maxWidth: 720, maxHeight: '85vh', overflow: 'auto' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>

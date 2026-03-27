@@ -3,14 +3,14 @@ import { User, Palette, Bell, Shield, Key, ChevronRight } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeProvider'
 
 const LANGUAGES = ['Tiếng Việt', 'English', '日本語', '한국어']
-const THEMES = ['Sáng', 'Tối', 'Theo hệ thống']
+const THEMES = ['Sáng', 'Tối', 'Luxury', 'Theo hệ thống']
 
 export default function SettingsPage({ user }) {
   const [activeSection, setActiveSection] = useState('account')
 
   const { theme: currentTheme, setTheme: applyTheme } = useTheme()
-  const themeMap = { 'Sáng': 'light', 'Tối': 'dark', 'Theo hệ thống': 'system' }
-  const themeMapReverse = { light: 'Sáng', dark: 'Tối', system: 'Theo hệ thống' }
+  const themeMap = { 'Sáng': 'light', 'Tối': 'dark', 'Luxury': 'luxury', 'Theo hệ thống': 'system' }
+  const themeMapReverse = { light: 'Sáng', dark: 'Tối', luxury: 'Luxury', system: 'Theo hệ thống' }
 
   const [form, setForm] = useState({
     name: user?.name || '',

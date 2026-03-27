@@ -84,4 +84,15 @@ function localFileSavePlugin() {
 
 export default defineConfig({
   plugins: [react(), localFileSavePlugin()],
+  server: {
+    proxy: {
+      // Proxy SePay API to avoid CORS issues
+      '/api/sepay': {
+        target: 'https://my.sepay.vn',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/sepay/, '/userapi'),
+        secure: true,
+      },
+    },
+  },
 })

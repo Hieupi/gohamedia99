@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback } from 'react'
 import { Upload, RotateCcw, Download, Save, ChevronDown, AlertCircle, Users, Eye, X } from 'lucide-react'
+import Portal from '../components/Portal'
 import { detectObjects, generateGarmentImage } from '../services/geminiService'
 import { getPrompt } from '../services/masterPrompts'
 import { getApiKeys } from '../services/apiKeyService'
@@ -200,7 +201,7 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
   ].filter(Boolean).filter((v, i, a) => a.indexOf(v) === i) // unique
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
           Lưu vào Kho Tài Nguyên
@@ -403,7 +404,7 @@ function SavePoseModal({ item, imageSrc, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 440 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
           🤸 Lưu làm Pose tham chiếu
@@ -780,29 +781,35 @@ export default function RemoveClothesPage() {
 
       {/* Save Modal */}
       {saveModalItem && (
-        <SaveModal item={saveModalItem.item} imageSrc={saveModalItem.imageSrc}
-          productName={productName}
-          onClose={() => setSaveModalItem(null)}
-          onSave={(record) => console.log('Saved:', record)} />
+        <Portal>
+          <SaveModal item={saveModalItem.item} imageSrc={saveModalItem.imageSrc}
+            productName={productName}
+            onClose={() => setSaveModalItem(null)}
+            onSave={(record) => console.log('Saved:', record)} />
+        </Portal>
       )}
       {savePoseItem && (
-        <SavePoseModal item={savePoseItem.item} imageSrc={savePoseItem.imageSrc}
-          onClose={() => setSavePoseItem(null)} />
+        <Portal>
+          <SavePoseModal item={savePoseItem.item} imageSrc={savePoseItem.imageSrc}
+            onClose={() => setSavePoseItem(null)} />
+        </Portal>
       )}
 
       {/* Preview Zoom Overlay */}
       {previewZoom && (
-        <div className="modal-overlay" onClick={() => setPreviewZoom(null)} style={{ zIndex: 9999 }}>
-          <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
-            <img src={previewZoom.src} alt={previewZoom.name}
-              style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
-            <div style={{ textAlign: 'center', color: '#fff', fontSize: 14, fontWeight: 600, marginTop: 10 }}>{previewZoom.name}</div>
-            <button onClick={() => setPreviewZoom(null)}
-              style={{ position: 'absolute', top: -12, right: -12, width: 32, height: 32, borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
-              <X size={16} />
-            </button>
+        <Portal>
+          <div className="modal-overlay" onClick={() => setPreviewZoom(null)} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
+            <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }} onClick={e => e.stopPropagation()}>
+              <img src={previewZoom.src} alt={previewZoom.name}
+                style={{ maxWidth: '90vw', maxHeight: '85vh', objectFit: 'contain', borderRadius: 12, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+              <div style={{ textAlign: 'center', color: '#fff', fontSize: 14, fontWeight: 600, marginTop: 10 }}>{previewZoom.name}</div>
+              <button onClick={() => setPreviewZoom(null)}
+                style={{ position: 'absolute', top: -12, right: -12, width: 32, height: 32, borderRadius: '50%', background: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px rgba(0,0,0,0.3)' }}>
+                <X size={16} />
+              </button>
+            </div>
           </div>
-        </div>
+        </Portal>
       )}
     </div>
   )

@@ -1,0 +1,26 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ===== USER LIBRARY IMAGES =====
+    // Path: users/{userId}/library/{imageId}
+    // Chỉ owner upload/đọc/xóa ảnh của mình
+    match /users/{userId}/library/{imageId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId)
+                   && request.resource.size < 10 * 1024 * 1024  // Max 10MB
+                   && request.resource.contentType.matches('image/.*');
+      allow delete: if isOwner(userId);
+    }
+
+    // ===== HELPER =====
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // ===== DENY ALL ELSE =====
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -6,3 +6,6 @@ dist/
 Thumbs.db
 *.mp4
 public/kho/
+
+functions/node_modules/
+.firebase/

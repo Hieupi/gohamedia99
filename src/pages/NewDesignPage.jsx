@@ -4,6 +4,8 @@ import {
   Send, Plus, Image as ImageIcon, Settings2, Loader, FolderOpen, Check, Eye
 } from 'lucide-react'
 import SeoAeoPanel from '../components/SeoAeoPanel'
+import VideoPromptPanel from '../components/VideoPromptPanel'
+import Portal from '../components/Portal'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt } from '../services/masterPrompts'
 import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems, generateUniqueName, getFolders, createFolder } from '../services/libraryService'
@@ -135,7 +137,7 @@ function PillSelect({ options, value, onChange }) {
 function LibraryPickerModal({ onSelect, onClose, title }) {
   const items = getLibraryItems()
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', width: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
         <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, flexShrink: 0 }}>
           <FolderOpen size={18} style={{ verticalAlign: -3 }} /> {title || 'Chọn từ Kho Thư Viện'}
@@ -213,7 +215,10 @@ function ResultCard({ idx, imageSrc, isLoading, error, onSave, onDownload, onDel
           /* ═══ REVIEW MODE ═══ */
           <div className="nd-result-loading" style={{ justifyContent: 'flex-start', padding: '10px 8px', gap: 5 }}>
             <div style={{ width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)' }}>{shotDesc.title}</span>
+              <div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--brand)' }}>SCENE {String(idx + 1).padStart(2, '0')}</span>
+                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary)', marginLeft: 4 }}>- {shotDesc.title}</span>
+              </div>
               <span style={{ fontSize: 8, padding: '1px 6px', borderRadius: 8, background: 'var(--brand)', color: '#fff', fontWeight: 600 }}>
                 {categoryBadge[shotDesc.category] || shotDesc.category}
               </span>
@@ -432,7 +437,7 @@ function SaveDesignModal({ imageSrc, projectName, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 420 }}>
         <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 14 }}>💾 Lưu vào Kho</h3>
         <img src={imageSrc} alt="" style={{ width: '100%', maxHeight: 180, objectFit: 'contain', borderRadius: 'var(--r-sm)', background: '#f5f5f5', marginBottom: 12 }} />
@@ -564,32 +569,51 @@ export default function NewDesignPage() {
 
 Analyze these images: model features, outfit details, fabric, colors, mood.
 
-CREATE 10 UNIQUE SHOTS following this VIRAL VIDEO structure:
-- Shot 1-2: HOOK — the most STRIKING, attention-grabbing angles. Think: dramatic low-angle, unexpected crop, or movement that makes viewers STOP scrolling
-- Shot 3-4: SETUP — classic beauty shots showing the outfit clearly from best angles
-- Shot 5-6: DETAIL — close-ups, texture, fabric movement, accessories focus
-- Shot 7-8: REAR VIEW — shot from BEHIND with CAMERA AT KNEE/SHIN HEIGHT angled UPWARD to make legs appear extremely long and elongated
-- Shot 9: TWIST — unexpected creative angle or artistic composition
-- Shot 10: FINALE — the most beautiful, share-worthy, magazine-cover shot
+CORE DIRECTIVE: CURIOSITY-DRIVEN STORYTELLING & STRICT CONSISTENCY
+You must apply deep critical thinking to craft a 10-shot narrative sequence that hooks the viewer by strategically hiding and revealing the model's face, while keeping the environment absolutely consistent.
 
-Mix camera angles: front hero, 3/4 walk, side profile, detail close-up, rear low-angle, editorial wide.
+=== CRITICAL RULES ===
+1. STRICT BACKGROUND CONSISTENCY: All 10 shots MUST take place in the EXACT SAME location and lighting. Choose ONE strongly defined background and repeat it verbatim or keep it completely consistent in every shot.
+2. THE CURIOSITY HOOK (Shots 1-3): Start from the BACK. Show her full body, outfit, long legs, and curves from behind. Make the audience burn with curiosity to see her face. NO frontal face shots early on.
+3. THE BUILD-UP (Shots 4-6): Transition to side profiles, over-the-shoulder glances, or dynamic movements (walking, turning slightly). Keep them waiting, just glimpses of the profile.
+4. THE REVEAL/CLIMAX (Shots 7-10): Finally, reveal her stunning front face. Confident strides towards the camera, close-ups, dramatic poses, and a beautiful smile or fierce look.
+5. CONTINUITY: The outfit, hair, and props must remain identical across all 10 shots.
+
+Before generating the JSON, you MUST output a <think> block where you reason about:
+- What is the single unifying background for all 10 shots?
+- How to structure the back -> side -> front progression?
+- How to ensure the shot descriptions strictly follow the "hidden face" rule early on?
+
+After the <think> block, return ONLY a valid JSON array with exactly 10 objects:
+- "title": short Vietnamese name (2-4 words, descriptive)
+- "shotDesc": detailed English shot description (full sentence, 20+ words). Must explicitly enforce the narrative arc (e.g. "shot from behind, face hidden", "side profile", "front view"). Also explicitly include the chosen consistent background here if needed to ensure the image generator keeps it.
+- "category": one of "hook" (back view), "setup" (side/moving), "detail" (closeups), "rear" (low angle back), "twist", "finale" (front reveal)
+
 ${prompt ? '\nUser style note: ' + prompt : ''}
 
-Return ONLY a valid JSON array with exactly 10 objects:
-- "title": short Vietnamese name (2-4 words, descriptive)
-- "shotDesc": detailed English shot description (30+ words, include camera angle, pose, expression, composition)
-- "category": one of "hook", "setup", "detail", "rear", "twist", "finale"
+Example Output:
+<think>
+1. Background: Luxury minimalist museum with concrete walls...
+2. Arc: Shots 1-3 from behind. Shots 4-6 side profile. Shots 7-10 front reveal...
+</think>
+[
+  {"title":"Bóng Lưng Gợi Cảm","shotDesc":"Full body shot from completely behind, showing off curves, long legs, walking away slowly, face completely hidden, wearing the exact outfit, luxury minimalist concrete museum background","category":"hook"},
+  ... exactly 10 objects ...
+]
 
-Example:
-[{"title":"Hook dramtic","shotDesc":"Low angle full-body shot from shin height, model striding toward camera with hair flying, dramatic backlit silhouette, one hand adjusting sunglasses","category":"hook"}]
-
-Return ONLY the JSON array, no markdown.`
+Return ONLY the <think> block followed by the JSON array.`
 
       const aiResponse = await callGemini({ prompt: scriptPrompt, images: allImages })
       let parsed
       try {
-        const jsonMatch = aiResponse.match(/\[\s*\{[\s\S]*\}\s*\]/)
-        parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : JSON.parse(aiResponse)
+        const cleanedResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+        const jsonMatch = cleanedResponse.match(/```json\s*([\s\S]*?)```/)
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[1])
+        } else {
+          const extractJson = cleanedResponse.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '')
+          parsed = JSON.parse(extractJson)
+        }
       } catch (e) {
         console.error('Failed to parse AI shot script:', e)
         alert('AI không thể tạo kịch bản. Thử lại hoặc dùng mặc định.')
@@ -1191,6 +1215,9 @@ Return ONLY the JSON array, no markdown.`
               ))}
             </div>
 
+            {/* ═══ Video Prompt Panel ═══ */}
+            {shotDescriptions.length > 0 && <VideoPromptPanel shotDescriptions={shotDescriptions} />}
+
             {/* ═══ SEO & AEO Panel ═══ */}
             <SeoAeoPanel
               images={results}
@@ -1203,22 +1230,28 @@ Return ONLY the JSON array, no markdown.`
 
       {/* Save Modal */}
       {saveModal && (
-        <SaveDesignModal imageSrc={saveModal} projectName={projectName}
-          onClose={() => setSaveModal(null)} />
+        <Portal>
+          <SaveDesignModal imageSrc={saveModal} projectName={projectName}
+            onClose={() => setSaveModal(null)} />
+        </Portal>
       )}
 
       {/* Library Picker Modal */}
       {libraryPicker && (
-        <LibraryPickerModal
-          title={libraryPicker === 'ref' ? 'Chọn ảnh mẫu từ Kho' : 'Chọn sản phẩm từ Kho'}
-          onClose={() => setLibraryPicker(null)}
-          onSelect={handleLibraryPick}
-        />
+        <Portal>
+          <LibraryPickerModal
+            title={libraryPicker === 'ref' ? 'Chọn ảnh mẫu từ Kho' : 'Chọn sản phẩm từ Kho'}
+            onClose={() => setLibraryPicker(null)}
+            onSelect={handleLibraryPick}
+          />
+        </Portal>
       )}
 
       {/* Image Preview Modal */}
       {previewImg && (
-        <ImagePreviewModal imageSrc={previewImg} onClose={() => setPreviewImg(null)} />
+        <Portal>
+          <ImagePreviewModal imageSrc={previewImg} onClose={() => setPreviewImg(null)} />
+        </Portal>
       )}
     </div>
   )

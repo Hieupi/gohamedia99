@@ -1,0 +1,534 @@
+/* =============================================
+   SOCIAL LINKS PAGE — DARK CYBERPUNK THEME
+   Scoped to .social-page only
+   ============================================= */
+
+/* ─── Page Container ────────────────────────── */
+.social-page {
+  min-height: 100vh;
+  background: linear-gradient(170deg, #0a0a1a 0%, #0d0b2e 40%, #1a0a2e 100%);
+  color: #e0e0f0;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  position: relative;
+  overflow-x: hidden;
+  padding: 0 0 60px;
+}
+
+/* Animated grid background */
+.social-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+  background-size: 60px 60px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Glow orbs */
+.social-page::after {
+  content: '';
+  position: fixed;
+  top: -200px;
+  right: -200px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(0, 212, 255, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.social-page > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─── Inner Container ───────────────────────── */
+.social-inner {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px 24px;
+}
+
+/* ─── Hero Section ──────────────────────────── */
+.social-hero {
+  text-align: center;
+  margin-bottom: 48px;
+}
+
+.social-hero-avatar {
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  margin: 0 auto 20px;
+  border: 3px solid rgba(0, 212, 255, 0.5);
+  box-shadow: 0 0 30px rgba(0, 212, 255, 0.2), 0 0 60px rgba(0, 212, 255, 0.05);
+  overflow: hidden;
+  background: linear-gradient(135deg, #1a1a3e, #2a1a4e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.social-hero-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.social-hero-avatar-fallback {
+  font-size: 36px;
+  font-weight: 900;
+  background: linear-gradient(135deg, #00d4ff, #ff00ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.social-hero-title {
+  font-size: 28px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #ffffff 0%, #00d4ff 50%, #ff00ff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+  letter-spacing: -0.5px;
+}
+
+.social-hero-tagline {
+  font-size: 14px;
+  color: rgba(224, 224, 240, 0.6);
+  max-width: 400px;
+  margin: 0 auto;
+  line-height: 1.6;
+}
+
+.social-hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: #00d4ff;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 20px;
+}
+
+/* ─── Section Headers ───────────────────────── */
+.social-section {
+  margin-bottom: 36px;
+}
+
+.social-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(224, 224, 240, 0.5);
+  margin-bottom: 18px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.social-section-title::before {
+  content: '';
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #00d4ff, #ff00ff);
+}
+
+/* ─── Link Cards Grid ───────────────────────── */
+.social-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+
+/* ─── Individual Link Card ──────────────────── */
+.social-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+
+.social-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 14px;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--card-glow, transparent), transparent 60%);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.social-card:hover::before {
+  opacity: 1;
+}
+
+.social-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 32px var(--card-shadow, rgba(0, 212, 255, 0.1));
+}
+
+.social-card:active {
+  transform: translateY(0);
+}
+
+.social-card-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 20px;
+  transition: box-shadow 0.3s ease;
+}
+
+.social-card:hover .social-card-icon {
+  box-shadow: 0 0 20px var(--card-shadow, rgba(0, 212, 255, 0.3));
+}
+
+.social-card-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.social-card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #f0f0ff;
+  margin-bottom: 2px;
+}
+
+.social-card-desc {
+  font-size: 11px;
+  color: rgba(224, 224, 240, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.social-card-arrow {
+  color: rgba(224, 224, 240, 0.2);
+  transition: all 0.3s ease;
+  flex-shrink: 0;
+}
+
+.social-card:hover .social-card-arrow {
+  color: var(--card-glow, #00d4ff);
+  transform: translateX(3px);
+}
+
+/* ─── Card Color Variants ───────────────────── */
+.social-card--zalo {
+  --card-glow: #0068ff;
+  --card-shadow: rgba(0, 104, 255, 0.2);
+}
+.social-card--zalo .social-card-icon {
+  background: rgba(0, 104, 255, 0.15);
+  color: #0068ff;
+}
+
+.social-card--facebook {
+  --card-glow: #1877f2;
+  --card-shadow: rgba(24, 119, 242, 0.2);
+}
+.social-card--facebook .social-card-icon {
+  background: rgba(24, 119, 242, 0.15);
+  color: #1877f2;
+}
+
+.social-card--youtube {
+  --card-glow: #ff0000;
+  --card-shadow: rgba(255, 0, 0, 0.2);
+}
+.social-card--youtube .social-card-icon {
+  background: rgba(255, 0, 0, 0.12);
+  color: #ff0000;
+}
+
+.social-card--tiktok {
+  --card-glow: #ff0050;
+  --card-shadow: rgba(255, 0, 80, 0.2);
+}
+.social-card--tiktok .social-card-icon {
+  background: rgba(255, 0, 80, 0.12);
+  color: #ff0050;
+}
+
+.social-card--telegram {
+  --card-glow: #0088cc;
+  --card-shadow: rgba(0, 136, 204, 0.2);
+}
+.social-card--telegram .social-card-icon {
+  background: rgba(0, 136, 204, 0.15);
+  color: #0088cc;
+}
+
+.social-card--phone {
+  --card-glow: #00ff88;
+  --card-shadow: rgba(0, 255, 136, 0.2);
+}
+.social-card--phone .social-card-icon {
+  background: rgba(0, 255, 136, 0.12);
+  color: #00ff88;
+}
+
+.social-card--bank {
+  --card-glow: #fbbf24;
+  --card-shadow: rgba(251, 191, 36, 0.2);
+}
+.social-card--bank .social-card-icon {
+  background: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+
+.social-card--website {
+  --card-glow: #a855f7;
+  --card-shadow: rgba(168, 85, 247, 0.2);
+}
+.social-card--website .social-card-icon {
+  background: rgba(168, 85, 247, 0.12);
+  color: #a855f7;
+}
+
+.social-card--instagram {
+  --card-glow: #e1306c;
+  --card-shadow: rgba(225, 48, 108, 0.2);
+}
+.social-card--instagram .social-card-icon {
+  background: rgba(225, 48, 108, 0.12);
+  color: #e1306c;
+}
+
+.social-card--masterclass {
+  --card-glow: #f59e0b;
+  --card-shadow: rgba(245, 158, 11, 0.2);
+}
+.social-card--masterclass .social-card-icon {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+/* ─── Donation Box ──────────────────────────── */
+.social-donate-box {
+  padding: 24px;
+  border-radius: 16px;
+  background: rgba(251, 191, 36, 0.04);
+  border: 1px solid rgba(251, 191, 36, 0.12);
+  margin-bottom: 14px;
+  text-align: center;
+}
+
+.social-donate-box-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fbbf24;
+  margin-bottom: 4px;
+}
+
+.social-donate-box-desc {
+  font-size: 12px;
+  color: rgba(224, 224, 240, 0.5);
+  margin-bottom: 16px;
+}
+
+.social-bank-info {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  text-align: left;
+}
+
+.social-qr-section {
+  display: flex;
+  justify-content: center;
+  margin: 12px 0 16px;
+}
+
+.social-qr-img {
+  width: 200px;
+  height: auto;
+  border-radius: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.1);
+  background: #fff;
+  padding: 4px;
+}
+
+.social-bank-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  overflow: hidden;
+  padding: 4px;
+}
+
+.social-bank-logo-img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.social-bank-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.social-bank-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: #f0f0ff;
+}
+
+.social-bank-number {
+  font-size: 15px;
+  font-weight: 800;
+  color: #fbbf24;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  letter-spacing: 1.5px;
+  margin: 2px 0;
+}
+
+.social-bank-holder {
+  font-size: 11px;
+  color: rgba(224, 224, 240, 0.5);
+}
+
+.social-bank-note {
+  font-size: 11px;
+  color: rgba(251, 191, 36, 0.7);
+  margin-top: 4px;
+}
+
+.social-bank-note strong {
+  color: #fbbf24;
+  font-weight: 800;
+  letter-spacing: 1px;
+}
+
+.social-hero-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.social-copy-btn {
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid rgba(251, 191, 36, 0.3);
+  background: rgba(251, 191, 36, 0.1);
+  color: #fbbf24;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.social-copy-btn:hover {
+  background: rgba(251, 191, 36, 0.2);
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+/* ─── Footer ────────────────────────────────── */
+.social-footer {
+  text-align: center;
+  padding-top: 40px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  margin-top: 20px;
+}
+
+.social-footer-text {
+  font-size: 11px;
+  color: rgba(224, 224, 240, 0.25);
+}
+
+.social-footer-brand {
+  color: #00d4ff;
+  font-weight: 600;
+}
+
+/* ─── Responsive ────────────────────────────── */
+@media (max-width: 640px) {
+  .social-inner {
+    padding: 28px 16px;
+  }
+
+  .social-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .social-hero-title {
+    font-size: 22px;
+  }
+
+  .social-hero-avatar {
+    width: 80px;
+    height: 80px;
+  }
+
+  .social-bank-info {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+/* ─── Animations ────────────────────────────── */
+@keyframes social-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.social-section {
+  animation: social-fade-in 0.5s ease both;
+}
+
+.social-section:nth-child(2) { animation-delay: 0.1s; }
+.social-section:nth-child(3) { animation-delay: 0.2s; }
+.social-section:nth-child(4) { animation-delay: 0.3s; }
+.social-section:nth-child(5) { animation-delay: 0.4s; }

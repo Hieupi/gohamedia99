@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Portal from '../components/Portal'
 import {
   Search, Grid, List, Download, Trash2, Heart, Eye, X, ImageOff, Upload, Loader, Copy, Check, FolderPlus, Film
 } from 'lucide-react'
@@ -61,7 +62,7 @@ function PreviewModal({ item, onClose }) {
   }, [item])
   if (!item) return null
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
       <div className="preview-modal" onClick={e => e.stopPropagation()}>
         <button className="preview-close" onClick={onClose}><X size={18} /></button>
         <img src={hdSrc || item.imageSrc} alt={item.name} className="preview-img" />
@@ -156,7 +157,7 @@ function UploadModal({ onClose, onSaved }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
       <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: 460 }}>
         <h3 style={{ fontSize: 17, fontWeight: 700, marginBottom: 16, color: 'var(--text-primary)' }}>
           Tải ảnh lên Kho
@@ -730,14 +731,16 @@ export default function LibraryPage() {
         )
       }
 
-      <PreviewModal item={preview} onClose={() => setPreview(null)} />
+      {preview && <Portal><PreviewModal item={preview} onClose={() => setPreview(null)} /></Portal>}
 
       {
         showUpload && (
-          <UploadModal
-            onClose={() => setShowUpload(false)}
-            onSaved={() => setItems(getLibraryItems())}
-          />
+          <Portal>
+            <UploadModal
+              onClose={() => setShowUpload(false)}
+              onSaved={() => setItems(getLibraryItems())}
+            />
+          </Portal>
         )
       }
     </div >

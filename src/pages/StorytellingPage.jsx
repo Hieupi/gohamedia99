@@ -5,6 +5,8 @@ import {
     ChevronDown, Film, BookOpen, PlusCircle, Check, RotateCcw
 } from 'lucide-react'
 import SeoAeoPanel from '../components/SeoAeoPanel'
+import VideoPromptPanel from '../components/VideoPromptPanel'
+import Portal from '../components/Portal'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt, VN_DNA_DEFAULTS } from '../services/masterPrompts'
 import { downloadImage, getLibraryItems, saveToLibrary, createLibraryRecord, generateUniqueName } from '../services/libraryService'
@@ -118,7 +120,10 @@ function SceneCard({ scene, index, imageSrc, isLoading, error, onPreview, onRemo
         <div className="st-scene-card">
             <div className="st-scene-header">
                 <span className="st-scene-number">{index + 1}</span>
-                <span className="st-scene-title">{scene.title}</span>
+                <span className="st-scene-title">
+                    <span style={{ color: 'var(--brand)', marginRight: 4 }}>SCENE {String(index + 1).padStart(2, '0')}</span>
+                    - {scene.title}
+                </span>
                 <span style={{ fontSize: 9, color: 'var(--text-muted)', marginLeft: 'auto' }}>3s</span>
                 {isCustom && (
                     <button className="st-scene-remove" onClick={onRemove} title="Xóa cảnh"><X size={14} /></button>
@@ -345,7 +350,7 @@ function ImagePreviewModal({ imageSrc, onClose }) {
 function LibraryPickerModal({ onSelect, onClose, title }) {
     const items = getLibraryItems()
     return (
-        <div className="modal-overlay" onClick={onClose}>
+        <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
             <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', width: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
                 <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, flexShrink: 0 }}>
                     <FolderOpen size={18} style={{ verticalAlign: -3 }} /> {title || 'Chọn từ Kho Thư Viện'}
@@ -533,56 +538,51 @@ export default function StorytellingPage() {
 
 Analyze these images carefully — model, outfit, accessories, setting, mood.
 
-CORE FORMULA: GIÁO DỤC + GIẢI TRÍ + KỂ CHUYỆN (Edutainment + Storytelling)
-The video must TEACH something (fashion tip, style hack, outfit idea) while ENTERTAINING and TELLING A STORY.
+CORE DIRECTIVE: CURIOSITY-DRIVEN STORYTELLING & STRICT CONSISTENCY
+You must apply deep critical thinking to craft a 9-scene narrative arc that hooks the viewer by strategically hiding and revealing the model's face, while keeping the environment absolutely consistent.
 
-=== 8 YẾU TỐ TRIỆU VIEW ===
-1. HOOK 3 GIÂY: Scene 1 = the most SHOCKING or CURIOSITY-INDUCING moment. NOT just a pretty pose. Think: unexpected action, dramatic entrance, or a "wait, what?" moment
-2. THUMBNAIL POWER: Scene 1 must make scrollers STOP — strong emotion, dramatic lighting, or unusual pose
-3. GIÁO DỤC (EDUCATION): Weave in a fashion tip — "Cách phối outfit này", "Mẹo chọn màu", "Trick tạo dáng"
-4. GIẢI TRÍ (ENTERTAINMENT): Each scene must be visually FUN — dynamic angles, playful poses, unexpected moments
-5. KỂ CHUYỆN (STORYTELLING): Build narrative: who is she? where is she going? what happens?
-6. TÌNH HUỐNG XOAY CHUYỂN (TWIST): Scene 6-7 = sudden mood/location/style shift that surprises
-7. YẾU TỐ GÂY TRANH CÃI (CONTROVERSY TRIGGER): Include ONE scene with a deliberate "imperfect" or "debatable" element — slightly unusual styling choice, controversial fashion mix, or pose that people will comment about. This triggers engagement through comments and debates.
-8. GIÁ TRỊ CHIA SẺ: Final scene = so beautiful or surprising that viewers tag friends or save the video
+=== CRITICAL RULES ===
+1. STRICT BACKGROUND CONSISTENCY: All 9 scenes MUST take place in the EXACT SAME location and lighting. Choose ONE strongly defined background and repeat it verbatim or keep it completely consistent in every scene.
+2. THE CURIOSITY HOOK (Scenes 1-3): Start from the BACK. Show her full body, outfit, long legs, and curves from behind. Make the audience burn with curiosity to see her face. NO frontal face shots early on.
+3. THE BUILD-UP (Scenes 4-6): Transition to side profiles, over-the-shoulder glances, or dynamic movements (walking, turning slightly). Keep them waiting, just glimpses of the profile.
+4. THE REVEAL/CLIMAX (Scenes 7-9): Finally, reveal her stunning front face. Confident strides towards the camera, dramatic poses, and a beautiful smile or fierce look.
+5. CONTINUITY: The outfit, hair, and props must remain identical across all 9 scenes.
 
-Create EXACTLY 9 scenes. Each scene = 1 photo → 3-second video clip.
+Before generating the JSON, you MUST output a <think> block where you reason about:
+- What is the single unifying background for all 9 scenes?
+- How to structure the back -> side -> front progression?
+- How to ensure the pose descriptions strictly follow the "hidden face" rule early on?
 
-Scene Structure:
-- Scene 1: HOOK — dramatic/shocking/curiosity (makes them STOP scrolling)
-- Scene 2-3: SETUP — introduce character + outfit (education element: style tip)
-- Scene 4-5: RISING ACTION — showcase from multiple angles (entertainment: dynamic)
-- Scene 6: CONTROVERSY SCENE — the "imperfect" moment that triggers debate/comments
-- Scene 7: TWIST — unexpected shift in mood/location/emotion
-- Scene 8-9: CLIMAX + FINALE — most stunning shots + memorable ending (share-worthy)
-
-Rules:
-- All 9 scenes: SAME person, SAME outfit
-- Mix camera angles: front, back, side, close-up, selfie, wide, artistic
-- Each scene must feel like natural continuation of the story
-${storyContext ? `\\nShared context: ${storyContext}` : ''}
-
-Return ONLY a valid JSON array with exactly 9 objects:
+After the <think> block, return ONLY a valid JSON array with exactly 9 objects:
 - "title": short Vietnamese scene name (2-4 words)
-- "pose": detailed English pose description (full sentence, 15+ words)
+- "pose": detailed English pose description (full sentence, 20+ words). Must explicitly enforce the narrative arc (e.g. "shot from behind, face hidden", "side profile", "front view"). Also explicitly include the chosen consistent background here if needed to ensure the image generator keeps it.
 - "camera": English camera angle description
 - "emotion": English emotion/expression (2-3 words)
 
-Example:
-[{"title":"Đóng băng thời gian","pose":"Standing frozen mid-stride, hair and skirt caught in wind, dramatic backlit silhouette, one hand reaching forward","camera":"Low angle wide shot, golden hour backlight","emotion":"Mysterious, powerful"}]
+Example Output:
+<think>
+1. Background: Luxury minimalist museum with concrete walls...
+2. Arc: Scenes 1-3 walking away showing back curves. Scenes 4-6 side profile looking over shoulder. Scenes 7-9 front reveal walking to camera...
+</think>
+[
+  {"title":"Bóng Lưng Gợi Cảm","pose":"Full body shot from completely behind, showing off curves, long legs, walking away slowly, face completely hidden, wearing the exact outfit, luxury minimalist concrete museum background","camera":"Low angle following from behind","emotion":"Mysterious, confident"},
+  ... exactly 9 objects ...
+]
 
-Return ONLY the JSON array, no markdown, no explanation.`
+Return ONLY the <think> block followed by the JSON array.`
 
             const aiResponse = await callGemini({ prompt: analyzePrompt, images: allImages })
 
             // Parse JSON from response
             let parsed
             try {
-                const jsonMatch = aiResponse.match(/\[\s*\{[\s\S]*\}\s*\]/)
+                const cleanedResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
+                const jsonMatch = cleanedResponse.match(/```json\s*([\s\S]*?)```/)
                 if (jsonMatch) {
-                    parsed = JSON.parse(jsonMatch[0])
+                    parsed = JSON.parse(jsonMatch[1])
                 } else {
-                    parsed = JSON.parse(aiResponse)
+                    const extractJson = cleanedResponse.replace(/^[^[{]*/, '').replace(/[^}\]]*$/, '')
+                    parsed = JSON.parse(extractJson)
                 }
             } catch (e) {
                 console.error('Failed to parse AI scene response:', e, aiResponse)
@@ -1336,6 +1336,9 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
             )
             }
 
+            {/* ═══ Video Prompt Panel ═══ */}
+            {Object.keys(results).length > 0 && <VideoPromptPanel shotDescriptions={scenes.map(s => ({ title: s.title, shotDesc: s.pose, category: 'setup' }))} />}
+
             {/* ═══ SEO & AEO Panel ═══ */}
             <SeoAeoPanel
                 images={Object.values(results)}
@@ -1344,16 +1347,18 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
             />
 
             {/* Preview */}
-            {previewImg && <ImagePreviewModal imageSrc={previewImg} onClose={() => setPreviewImg(null)} />}
+            {previewImg && <Portal><ImagePreviewModal imageSrc={previewImg} onClose={() => setPreviewImg(null)} /></Portal>}
 
             {/* Library Picker */}
             {
                 libraryPicker && (
-                    <LibraryPickerModal
-                        title={libraryPicker === 'ref' ? 'Chọn ảnh mẫu' : 'Chọn sản phẩm'}
-                        onClose={() => setLibraryPicker(null)}
-                        onSelect={handleLibraryPick}
-                    />
+                    <Portal>
+                        <LibraryPickerModal
+                            title={libraryPicker === 'ref' ? 'Chọn ảnh mẫu' : 'Chọn sản phẩm'}
+                            onClose={() => setLibraryPicker(null)}
+                            onSelect={handleLibraryPick}
+                        />
+                    </Portal>
                 )
             }
         </div >

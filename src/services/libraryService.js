@@ -8,6 +8,40 @@
 
 import { saveOriginalImage, deleteOriginalImage } from './imageStorageService'
 import { saveToDownloadFolder, saveToKhoFolder } from './fileSaveService'
+import { syncItemToCloud, deleteCloudItem, toggleCloudLike } from './cloudLibraryService'
+
+// ─── Cloud Sync Helper (non-blocking) ─────────────────────────────────────────
+// Gets current user from Firebase Auth. Only syncs if logged in.
+function getAuthUid() {
+    try {
+        const { auth } = require('./firebaseConfig')
+        return auth.currentUser?.uid || null
+    } catch { return null }
+}
+
+function bgCloudSync(item) {
+    const uid = getAuthUid()
+    if (!uid) return
+    syncItemToCloud(uid, item).catch(err =>
+        console.warn('[bgCloudSync] Failed:', err.message)
+    )
+}
+
+function bgCloudDelete(itemId) {
+    const uid = getAuthUid()
+    if (!uid) return
+    deleteCloudItem(uid, itemId).catch(err =>
+        console.warn('[bgCloudSync] Delete failed:', err.message)
+    )
+}
+
+function bgCloudLike(itemId, liked) {
+    const uid = getAuthUid()
+    if (!uid) return
+    toggleCloudLike(uid, itemId, liked).catch(err =>
+        console.warn('[bgCloudSync] Like failed:', err.message)
+    )
+}
 
 const STORAGE_KEY = 'goha_studio_library'
 const FOLDERS_KEY = 'goha_studio_folders'
@@ -89,6 +123,9 @@ export async function saveToLibrary(record) {
             )
         }
 
+        // ★ Background cloud sync (non-blocking)
+        bgCloudSync(record)
+
         return { success: true, items }
     } catch (err) {
         console.error('saveToLibrary error:', err)
@@ -97,6 +134,7 @@ export async function saveToLibrary(record) {
                 record.imageSrc = await resizeForStorage(record.imageSrc, 400)
                 const items = getLibraryItems(); items.unshift(record)
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+                bgCloudSync(record)
                 return { success: true, items }
             } catch { return { success: false, error: 'localStorage đã đầy.' } }
         }
@@ -110,12 +148,15 @@ export function deleteFromLibrary(id) {
     const items = getLibraryItems().filter(i => i.id !== id)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
     deleteOriginalImage(id)
+    bgCloudDelete(id) // ★ Cloud sync
     return items
 }
 
 export function toggleLikeInLibrary(id) {
     const items = getLibraryItems().map(i => i.id === id ? { ...i, liked: !i.liked } : i)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    const toggled = items.find(i => i.id === id)
+    if (toggled) bgCloudLike(id, toggled.liked) // ★ Cloud sync
     return items
 }
 
