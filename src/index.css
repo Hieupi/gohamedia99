@@ -2773,6 +2773,112 @@ textarea {
   gap: 8px;
 }
 
+.kol-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kol-subtabs-wrap {
+  margin-bottom: 14px;
+}
+
+.kol-subtabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.kol-subtab {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-radius: var(--r-md);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kol-subtab.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: rgba(255, 107, 53, 0.1);
+}
+
+.kol-brain-note {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+.kol-chip {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.kol-chip.active {
+  border-color: var(--brand);
+  color: var(--brand);
+  background: rgba(255, 107, 53, 0.08);
+}
+
+.kol-alert {
+  margin: 8px 0 12px;
+  border: 1px solid rgba(239, 68, 68, 0.45);
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
+  border-radius: var(--r-md);
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.kol-block {
+  border-top: 1px solid var(--border);
+  padding: 10px 12px;
+}
+
+.kol-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.kol-code {
+  min-height: 140px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.kol-step-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.kol-step-box {
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-md);
+  padding: 10px;
+  background: var(--surface);
+}
+
 /* =============================================
    POSE LIBRARY
    ============================================= */
@@ -4022,7 +4128,7 @@ textarea {
 .lib-breadcrumb-btn:hover { background: var(--surface); color: var(--brand); }
 
 
-/* --- DARK THEME � Cosmic Purple (Reference: Crypto Wallet UI) ----------- */
+/* --- DARK THEME - Cosmic Purple (Reference: Crypto Wallet UI) ----------- */
 [data-theme="dark"] {
   --brand: #d058f3;
   --brand-dark: #b840e0;
@@ -4531,7 +4637,7 @@ textarea {
   background: #c9a84c;
 }
 
-/* --- LIGHT THEME PREMIUM UPGRADE � Depth & Elevation ------------------- */
+/* --- LIGHT THEME PREMIUM UPGRADE - Depth & Elevation ------------------- */
 
 /* Deeper shadows for 3D feel */
 [data-theme="light"] body, body:not([data-theme]) {

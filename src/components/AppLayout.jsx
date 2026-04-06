@@ -1,22 +1,26 @@
 import { Outlet, useNavigate, useLocation } from 'react-router-dom'
 import { useState } from 'react'
 import {
-  Home, Wand2, Scissors, Image, Shield, Settings, LogOut, Phone, BookOpen, Video, Lock, Sparkles, Share2
+  Home, Wand2, Scissors, Image, Shield, Settings, LogOut, Phone, BookOpen, Video, Lock, Sparkles, Share2, Package
 } from 'lucide-react'
 import useSubscription from '../hooks/useSubscription'
 import UpgradePrompt from './UpgradePrompt'
 import NewDesignPage from '../pages/NewDesignPage'
 import StorytellingPage from '../pages/StorytellingPage'
+import KOLReviewSalesPage from '../pages/KOLReviewSalesPage'
 import RemoveClothesPage from '../pages/RemoveClothesPage'
+import RemoveProductPage from '../pages/RemoveProductPage'
 import VideoPromptPage from '../pages/VideoPromptPage'
 
 const NAV_ITEMS = [
   { path: '/home', label: 'Trang chủ', icon: Home, feature: null },
   { path: '/new-design', label: 'Thiết kế mới', icon: Wand2, feature: 'new-design' },
   { path: '/storytelling', label: 'Storytelling', icon: BookOpen, feature: 'storytelling' },
+  { path: '/kol-review-sales', label: 'KOL Review Bán Hàng', icon: Sparkles, feature: 'storytelling' },
   { path: '/video-prompt', label: 'Video Prompt', icon: Video, feature: 'video-prompt' },
   { path: '/prompt-library', label: 'Kho Prompt', icon: BookOpen, feature: null },
   { path: '/remove-clothes', label: 'Tách đồ áo', icon: Scissors, feature: 'remove-clothes' },
+  { path: '/remove-product', label: 'Tách sản phẩm', icon: Package, feature: 'remove-clothes' },
   { path: '/library', label: 'Thư viện', icon: Image, feature: 'library' },
   { path: '/social', label: 'Social Links', icon: Share2, feature: null },
   { path: '/admin', label: 'Quản trị', icon: Shield, feature: 'admin' },
@@ -27,7 +31,9 @@ const NAV_ITEMS = [
 const KEEP_ALIVE_PAGES = [
   { path: '/new-design', Component: NewDesignPage, feature: 'new-design' },
   { path: '/storytelling', Component: StorytellingPage, feature: 'storytelling' },
+  { path: '/kol-review-sales', Component: KOLReviewSalesPage, feature: 'storytelling' },
   { path: '/remove-clothes', Component: RemoveClothesPage, feature: 'remove-clothes' },
+  { path: '/remove-product', Component: RemoveProductPage, feature: 'remove-clothes' },
   { path: '/video-prompt', Component: VideoPromptPage, feature: 'video-prompt' },
 ]
 
@@ -36,6 +42,7 @@ const KEEP_ALIVE_PATHS = KEEP_ALIVE_PAGES.map(p => p.path)
 const FEATURE_LABELS = {
   'new-design': 'Thiết kế mới (10-shot AI)',
   'storytelling': 'Storytelling (9 cảnh)',
+  'kol-review-sales': 'KOL Review Bán Hàng',
   'video-prompt': 'Video Prompt điện ảnh',
   'seo-aeo': 'SEO & AEO Content',
 }

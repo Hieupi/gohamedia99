@@ -99,6 +99,34 @@ RESPOND with ONLY valid JSON array — no markdown, no extra text:
 Now analyze the attached image.`
 
 // ─────────────────────────────────────────────────────────────────────────────
+// PROMPT 2b: PRODUCT_DETECTION — Phát hiện sản phẩm từ ảnh, trả danh sách tiếng Việt
+// ─────────────────────────────────────────────────────────────────────────────
+const PRODUCT_DETECTION = `You are a product photography expert and object detection specialist.
+
+ANALYZE the attached image and identify ALL visible products/objects:
+1. Every distinct product or item in the image (electronics, furniture, cosmetics, food, appliances, bags, etc.)
+2. The BACKGROUND/SCENE if visible
+
+RULES:
+- Use VIETNAMESE names for each item.
+- Be specific and include color + key details. Example: "Laptop Lenovo ThinkPad X1 màu xám" not just "Laptop".
+- Include a short description (1 line) for each item describing appearance, key features, or brand.
+- "Nền" category = background/scene description.
+- Do NOT include people/models as separate items — focus on products only.
+- Maximum 8 items total.
+
+RESPOND with ONLY valid JSON array — no markdown, no extra text:
+[
+  { "id": 1, "nameVi": "Laptop Lenovo ThinkPad X1 Yoga", "description": "Máy tính xách tay 2-trong-1 màu xám, màn hình cảm ứng...", "category": "electronics" },
+  { "id": 2, "nameVi": "Chuột không dây màu đen", "description": "Chuột máy tính không dây dạng ergonomic màu đen bóng...", "category": "electronics" },
+  { "id": 3, "nameVi": "Nền", "description": "Bàn làm việc gỗ sáng màu, phông nền trắng studio...", "category": "background" }
+]
+
+Valid categories: electronics, furniture, cosmetics, food, appliance, clothing, bag, book, toy, other, background
+
+Now analyze the attached image.`
+
+// ─────────────────────────────────────────────────────────────────────────────
 // PROMPT 3: OUTFIT COMPOSITION — Ghép trang phục lên người mẫu (placeholder)
 // ─────────────────────────────────────────────────────────────────────────────
 const OUTFIT_COMPOSITION = `[Placeholder — sẽ được xây dựng ở phase tiếp theo]`
@@ -334,6 +362,7 @@ export const VN_DNA_DEFAULTS = {
 export const PROMPTS = {
   GARMENT_EXTRACTION,
   OBJECT_DETECTION,
+  PRODUCT_DETECTION,
   OUTFIT_COMPOSITION,
   LOOKBOOK_CAPTION,
   // C.R.A.F.T. V6.1 Multi-Bot
