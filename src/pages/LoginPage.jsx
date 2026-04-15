@@ -82,10 +82,14 @@ export default function LoginPage() {
       <div className="auth-card fade-in">
         {/* Logo */}
         <div className="auth-logo">
-          <div className="auth-logo-icon">FS</div>
+          <img src="/assets/avatar-hieu.png" alt="Nguyễn Hiếu AI"
+            style={{ width: 64, height: 64, borderRadius: '50%', objectFit: 'cover', boxShadow: '0 4px 20px rgba(243,112,33,0.35)' }} />
           <div>
-            <div className="auth-title">Fashion Studio AI</div>
-            <div className="auth-subtitle" style={{ textAlign: 'center' }}>
+            <div className="auth-title" style={{ textAlign: 'center' }}>NGUYỄN HIẾU AI</div>
+            <div style={{ textAlign: 'center', fontSize: 12, fontWeight: 600, color: 'rgba(255,255,255,0.45)', letterSpacing: 1.5, marginTop: 2 }}>
+              GOHA MEDIA AFF TOOL
+            </div>
+            <div className="auth-subtitle" style={{ textAlign: 'center', marginTop: 8 }}>
               {mode === 'login' ? 'Đăng nhập để tiếp tục' :
                 mode === 'register' ? 'Tạo tài khoản mới' :
                   'Đặt lại mật khẩu'}

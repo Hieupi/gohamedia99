@@ -8,15 +8,13 @@
 
 import { saveOriginalImage, deleteOriginalImage } from './imageStorageService'
 import { saveToDownloadFolder, saveToKhoFolder } from './fileSaveService'
-import { syncItemToCloud, deleteCloudItem, toggleCloudLike } from './cloudLibraryService'
+import { syncItemToCloud, deleteCloudItem, toggleCloudLike, getCloudLibraryItems, getCloudFolders, syncFoldersToCloud } from './cloudLibraryService'
+import { uploadImageToCloud } from './cloudStorageService'
+import { auth } from './firebaseConfig'
 
 // ─── Cloud Sync Helper (non-blocking) ─────────────────────────────────────────
-// Gets current user from Firebase Auth. Only syncs if logged in.
 function getAuthUid() {
-    try {
-        const { auth } = require('./firebaseConfig')
-        return auth.currentUser?.uid || null
-    } catch { return null }
+    return auth.currentUser?.uid || null
 }
 
 function bgCloudSync(item) {
@@ -40,6 +38,14 @@ function bgCloudLike(itemId, liked) {
     if (!uid) return
     toggleCloudLike(uid, itemId, liked).catch(err =>
         console.warn('[bgCloudSync] Like failed:', err.message)
+    )
+}
+
+function bgCloudSyncFolders(folders) {
+    const uid = getAuthUid()
+    if (!uid) return
+    syncFoldersToCloud(uid, folders).catch(err =>
+        console.warn('[bgCloudSync] Folders failed:', err.message)
     )
 }
 
@@ -77,6 +83,80 @@ export function getLibraryItems() {
     catch { return [] }
 }
 
+/**
+ * Tải thư viện kết hợp: localStorage + Firestore cloud (nếu đã đăng nhập).
+ * Gọi khi trang Thư viện mount — đồng bộ dữ liệu từ cloud về máy mới.
+ * @returns {{ items: Array, folders: Array }}
+ */
+export async function loadLibraryWithCloudSync() {
+    const uid = getAuthUid()
+    const localItems = getLibraryItems()
+    const localFolders = getFolders()
+
+    if (!uid) return { items: localItems, folders: localFolders }
+
+    try {
+        const [cloudItems, cloudFolders] = await Promise.all([
+            getCloudLibraryItems(uid),
+            getCloudFolders(uid),
+        ])
+
+        if (!cloudItems.length && !cloudFolders.length) {
+            return { items: localItems, folders: localFolders }
+        }
+
+        // Merge: cloud là nguồn chính, local bổ sung những item chưa sync lên cloud
+        const cloudMap = new Map(cloudItems.map(i => [i.id, i]))
+        const localMap = new Map(localItems.map(i => [i.id, i]))
+
+        // Gộp: lấy tất cả id từ cả hai, ưu tiên cloud metadata NHƯNG giữ data URL local
+        const allIds = new Set([...cloudMap.keys(), ...localMap.keys()])
+        const merged = []
+        for (const id of allIds) {
+            const cloud = cloudMap.get(id)
+            const local = localMap.get(id)
+            if (cloud) {
+                // Cloud có → merge metadata từ cloud, nhưng ưu tiên imageSrc local (data URL)
+                // vì Firebase Storage URL bị chặn CORS khi fetch() từ browser
+                const localDataUrl = local?.imageSrc?.startsWith('data:') ? local.imageSrc : null
+                merged.push({
+                    ...local,
+                    ...cloud,
+                    imageSrc: localDataUrl || cloud.imageSrc, // Giữ data URL local nếu có
+                    cloudUrl: cloud.imageSrc,                 // Lưu Firebase URL riêng để tham chiếu
+                })
+            } else {
+                // Chỉ có local (chưa kịp sync) → giữ nguyên
+                merged.push(local)
+            }
+        }
+
+        // Sắp xếp theo ngày tạo mới nhất lên đầu
+        merged.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+
+        // Lưu kết quả về localStorage để dùng offline
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged))
+
+        // Merge folders: cloud là nguồn chính
+        let mergedFolders = localFolders
+        if (cloudFolders.length > 0) {
+            const cloudFolderMap = new Map(cloudFolders.map(f => [f.id, f]))
+            const localFolderMap = new Map(localFolders.map(f => [f.id, f]))
+            const allFolderIds = new Set([...cloudFolderMap.keys(), ...localFolderMap.keys()])
+            mergedFolders = []
+            for (const id of allFolderIds) {
+                mergedFolders.push(cloudFolderMap.get(id) || localFolderMap.get(id))
+            }
+            localStorage.setItem(FOLDERS_KEY, JSON.stringify(mergedFolders))
+        }
+
+        return { items: merged, folders: mergedFolders }
+    } catch (err) {
+        console.warn('[loadLibraryWithCloudSync] Cloud load failed:', err.message)
+        return { items: localItems, folders: localFolders }
+    }
+}
+
 // ─── Smart Name ───────────────────────────────────────────────────────────────
 
 const CATEGORY_PREFIXES = {
@@ -103,40 +183,71 @@ export function generateUniqueName({ category, description, prefix } = {}) {
 // ─── Write ────────────────────────────────────────────────────────────────────
 
 export async function saveToLibrary(record) {
-    // Giữ bản gốc để lưu vào Kho disk
     const originalSrc = record.imageSrc
     try {
-        if (record.imageSrc && record.imageSrc.startsWith('data:')) {
-            await saveOriginalImage(record.id, record.imageSrc)
-            record.imageSrc = await resizeForStorage(record.imageSrc, 800)
+        // 1. Lưu bản gốc full-quality vào IndexedDB (offline/download HD)
+        if (originalSrc && originalSrc.startsWith('data:')) {
+            await saveOriginalImage(record.id, originalSrc)
         }
+
+        // 2. Upload lên Firebase Storage TRƯỚC — lấy URL ngắn (~100 ký tự)
+        //    Nếu thành công → localStorage chỉ lưu URL, KHÔNG lưu base64
+        //    → localStorage không bao giờ bị đầy
+        const uid = getAuthUid()
+        let cloudUrl = null
+        if (uid && originalSrc && originalSrc.startsWith('data:')) {
+            try {
+                cloudUrl = await uploadImageToCloud(uid, record.id, originalSrc)
+            } catch (err) {
+                console.warn('[saveToLibrary] Cloud upload failed, fallback to thumbnail:', err.message)
+            }
+        }
+
+        // 3. Gán imageSrc cho localStorage:
+        //    - Đã có cloud URL → lưu URL (cực nhỏ)
+        //    - Chưa login / upload fail → lưu thumbnail nhỏ 400px (fallback)
+        if (cloudUrl) {
+            record.imageSrc = cloudUrl
+        } else if (originalSrc && originalSrc.startsWith('data:')) {
+            record.imageSrc = await resizeForStorage(originalSrc, 400)
+        }
+
+        // 4. Lưu metadata + URL vào localStorage
         const items = getLibraryItems()
         const exists = items.findIndex(i => i.id === record.id)
         if (exists >= 0) { items[exists] = { ...items[exists], ...record } }
         else { items.unshift(record) }
         localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
 
-        // ★ Auto-save bản gốc vào public/kho
+        // 5. Đồng bộ metadata lên Firestore (background, non-blocking)
+        //    imageSrc đã là cloudUrl → syncItemToCloud sẽ KHÔNG upload lại
+        bgCloudSync(record)
+
+        // 6. Auto-save bản gốc vào public/kho (background)
         if (originalSrc && originalSrc.startsWith('data:')) {
             saveToKhoFolder(originalSrc, record.name || record.id).catch(err =>
                 console.warn('[saveToLibrary] Kho disk save failed:', err.message)
             )
         }
 
-        // ★ Background cloud sync (non-blocking)
-        bgCloudSync(record)
-
         return { success: true, items }
     } catch (err) {
         console.error('saveToLibrary error:', err)
+        // Fallback cuối cùng nếu localStorage vẫn đầy (thumbnail nhỏ hơn nữa)
         if (err.name === 'QuotaExceededError' || err.code === 22) {
             try {
-                record.imageSrc = await resizeForStorage(record.imageSrc, 400)
-                const items = getLibraryItems(); items.unshift(record)
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-                bgCloudSync(record)
-                return { success: true, items }
-            } catch { return { success: false, error: 'localStorage đã đầy.' } }
+                // Dọn ảnh cũ nhất nếu có thể
+                const items = getLibraryItems()
+                if (items.length > 0) {
+                    items.pop() // xóa item cũ nhất
+                    record.imageSrc = await resizeForStorage(originalSrc || record.imageSrc, 200)
+                    items.unshift(record)
+                    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+                    bgCloudSync(record)
+                    return { success: true, items }
+                }
+            } catch { /* ignore */ }
+            return { success: false, error: 'Bộ nhớ cục bộ đã đầy. Hãy đăng nhập để lưu ảnh lên Cloud tự động.' }
         }
         return { success: false, error: err.message }
     }
@@ -240,6 +351,7 @@ export function createFolder(name, parentId = null) {
         createdAt: new Date().toISOString(),
     })
     localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders))
+    bgCloudSyncFolders(folders) // ★ Cloud sync folders
     return folders
 }
 
@@ -257,6 +369,7 @@ export function deleteFolder(folderId) {
     }
     const folders = allFolders.filter(f => !toDelete.has(f.id))
     localStorage.setItem(FOLDERS_KEY, JSON.stringify(folders))
+    bgCloudSyncFolders(folders) // ★ Cloud sync folders
     const items = getLibraryItems().map(i => toDelete.has(i.folderId) ? { ...i, folderId: null } : i)
     localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
     return folders
@@ -279,6 +392,7 @@ export function moveFolderInto(folderId, targetParentId) {
     }
     const updated = folders.map(f => f.id === folderId ? { ...f, parentId: targetParentId || null } : f)
     localStorage.setItem(FOLDERS_KEY, JSON.stringify(updated))
+    bgCloudSyncFolders(updated) // ★ Cloud sync folders
     return updated
 }
 

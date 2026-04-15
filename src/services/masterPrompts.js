@@ -311,6 +311,59 @@ Aspect Ratio: {aspect}
 OUTPUT: One complete, copy-paste-ready positive prompt per shot variation.
 RESPOND WITH ONLY THE FINAL COMPOSED PROMPT TEXT.`
 
+// ─── BOT BG: REAL BACKGROUND ANALYZER (REMIX MODE) ───────────────────────────
+const BOT_BG_ANALYZER = `You are an elite Location Scout & Environment Analyst with 20+ years scouting real commercial spaces for top fashion brands and product campaigns in Vietnam.
+
+MISSION: Analyze the attached REAL PHOTOGRAPH(S) of an actual store, showroom, warehouse, or commercial space. Extract a comprehensive environmental DNA that will allow an AI image generator to PERFECTLY COMPOSITE a KOL model into this real space.
+
+ANALYZE IN EXTREME DETAIL:
+
+1. SPATIAL ARCHITECTURE:
+   - Room type & purpose (audio showroom, fashion boutique, warehouse, cafe, etc.)
+   - Ceiling height and structure (beams, panels, exposed pipes, decorative elements)
+   - Floor material and pattern (tiles, wood, marble, concrete, carpet)
+   - Wall finish (painted, paneled, glass, brick, wallpaper, branded signage)
+   - Overall spatial depth and width visible in the photo
+
+2. LIGHTING ANALYSIS (critical for seamless compositing):
+   - Light sources: natural windows, overhead LED/fluorescent, accent spotlights, neon signs
+   - Color temperature (warm amber ~2700K / neutral white ~4000K / cool daylight ~6500K)
+   - Shadow direction, angles, and intensity
+   - Highlight catchpoints on floor/surfaces
+   - Overall exposure level (bright / moody ambient / mixed)
+
+3. BRAND & PRODUCT CONTEXT:
+   - Visible brand signage, logos, or store name (exact text if legible)
+   - Product categories on display (speakers, audio equipment, electronics, furniture, clothing, etc.)
+   - Display arrangements, shelving, or showcases visible
+   - Any promotional materials, banners, or posters
+
+4. CAMERA PERSPECTIVE:
+   - Estimated camera height (low ~80cm / eye level ~160cm / elevated ~220cm)
+   - Viewing angle (front-facing / slight diagonal / overhead)
+   - Depth of field (all sharp / softly blurred background)
+   - Focal length feel (wide-angle 24mm / standard 50mm / mild tele 85mm)
+
+5. ATMOSPHERE & MOOD:
+   - Color palette (dominant colors, accent colors, tonal range)
+   - Style descriptor (luxury / modern / industrial / cozy / high-tech / rustic / boutique)
+   - Overall energy (vibrant / professional / intimate / dynamic)
+
+6. KEY VISUAL ANCHORS (3-5 most distinctive elements):
+   - List the most immediately noticeable visual elements (e.g., "golden NH logo on back wall", "large black speaker towers flanking center", "warm wood panel ceiling")
+
+DEEP REASONING PROTOCOL:
+Before writing your output, think critically:
+- What is the EXACT lighting setup? If a KOL stands here, what direction will the light hit her face?
+- What camera angle must the KOL be photographed at to match this space's perspective?
+- What spatial scale — how tall should the KOL appear relative to the room elements?
+- What color temperature should her skin tones be adjusted to, to match this environment?
+
+OUTPUT FORMAT (English only — comprehensive and precise):
+[EXTRACTED_BACKGROUND] = "Real [room type], [city/context if apparent]. Architecture: [floor, ceiling, walls described precisely]. Products/Display: [what's visible on shelves/displays]. Lighting: [color temp K, direction, quality, shadows]. Camera: [height, angle, focal feel, depth]. Atmosphere: [style descriptors]. Dominant colors: [list]. Key anchors: [3-5 most distinctive visual elements with exact description]."
+
+RESPOND WITH ONLY THE [EXTRACTED_BACKGROUND] TEXT — no commentary, no extra lines.`
+
 // ─── BOT 7: PRECISION RETOUCHER ──────────────────────────────────────────────
 const BOT7_PRECISION_RETOUCHER = `You are an S-tier Photoshop & Liquid-Retouch Specialist with 20+ years retouching fashion images for Vogue, Elle, and Harper's Bazaar Asia.
 
@@ -373,6 +426,7 @@ export const PROMPTS = {
   BOT5_VISUAL_DIRECTOR,
   BOT6_MASTER_COMPOSER,
   BOT7_PRECISION_RETOUCHER,
+  BOT_BG_ANALYZER,
 }
 
 /**
@@ -404,9 +458,17 @@ export function buildMasterImagePrompt({
   shotDescription = '',
   referenceImages = [],
   productImages = [],
-  // ── KOL Preset params (NEW) ──
+  // ── KOL Preset params ──
   cameraPreset = '',
   makeupStyle = '',
+  // ── REMIX MODE: Real background composite ──
+  extractedBackground = '',
+  isRemixMode = false,
+  bgCount = 0,
+  // ── LOGO DNA LOCK ──
+  logoCount = 0,
+  // ── STORYTELLING / MULTI-SCENE CONSISTENCY ──
+  isStorytellingMode = false,
 }) {
   const AUTO = '🤖 Auto (AI tự chọn)'
   const isAuto = (v) => !v || v === AUTO
@@ -434,6 +496,51 @@ Treat the reference face as a LOCKED TEMPLATE that cannot be altered in any way.
     parts.push(`\n[FACIAL DNA SPECIFICATION]\n${extractedIdentity}\nEvery single facial feature described above must be precisely replicated — this is the SAME PERSON as in the reference photos.`)
   }
 
+  // ── REMIX MODE: REAL BACKGROUND LOCK ────────────────────────────────────
+  if (isRemixMode && bgCount > 0) {
+    parts.push(`
+[ABSOLUTE BACKGROUND LOCK — REAL PHOTO COMPOSITE MODE — NON-NEGOTIABLE]
+The LAST ${bgCount} image(s) attached are REAL PHOTOGRAPHS of an actual store/showroom/commercial space.
+This is a PHOTO COMPOSITE operation — generate a scene where the AI KOL is seamlessly placed INSIDE this real environment.
+
+STRICT COMPOSITE RULES:
+1. BACKGROUND MUST BE IDENTICAL: Walls, floor, ceiling, products on shelves, signage, lighting fixtures, furniture — all must appear EXACTLY as in the real photo
+2. DO NOT modify, replace, stylize, reimagine, or AI-ify the background — it must look like the real photograph
+3. LIGHTING MATCH: The KOL's skin, clothing, and shadows MUST match the real photo's lighting — same color temperature, same shadow direction, same intensity
+4. PERSPECTIVE MATCH: The KOL must stand at the correct scale and perspective relative to the room — matching the camera angle and vanishing points of the real photo
+5. ALL REAL PRODUCTS STAY REAL: Every product, display item, or object visible in the background photo remains EXACTLY as photographed — do NOT alter them
+6. SEAMLESS INTEGRATION: The KOL should appear as if she was actually photographed inside this real commercial space — zero compositing artifacts`)
+  }
+  if (isRemixMode && extractedBackground) {
+    parts.push(`\n[REAL BACKGROUND DNA — ENVIRONMENT SPECIFICATION]\n${extractedBackground}\nThis is the EXACT environment where the KOL must be composited. Match every architectural, lighting, and atmospheric detail precisely.`)
+  }
+
+  // ── LOGO DNA LOCK ────────────────────────────────────────────────────────
+  if (logoCount > 0) {
+    const logoStart = referenceImages.length + bgCount + 1
+    parts.push(`
+[LOGO DNA LOCK — NON-NEGOTIABLE]
+Image(s) #${logoStart} to #${logoStart + logoCount - 1} (the LAST ${logoCount} attached image${logoCount > 1 ? 's' : ''}) are BRAND/STORE LOGO reference images.
+CRITICAL LOGO RULES:
+1. These logos MUST appear in the scene EXACTLY as shown — SAME color, SAME design, SAME proportions, ZERO alteration
+2. Logo placement: naturally visible in the environment (on wall, signage, display stand, product packaging, or clothing tag)
+3. The logo must look PIXEL-PERFECT IDENTICAL across ALL generated scenes — if another scene already placed the logo somewhere, MAINTAIN that exact placement, size, and appearance
+4. DO NOT distort, reinterpret, stylize, or recreate the logo from memory — ONLY use the exact logo from the reference image`)
+  }
+
+  // ── SCENE CONSISTENCY LOCK (STORYTELLING MODE) ───────────────────────────
+  if (isStorytellingMode) {
+    parts.push(`
+[SCENE CONSISTENCY LOCK — MULTI-SCENE STORYTELLING MODE — NON-NEGOTIABLE]
+This image is ONE SCENE in a continuous multi-scene story sequence. ABSOLUTE CONSISTENCY RULES:
+1. BACKGROUND IS FROZEN AND IDENTICAL: Every background element — walls, floor, ceiling, furniture, products, shelves, signage, decor, lighting fixtures, color palette, architectural details — must be 100% IDENTICAL to all other scenes in this story
+2. ENVIRONMENT DNA IS LOCKED: The room layout, perspective, camera height, and spatial relationships between objects DO NOT CHANGE between scenes
+3. ONLY THESE ELEMENTS CHANGE PER SCENE: KOL pose, KOL body gesture, KOL facial expression, camera framing/angle
+4. THINK OF IT AS A FILM SET: The stage and all props are fixed — only the actor's movement changes
+5. DO NOT vary: any background color, any object position, any lighting source, any environmental detail
+6. SAME TIME OF DAY: Lighting angle, shadow direction, and color temperature are IDENTICAL across all scenes`)
+  }
+
   // ── LAYER 2: SKIN REFERENCE ─────────────────────────────────────────────
   if (productImages.length > 1) {
     parts.push(`\napply the skin tone and color rendering from @img2 only, bright pale clean skin, no yellow tint, do not copy its face`)
@@ -452,9 +559,13 @@ Treat the reference face as a LOCKED TEMPLATE that cannot be altered in any way.
   // ── LAYER 4: SUBJECT + POSE ─────────────────────────────────────────────
   const modelDesc = isAuto(modelType) ? VN_DNA_DEFAULTS.modelType : modelType
   const poseDesc = isAuto(pose) ? 'natural relaxed pose, soft confident gaze, slight head tilt' : pose
-  const bgDesc = isAuto(background) ? 'a clean, aesthetically beautiful setting that complements this specific garment' : background
 
-  parts.push(`\n${modelDesc}, ${poseDesc}, in ${bgDesc}`)
+  if (isRemixMode) {
+    parts.push(`\n${modelDesc}, ${poseDesc}, naturally composited and standing inside the real store/showroom environment from the background reference photo`)
+  } else {
+    const bgDesc = isAuto(background) ? 'a clean, aesthetically beautiful setting that complements this specific garment' : background
+    parts.push(`\n${modelDesc}, ${poseDesc}, in ${bgDesc}`)
+  }
 
   // ── LAYER 5: FOCUS BEHAVIOR ─────────────────────────────────────────────
   parts.push(`\nfocus behavior: face and upper body critically sharp, eyes in perfect focus, background smoothly blurred into creamy bokeh`)
@@ -489,7 +600,9 @@ Treat the reference face as a LOCKED TEMPLATE that cannot be altered in any way.
   }
 
   // ── LAYER 11: ENVIRONMENT ───────────────────────────────────────────────
-  if (!isAuto(background)) {
+  if (isRemixMode) {
+    parts.push(`\nenvironment: REAL STORE/SHOWROOM from the reference photo — preserve every element exactly as photographed, no background blur, show the full real environment with depth and sharpness matching the original photo`)
+  } else if (!isAuto(background)) {
     parts.push(`\nenvironment: ${background}, softly blurred background for depth`)
   }
 
@@ -513,7 +626,16 @@ Treat the reference face as a LOCKED TEMPLATE that cannot be altered in any way.
   }
 
   // ── NEGATIVE PROMPT ─────────────────────────────────────────────────────
-  parts.push(`\nnegative: identity change, different face, new face, modified facial features, different person, face swap, plastic skin, over-smoothing, CGI, flat lighting, blurry face, focus on background, yellow skin, orange skin cast, heavy blush, wax doll, airbrushed, cartoon, illustration, deformed hands, tan skin, warm golden skin`)
+  const negativeExtra = isRemixMode
+    ? ', changed background, replaced background, AI background, fantasy environment, studio backdrop, blank background, white background, blurred background'
+    : ''
+  const storyNegative = isStorytellingMode
+    ? ', different background, background variation, new room, new environment, changed furniture, changed wall color, changed floor, changed lighting, inconsistent background, scene variation'
+    : ''
+  const logoNegative = logoCount > 0
+    ? ', logo distortion, wrong logo, modified logo, missing logo, logo variation, different brand mark'
+    : ''
+  parts.push(`\nnegative: identity change, different face, new face, modified facial features, different person, face swap, plastic skin, over-smoothing, CGI, flat lighting, blurry face, yellow skin, orange skin cast, heavy blush, wax doll, airbrushed, cartoon, illustration, deformed hands, tan skin, warm golden skin${negativeExtra}${storyNegative}${logoNegative}`)
 
   return parts.join('\n')
 }

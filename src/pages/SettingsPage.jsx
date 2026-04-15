@@ -1,13 +1,19 @@
 import { useState } from 'react'
-import { User, Palette, Bell, Shield, Key, ChevronRight } from 'lucide-react'
+import { User, Palette, Bell, Shield, Key, ChevronRight, Crown, Calendar, Clock, Sparkles } from 'lucide-react'
 import { useTheme } from '../contexts/ThemeProvider'
+import { useAuth } from '../contexts/AuthContext'
+import useSubscription from '../hooks/useSubscription'
+import UpgradePrompt from '../components/UpgradePrompt'
 
 const LANGUAGES = ['Tiếng Việt', 'English', '日本語', '한국어']
 const THEMES = ['Sáng', 'Tối', 'Luxury', 'Theo hệ thống']
 
 export default function SettingsPage({ user }) {
   const [activeSection, setActiveSection] = useState('account')
+  const [showUpgrade, setShowUpgrade] = useState(false)
 
+  const { profile } = useAuth()
+  const { isPro, isAdmin, isExpired, isExpiringSoon, daysRemaining, planExpiry, getPlanLabel } = useSubscription()
   const { theme: currentTheme, setTheme: applyTheme } = useTheme()
   const themeMap = { 'Sáng': 'light', 'Tối': 'dark', 'Luxury': 'luxury', 'Theo hệ thống': 'system' }
   const themeMapReverse = { light: 'Sáng', dark: 'Tối', luxury: 'Luxury', system: 'Theo hệ thống' }
@@ -30,6 +36,7 @@ export default function SettingsPage({ user }) {
 
   const SECTIONS = [
     { id: 'account', label: 'Tài khoản', icon: User },
+    { id: 'subscription', label: 'Gói đăng ký', icon: Crown },
     { id: 'display', label: 'Giao diện', icon: Palette },
     { id: 'notif', label: 'Thông báo', icon: Bell },
     { id: 'security', label: 'Bảo mật', icon: Shield },
@@ -115,6 +122,181 @@ export default function SettingsPage({ user }) {
                     <input className="form-input" type="tel" value={form.phone} onChange={e => set('phone', e.target.value)} placeholder="0901 234 567" />
                   </div>
                   <button className="btn btn-primary" style={{ alignSelf: 'flex-start' }}>Lưu thay đổi</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Subscription ── */}
+          {activeSection === 'subscription' && (
+            <div>
+              <div className="settings-panel-title">Gói đăng ký</div>
+
+              {/* Plan badge card */}
+              <div style={{
+                padding: 24, borderRadius: 16, marginBottom: 20,
+                background: isAdmin
+                  ? 'linear-gradient(135deg, rgba(168,85,247,0.08), rgba(168,85,247,0.02))'
+                  : isPro
+                    ? 'linear-gradient(135deg, rgba(245,158,11,0.08), rgba(245,158,11,0.02))'
+                    : 'var(--bg)',
+                border: `1.5px solid ${isAdmin ? 'rgba(168,85,247,0.2)' : isPro ? 'rgba(245,158,11,0.2)' : 'var(--border)'}`,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 20 }}>
+                  <div style={{
+                    width: 56, height: 56, borderRadius: 14,
+                    background: isAdmin
+                      ? 'linear-gradient(135deg, #a855f7, #7c3aed)'
+                      : isPro
+                        ? 'linear-gradient(135deg, #f59e0b, #ef4444)'
+                        : 'var(--border)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0
+                  }}>
+                    <Crown size={26} color="#fff" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--text-main)' }}>
+                      {getPlanLabel}
+                    </div>
+                    <div style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>
+                      {isAdmin ? 'Toàn quyền quản trị' : isPro ? 'Truy cập đầy đủ tính năng AI' : 'Truy cập các tính năng cơ bản'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Info grid */}
+                <div style={{
+                  display: 'grid', gridTemplateColumns: '1fr 1fr',
+                  gap: 12
+                }}>
+                  {/* Ngày đăng ký */}
+                  <InfoCard
+                    icon={<Calendar size={16} style={{ color: '#3b82f6' }} />}
+                    label="Ngày đăng ký"
+                    value={profile?.createdAt
+                      ? (profile.createdAt.toDate
+                          ? profile.createdAt.toDate()
+                          : new Date(profile.createdAt.seconds * 1000)
+                        ).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : '—'
+                    }
+                  />
+
+                  {/* Gói hiện tại */}
+                  <InfoCard
+                    icon={<Sparkles size={16} style={{ color: '#f59e0b' }} />}
+                    label="Gói hiện tại"
+                    value={isAdmin ? 'Admin' : isPro ? 'Pro' : 'Free'}
+                    valueColor={isAdmin ? '#a855f7' : isPro ? '#f59e0b' : '#94a3b8'}
+                  />
+
+                  {/* Ngày nâng cấp */}
+                  <InfoCard
+                    icon={<Sparkles size={16} style={{ color: '#22c55e' }} />}
+                    label="Ngày nâng cấp"
+                    value={profile?.upgradedAt
+                      ? (profile.upgradedAt.toDate
+                          ? profile.upgradedAt.toDate()
+                          : new Date(profile.upgradedAt.seconds * 1000)
+                        ).toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                      : '—'
+                    }
+                  />
+
+                  {/* Ngày hết hạn */}
+                  <InfoCard
+                    icon={<Clock size={16} style={{ color: isExpired ? '#ef4444' : isExpiringSoon ? '#f97316' : '#22c55e' }} />}
+                    label="Ngày hết hạn"
+                    value={
+                      isAdmin ? 'Không giới hạn'
+                        : !isPro && !isExpired ? '—'
+                        : planExpiry
+                          ? planExpiry.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' })
+                          : 'Vĩnh viễn'
+                    }
+                    valueColor={isExpired ? '#ef4444' : isExpiringSoon ? '#f97316' : undefined}
+                  />
+                </div>
+
+                {/* Expiry warning */}
+                {isExpired && (
+                  <div style={{
+                    marginTop: 16, padding: '10px 14px', borderRadius: 10,
+                    background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)',
+                    fontSize: 13, color: '#ef4444', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: 8
+                  }}>
+                    ⚠️ Gói Pro đã hết hạn. Gia hạn để tiếp tục sử dụng tính năng cao cấp.
+                  </div>
+                )}
+                {isExpiringSoon && !isExpired && (
+                  <div style={{
+                    marginTop: 16, padding: '10px 14px', borderRadius: 10,
+                    background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)',
+                    fontSize: 13, color: '#f59e0b', fontWeight: 600,
+                    display: 'flex', alignItems: 'center', gap: 8
+                  }}>
+                    ⏳ Gói Pro còn {daysRemaining} ngày. Gia hạn sớm để không bị gián đoạn.
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              {!isAdmin && (
+                <div style={{ display: 'flex', gap: 10 }}>
+                  {(!isPro || isExpired || isExpiringSoon) && (
+                    <button
+                      onClick={() => setShowUpgrade(true)}
+                      className="btn btn-primary"
+                      style={{
+                        padding: '10px 24px', fontSize: 14, fontWeight: 700,
+                        display: 'flex', alignItems: 'center', gap: 8,
+                        background: 'linear-gradient(135deg, #f59e0b, #ef4444)',
+                        border: 'none', borderRadius: 10
+                      }}>
+                      <Sparkles size={16} />
+                      {isExpired ? 'Gia hạn ngay' : isExpiringSoon ? 'Gia hạn sớm' : 'Nâng cấp Pro'}
+                    </button>
+                  )}
+                  <button
+                    onClick={() => window.location.href = '#/pricing'}
+                    className="btn btn-secondary"
+                    style={{ padding: '10px 20px', fontSize: 13 }}>
+                    Xem bảng giá
+                  </button>
+                </div>
+              )}
+
+              {/* Pro features list */}
+              <div style={{
+                marginTop: 24, padding: 20, borderRadius: 14,
+                background: 'var(--bg)', border: '1px solid var(--border)'
+              }}>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 14, color: 'var(--text-main)' }}>
+                  Tính năng Pro bao gồm
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px 20px', fontSize: 13 }}>
+                  {[
+                    'Thiết kế mới (10-shot AI)',
+                    'Storytelling (9 cảnh)',
+                    'KOL Review Bán Hàng',
+                    'Video Prompt điện ảnh',
+                    'SEO & AEO Content',
+                    'Hỗ trợ ưu tiên',
+                  ].map(f => (
+                    <div key={f} style={{ display: 'flex', alignItems: 'center', gap: 6, color: 'var(--text-main)' }}>
+                      <span style={{
+                        width: 18, height: 18, borderRadius: 5,
+                        background: (isPro || isAdmin) ? 'rgba(34,197,94,0.15)' : 'var(--border)',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        flexShrink: 0, fontSize: 11
+                      }}>
+                        {(isPro || isAdmin) ? '✓' : '🔒'}
+                      </span>
+                      {f}
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -216,6 +398,35 @@ export default function SettingsPage({ user }) {
 
         </div>
       </div>
+
+      {/* Upgrade modal */}
+      {showUpgrade && (
+        <UpgradePrompt
+          featureName=""
+          onClose={() => setShowUpgrade(false)}
+          onUpgrade={() => setShowUpgrade(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── Info Card for subscription section ───────────────────────────────────────
+function InfoCard({ icon, label, value, valueColor }) {
+  return (
+    <div style={{
+      padding: '12px 14px', borderRadius: 10,
+      background: 'var(--bg-card, #fff)', border: '1px solid var(--border)',
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+        {icon}
+        <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: 0.3 }}>
+          {label}
+        </span>
+      </div>
+      <div style={{ fontSize: 15, fontWeight: 800, color: valueColor || 'var(--text-main)' }}>
+        {value}
+      </div>
     </div>
   )
 }
@@ -237,6 +448,24 @@ function lsGetIdx() { return parseInt(localStorage.getItem(LS_IDX) || '0', 10) }
 function lsSaveIdx(i) { localStorage.setItem(LS_IDX, String(i)) }
 function maskKey(k) { return k && k.length > 8 ? '••••' + k.slice(-4) : '••••••••' }
 
+async function testKeyDirect(keyStr) {
+  // Test key bằng cách gọi Gemini text model đơn giản nhất
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${keyStr}`
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: 'Reply with: OK' }] }],
+      generationConfig: { maxOutputTokens: 5 }
+    })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || `HTTP ${res.status}`)
+  }
+  return true
+}
+
 function ApiKeyManager() {
   const [keys, setKeys] = useState(lsLoadKeys)
   const [newKey, setNewKey] = useState('')
@@ -247,6 +476,8 @@ function ApiKeyManager() {
   const [editId, setEditId] = useState(null)
   const [editLabel, setEditLabel] = useState('')
   const [rotIdx, setRotIdx] = useState(lsGetIdx)
+  const [testingId, setTestingId] = useState(null)
+  const [testStatus, setTestStatus] = useState({})
 
   const persist = updated => { lsSaveKeys(updated); setKeys(updated) }
 
@@ -300,6 +531,20 @@ function ApiKeyManager() {
 
   /* Copy */
   const doCopy = key => navigator.clipboard.writeText(key).then(() => flash('ok', 'Đã sao chép!'))
+
+  /* Test key thực tế */
+  const doTest = async (k) => {
+    setTestingId(k.id)
+    setTestStatus(prev => ({ ...prev, [k.id]: null }))
+    try {
+      await testKeyDirect(k.key)
+      setTestStatus(prev => ({ ...prev, [k.id]: { ok: true, msg: 'Key hợp lệ, kết nối thành công!' } }))
+    } catch (err) {
+      setTestStatus(prev => ({ ...prev, [k.id]: { ok: false, msg: err.message } }))
+    } finally {
+      setTestingId(null)
+    }
+  }
 
   /* Simulate round-robin */
   const activeKeys = keys.filter(k => k.active)
@@ -505,6 +750,23 @@ function ApiKeyManager() {
                     style={{ height: 32, padding: '0 10px', fontSize: 13, flexShrink: 0 }}>
                     📋
                   </button>
+                  {/* ── Test key button ── */}
+                  <button
+                    onClick={() => doTest(k)}
+                    disabled={testingId === k.id}
+                    title="Kiểm tra key có hoạt động không"
+                    style={{
+                      height: 32, padding: '0 12px', fontSize: 12, flexShrink: 0,
+                      border: '1px solid rgba(99,179,237,0.4)', borderRadius: 'var(--r-sm)',
+                      background: testingId === k.id ? 'rgba(99,179,237,0.05)' : 'rgba(99,179,237,0.1)',
+                      color: '#2b6cb0', cursor: testingId === k.id ? 'wait' : 'pointer',
+                      fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4,
+                    }}>
+                    {testingId === k.id
+                      ? <><span style={{ display: 'inline-block', animation: 'spin 1s linear infinite' }}>⏳</span> Đang test...</>
+                      : '🧪 Test'
+                    }
+                  </button>
                   <button onClick={() => doRemove(k.id)}
                     title="Xóa key này"
                     style={{
@@ -515,6 +777,19 @@ function ApiKeyManager() {
                     🗑
                   </button>
                 </div>
+
+                {/* Test result */}
+                {testStatus[k.id] && (
+                  <div style={{
+                    marginTop: 8, padding: '7px 12px', borderRadius: 7, fontSize: 12, fontWeight: 600,
+                    background: testStatus[k.id].ok ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)',
+                    border: `1px solid ${testStatus[k.id].ok ? 'rgba(34,197,94,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                    color: testStatus[k.id].ok ? '#15803d' : '#dc2626',
+                    wordBreak: 'break-word',
+                  }}>
+                    {testStatus[k.id].ok ? '✅' : '❌'} {testStatus[k.id].msg}
+                  </div>
+                )}
 
                 {/* Row 3 — stats */}
                 <div style={{ marginTop: 8, fontSize: 11.5, color: 'var(--text-muted)', display: 'flex', gap: 16 }}>
@@ -537,10 +812,11 @@ function ApiKeyManager() {
         <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--text-secondary)', lineHeight: 1.9 }}>
           <li>Mỗi lần gọi AI, app dùng 1 key rồi chuyển sang key kế tiếp (round-robin)</li>
           <li>Key bị <strong>tắt</strong> sẽ bị bỏ qua trong vòng xoay</li>
-          <li>Nhấn <strong>Test xoay vòng</strong> để xem thứ tự và +1 requestCount</li>
+          <li>Nhấn <strong>🧪 Test</strong> để kiểm tra từng key có hợp lệ không</li>
           <li>Keys được lưu trong trình duyệt (localStorage) — không ai khác truy cập được</li>
         </ul>
       </div>
+      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
     </div>
   )
 }

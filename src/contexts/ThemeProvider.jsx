@@ -10,7 +10,7 @@ const THEME_KEY = 'goha_studio_theme'
 
 export default function ThemeProvider({ children }) {
     const [theme, setThemeState] = useState(() => {
-        return localStorage.getItem(THEME_KEY) || 'system'
+        return localStorage.getItem(THEME_KEY) || 'light'
     })
 
     const setTheme = (t) => {

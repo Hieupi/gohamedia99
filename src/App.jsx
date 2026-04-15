@@ -1,9 +1,7 @@
-import { useState } from 'react'
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import useSubscription from './hooks/useSubscription'
 import AppLayout from './components/AppLayout'
-import UpgradePrompt from './components/UpgradePrompt'
 import LoginPage from './pages/LoginPage'
 import HomePage from './pages/HomePage'
 import LibraryPage from './pages/LibraryPage'
@@ -11,26 +9,9 @@ import AdminPage from './pages/AdminPage'
 import SettingsPage from './pages/SettingsPage'
 import SocialPage from './pages/SocialPage'
 import PromptLibraryPage from './pages/PromptLibraryPage'
-
-// ─── Protected Route for Pro features ─────────────────────────────────────────
-function ProGuard({ feature, featureLabel, children }) {
-  const { canAccess } = useSubscription()
-  const [showUpgrade, setShowUpgrade] = useState(false)
-  const nav = useNavigate()
-
-  if (!canAccess(feature)) {
-    return (
-      <>
-        <UpgradePrompt
-          featureName={featureLabel}
-          onClose={() => nav('/home')}
-          onUpgrade={() => { setShowUpgrade(false); nav('/home') }}
-        />
-      </>
-    )
-  }
-  return children
-}
+import CommandAssistantPage from './pages/CommandAssistantPage'
+import GuidePage from './pages/GuidePage'
+import PricingPage from './pages/PricingPage'
 
 // ─── Admin Guard ──────────────────────────────────────────────────────────────
 function AdminGuard({ children }) {
@@ -85,6 +66,9 @@ export default function App() {
         <Route path="settings" element={<SettingsPage user={appUser} />} />
         <Route path="social" element={<SocialPage />} />
         <Route path="prompt-library" element={<PromptLibraryPage />} />
+        <Route path="prompt-assistant" element={<CommandAssistantPage />} />
+        <Route path="huong-dan" element={<GuidePage />} />
+        <Route path="pricing" element={<PricingPage />} />
         {/* Pro features — guarded */}
         {/* NewDesign, Storytelling, VideoPrompt are keep-alive in AppLayout, guarding is done in AppLayout */}
         {/* Admin — guarded */}

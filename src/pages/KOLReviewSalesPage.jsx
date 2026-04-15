@@ -1,8 +1,9 @@
 ﻿import { useMemo, useRef, useState } from 'react'
-import { Upload, Sparkles, X, Plus, Copy, Check, MessageSquareText, Wand2, Film, FolderOpen } from 'lucide-react'
+import { Upload, Sparkles, X, Plus, Copy, Check, MessageSquareText, Wand2, Film } from 'lucide-react'
 import Portal from '../components/Portal'
+import LibraryPickerModal from '../components/LibraryPickerModal'
 import { callGemini } from '../services/geminiService'
-import { getLibraryItems } from '../services/libraryService'
+import { getPrompt } from '../services/masterPrompts'
 
 const KOL_TEMPLATES = [
     {
@@ -139,7 +140,7 @@ function parseModelJson(rawText) {
     }
 }
 
-function buildSetupPrompt({ productName, characterDescription, toneOverride }) {
+function buildSetupPrompt({ productName, characterDescription, toneOverride, extractedBackground }) {
     const setup = JSON.parse(JSON.stringify(BASE_SETUP_PROMPT))
     if (productName?.trim()) {
         setup.product.name = productName.trim()
@@ -156,6 +157,15 @@ function buildSetupPrompt({ productName, characterDescription, toneOverride }) {
 
     if (toneOverride?.trim()) {
         setup.character.tone = toneOverride.trim()
+    }
+
+    if (extractedBackground?.trim()) {
+        setup.environment = {
+            location: 'REAL STORE/SHOWROOM — from uploaded reference photos',
+            details: [extractedBackground.trim()],
+            atmosphere: 'real commercial space, authentic, product in natural context',
+            remix_mode: true,
+        }
     }
 
     return setup
@@ -220,61 +230,21 @@ async function entriesToFiles(entries) {
     return Promise.all(entries.map((entry, idx) => entryToFile(entry, `asset-${idx}.png`)))
 }
 
-function LibraryPickerModal({ onSelect, onClose, title }) {
-    const items = getLibraryItems()
-    return (
-        <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
-            <div className="modal-box" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '90vw', width: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, flexShrink: 0 }}>
-                    <FolderOpen size={18} style={{ verticalAlign: -3 }} /> {title || 'Chọn từ Thư viện'}
-                </h3>
-                {items.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '56px 0', color: 'var(--text-muted)', fontSize: 14 }}>
-                        Thư viện đang trống.
-                    </div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, overflowY: 'auto', flex: 1, padding: '4px 0' }}>
-                        {items.map((item) => (
-                            <div
-                                key={item.id}
-                                onClick={() => onSelect(item)}
-                                style={{ cursor: 'pointer', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '2px solid var(--border)', transition: 'all 0.15s' }}
-                                onMouseEnter={(e) => {
-                                    e.currentTarget.style.borderColor = 'var(--brand)'
-                                    e.currentTarget.style.transform = 'scale(1.03)'
-                                }}
-                                onMouseLeave={(e) => {
-                                    e.currentTarget.style.borderColor = 'var(--border)'
-                                    e.currentTarget.style.transform = 'scale(1)'
-                                }}
-                            >
-                                <img src={item.imageSrc} alt={item.name} style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }} />
-                                <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {item.name}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, flexShrink: 0 }}>
-                    <button className="btn btn-ghost" onClick={onClose}>Đóng</button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
 export default function KOLReviewSalesPage() {
     const refFileRef = useRef(null)
     const productFileRef = useRef(null)
+    const bgFileRef = useRef(null)
+    const logoFileRef = useRef(null)
 
     const [selectedTemplate, setSelectedTemplate] = useState(KOL_TEMPLATES[0])
     const [refImages, setRefImages] = useState([])
     const [productImages, setProductImages] = useState([])
+    const [bgImages, setBgImages] = useState([])
+    const [logoImages, setLogoImages] = useState([])
+    const isRemixMode = bgImages.length > 0
     const [industryContext, setIndustryContext] = useState('')
     const [characterDescription, setCharacterDescription] = useState('long wavy ash-brown hair, beige ribbed knit sweater')
     const [productName, setProductName] = useState('Skin Aqua Tone Up UV Essence sunscreen')
-    const [sceneCount, setSceneCount] = useState(2)
     const [platforms, setPlatforms] = useState(['Facebook', 'YouTube', 'TikTok'])
     const [setupPrompt, setSetupPrompt] = useState(null)
     const [scenes, setScenes] = useState([])
@@ -330,9 +300,27 @@ export default function KOLReviewSalesPage() {
         setProductImages((prev) => [...prev, ...picked.map((f) => ({ file: f, url: URL.createObjectURL(f) }))])
     }
 
+    const addBgImages = (files) => {
+        const picked = Array.from(files)
+            .filter((f) => f.type.startsWith('image/'))
+            .slice(0, 3 - bgImages.length)
+        setBgImages((prev) => [...prev, ...picked.map((f) => ({ file: f, url: URL.createObjectURL(f) }))])
+    }
+
+    const addLogoImages = (files) => {
+        const picked = Array.from(files)
+            .filter((f) => f.type.startsWith('image/'))
+            .slice(0, 3 - logoImages.length)
+        setLogoImages((prev) => [...prev, ...picked.map((f) => ({ file: f, url: URL.createObjectURL(f) }))])
+    }
+
     const handleLibraryPick = (item) => {
         if (libraryPicker === 'ref') {
             setRefImages((prev) => [...prev, { url: item.imageSrc }].slice(0, 5))
+        } else if (libraryPicker === 'bg') {
+            setBgImages((prev) => [...prev, { url: item.imageSrc }].slice(0, 3))
+        } else if (libraryPicker === 'logo') {
+            setLogoImages((prev) => [...prev, { url: item.imageSrc }].slice(0, 3))
         } else {
             setProductImages((prev) => [...prev, { url: item.imageSrc }].slice(0, 8))
         }
@@ -355,50 +343,114 @@ export default function KOLReviewSalesPage() {
         try {
             const productFiles = await entriesToFiles(productImages.slice(0, 2))
             const refFiles = refImages.length > 0 ? await entriesToFiles(refImages.slice(0, 2)) : []
-            const imagesForAi = [...refFiles, ...productFiles]
+            const bgFiles = bgImages.length > 0 ? await entriesToFiles(bgImages) : []
+            const logoFiles = logoImages.length > 0 ? await entriesToFiles(logoImages) : []
 
-            const aiPrompt = `You are a direct-response Vietnamese social commerce scriptwriter.
+            // Run BotBG in parallel with image prep
+            const extractedBackground = bgFiles.length > 0
+                ? await callGemini({ prompt: getPrompt('BOT_BG_ANALYZER'), images: bgFiles })
+                : ''
 
-Task: Create a high-conversion KOL review script for ${platforms.join(', ')}.
-Niche tab selected: ${selectedTemplate.name}
-SYSTEM INSTRUCTION (BRAIN): ${selectedTemplate.systemInstruction}
-Industry and product context from user:
+            // Pass logos + refs to AI so it can describe them in image_prompts
+            const imagesForAi = [...refFiles, ...productFiles, ...logoFiles]
+
+            const remixContext = isRemixMode && extractedBackground
+                ? `\n\nREAL STORE/SHOWROOM CONTEXT (REMIX MODE):\nThe KOL is filming INSIDE the real store/showroom shown in the background photos. All scene actions, image prompts, and the environment in SETUP PROMPT must reflect this real commercial space:\n${extractedBackground}\nIMPORTANT: Every image_prompt must integrate the KOL naturally into this real background — the store/shelves/products/decor must be visible and authentic.`
+                : ''
+
+            const logoContext = logoFiles.length > 0
+                ? `\n\nLOGO DNA LOCK (CRITICAL):\nThe last ${logoFiles.length} image(s) in the references are brand/store logos. STRICT RULES:\n1. These logos must appear IDENTICALLY in EVERY scene's image_prompt — same color, same design, same proportions\n2. Describe the logo placement consistently (e.g. "logo on wall behind KOL" or "logo on product packaging") — NEVER vary between scenes\n3. Include explicit logo description in every image_prompt field\n4. Logo must be clearly visible and NOT distorted or reinterpreted`
+                : ''
+
+            const aiPrompt = `You are a direct-response Vietnamese social commerce scriptwriter specialising in short-form video for Veo 3.1.
+
+═══════════════════════════════════════════════
+TASK
+═══════════════════════════════════════════════
+Analyse the user's script/context below and produce a full KOL review sequence for ${platforms.join(', ')}.
+Niche: ${selectedTemplate.name}
+Brain: ${selectedTemplate.systemInstruction}
+
+User script / product context:
+"""
 ${industryContext || selectedTemplate.contextHint}
+"""
+${remixContext}
 
-Selected template: ${selectedTemplate.name}
-Number of scenes: ${sceneCount}
-Duration per scene: exactly 8 seconds.
+═══════════════════════════════════════════════
+STEP 1 — SCENE COUNT ANALYSIS (reason before writing)
+═══════════════════════════════════════════════
+Read the user's script carefully. Count its logical beats, then decide the optimal scene count:
 
-HARD CONSTRAINTS:
-1) Keep one consistent KOL voice/persona across all scenes.
-2) Dialogue language: Vietnamese only.
-3) Each scene dialogue must be 15-20 Vietnamese words.
-4) Total words across all dialogues must be <= 40 words.
-5) Strong conversion flow: hook -> key benefit/proof -> CTA to buy.
-6) Natural speech pacing and lip-sync friendly.
-7) Use image references order: photo #1 = model/KOL, photo #2 = product.
-8) Every scene must include:
-   - action (for Veo direction)
-   - dialogue (Vietnamese line)
-   - image_prompt (for Google Nano Banana 2, photorealistic and consistent with references)
+• 2 scenes — very short hook or single-benefit script (< 2 clear beats)
+• 3 scenes — standard hook → benefit → CTA (most common)
+• 4 scenes — hook → pain-point → demo/proof → CTA
+• 5 scenes — narrative arc: hook → problem → solution → proof → CTA
+• 6 scenes — rich storytelling with before/after, comparison, or multi-benefit demo
 
-Output ONLY valid JSON (no markdown):
+Rule: scene count must match CONTENT richness — never pad, never truncate real beats.
+Output your reasoning in the field "scene_count_reasoning".
+
+═══════════════════════════════════════════════
+STEP 2 — WORD COUNT PER SCENE (8-second Veo 3.1)
+═══════════════════════════════════════════════
+Each clip is exactly 8 seconds.
+Natural Vietnamese speech rate: ~2.1 words/second.
+Reserve 1.5–2 s for: natural inhale before speaking, mid-sentence pause for emphasis, end-of-scene breath.
+Effective speech window per scene: 6–6.5 seconds → 12–14 words ideal, HARD CAP 15 words.
+
+Per-scene word budget formula:
+  words_this_scene = min(15, floor(scene_emotional_weight × 13))
+  • hook scenes (high energy): 13–14 words
+  • proof/demo scenes (measured pace): 12–13 words
+  • CTA scenes (punchy close): 11–13 words
+
+Dialogue must feel naturally spoken, NOT read. Include micro-pauses via punctuation (comma = 0.3s pause, ellipsis = 0.6s pause).
+Total word cap: scene_count × 13 (never exceed).
+
+═══════════════════════════════════════════════
+STEP 3 — BACKGROUND LOCK (product review = fixed environment)
+═══════════════════════════════════════════════
+This is a product REVIEW — the background/environment is LOCKED across ALL scenes:
+• Identical room, same product placement, same prop arrangement in every scene.
+• ONLY the KOL's camera angle, pose, gesture, and facial expression change per scene.
+• Every image_prompt must describe THE EXACT SAME background.
+• Use explicit lock phrase in each image_prompt: "[BG LOCKED] same [location description] background"${isRemixMode ? '\n• REMIX MODE ACTIVE: background is the real store/showroom — KOL integrated naturally into that real space in every scene.' : ''}
+${logoContext}
+
+═══════════════════════════════════════════════
+CONSTRAINTS (NON-NEGOTIABLE)
+═══════════════════════════════════════════════
+1. One consistent KOL voice/persona across ALL scenes.
+2. Dialogue: Vietnamese ONLY.
+3. Strict per-scene word cap: 15 words max (see Step 2 formula).
+4. Natural lip-sync friendly phrasing — no run-on sentences.
+5. Conversion arc: hook → proof/benefit → CTA (must close with clear buy action).
+6. Image reference order: photo #1 = KOL/model identity, photo #2 = product.
+7. image_prompt: photorealistic, Veo/Nano Banana 2 compatible, include [BG LOCKED] tag.
+
+═══════════════════════════════════════════════
+OUTPUT FORMAT — JSON ONLY (no markdown, no commentary)
+═══════════════════════════════════════════════
 {
+  "scene_count_reasoning": "brief explanation of why X scenes",
+  "word_budget_note": "total words planned and per-scene breakdown",
   "character_override": {
-    "appearance": "short phrase for hair + outfit",
-    "tone": "short phrase for KOL voice style"
+    "appearance": "hair + outfit short phrase",
+    "tone": "KOL voice style short phrase"
   },
   "product_override": {
-    "name": "exact product name for setup prompt"
+    "name": "exact product name"
   },
   "scenes": [
     {
       "scene": 1,
       "title": "scene title",
       "duration_sec": 8,
-      "action": "camera and action direction",
-      "dialogue": "Vietnamese sentence",
-      "image_prompt": "Nano Banana 2 image prompt"
+      "action": "camera angle + KOL gesture/pose direction (background identical to all other scenes)",
+      "dialogue": "Vietnamese line — natural phrasing, 12–15 words",
+      "word_count": 13,
+      "image_prompt": "[BG LOCKED] same [background description]. [KOL description specific to this scene]. Photorealistic, natural lighting."
     }
   ]
 }`
@@ -419,10 +471,11 @@ Output ONLY valid JSON (no markdown):
                 productName: parsed?.product_override?.name || productName,
                 characterDescription: parsed?.character_override?.appearance || characterDescription,
                 toneOverride: parsed?.character_override?.tone,
+                extractedBackground,
             })
 
             const normalizedScenes = parsed.scenes
-                .slice(0, sceneCount)
+                .slice(0, 6) // AI-determined, cap at 6 for UX
                 .map((scene, idx) => {
                     const safeDialogue = (scene.dialogue || '').trim()
                     const scenePrompt = buildScenePrompt({
@@ -433,7 +486,7 @@ Output ONLY valid JSON (no markdown):
                     return {
                         scene: idx + 1,
                         title: (scene.title || `Cảnh ${idx + 1}`).trim(),
-                        durationSec: Number(scene.duration_sec) === 8 ? 8 : 8,
+                        durationSec: 8,
                         action: (scene.action || '').trim(),
                         dialogue: safeDialogue,
                         wordCount: countWords(safeDialogue),
@@ -444,8 +497,11 @@ Output ONLY valid JSON (no markdown):
                 })
 
             const combinedWords = normalizedScenes.reduce((sum, scene) => sum + scene.wordCount, 0)
-            if (combinedWords > 40) {
-                setError(`Cảnh báo: tổng số từ đang là ${combinedWords} (>40). Bạn nên bấm tạo lại để đúng guideline Veo.`)
+            const wordCap = normalizedScenes.length * 15
+            const sceneOverLimit = normalizedScenes.filter(s => s.wordCount > 15)
+            if (sceneOverLimit.length > 0 || combinedWords > wordCap) {
+                const overScenes = sceneOverLimit.map(s => `Cảnh ${s.scene} (${s.wordCount} từ)`).join(', ')
+                setError(`Cảnh báo: ${overScenes ? overScenes + ' vượt 15 từ/cảnh. ' : ''}Tổng ${combinedWords}/${wordCap} từ. KOL sẽ đọc bị vội — nên tạo lại.`)
             }
 
             setSetupPrompt(setup)
@@ -480,7 +536,7 @@ Output ONLY valid JSON (no markdown):
 
             <div className="st-header">
                 <h2 className="st-active-title">{selectedTemplate.name}</h2>
-                <span className="st-scene-count">{scenes.length || sceneCount} cảnh x 8s</span>
+                <span className="st-scene-count">{scenes.length > 0 ? `${scenes.length} cảnh` : 'AI tự tính'} × 8s</span>
             </div>
 
             <div className="st-layout">
@@ -537,6 +593,76 @@ Output ONLY valid JSON (no markdown):
                                 </div>
                             </div>
 
+                            {/* ── Step BG: REMIX ── */}
+                            <div className="design-step">
+                                <div className="design-step-header">
+                                    <div className="design-step-number" style={{ background: isRemixMode ? 'linear-gradient(135deg, #f59e0b, #d97706)' : undefined }}>BG</div>
+                                    <div className="design-step-title">
+                                        Nền thật ({bgImages.length}/3)
+                                        {isRemixMode && <span style={{ marginLeft: 8, fontSize: 10, background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', borderRadius: 6, padding: '1px 7px', fontWeight: 700, letterSpacing: 0.5 }}>REMIX</span>}
+                                    </div>
+                                    <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 12 }} onClick={() => bgFileRef.current?.click()}>
+                                        <Upload size={13} /> Tải
+                                    </button>
+                                    <input ref={bgFileRef} type="file" accept="image/*" multiple hidden onChange={(e) => addBgImages(e.target.files)} />
+                                </div>
+                                <div style={{ padding: '0 12px 12px' }}>
+                                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.4 }}>
+                                        Tùy chọn: Tải ảnh cửa hàng/showroom thật — AI sẽ đặt KOL vào bối cảnh thật trong script và image prompt.
+                                    </p>
+                                    <div className="nd-img-grid">
+                                        {bgImages.map((img, idx) => (
+                                            <div key={`${img.url}-${idx}`} className="img-slot filled">
+                                                <img src={img.url} alt="" />
+                                                <button className="img-slot-remove" onClick={() => setBgImages((prev) => prev.filter((_, i) => i !== idx))}>
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {bgImages.length < 3 && (
+                                            <div className="img-slot empty" onClick={() => setLibraryPicker('bg')}>
+                                                <Plus size={18} style={{ color: 'var(--brand)' }} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* ── Step Logo ── */}
+                            <div className="design-step">
+                                <div className="design-step-header">
+                                    <div className="design-step-number" style={{ background: logoImages.length > 0 ? 'linear-gradient(135deg,#6366f1,#8b5cf6)' : undefined }}>LG</div>
+                                    <div className="design-step-title">
+                                        Logo thương hiệu ({logoImages.length}/3)
+                                        {logoImages.length > 0 && <span style={{ marginLeft: 8, fontSize: 10, background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', color: '#fff', borderRadius: 6, padding: '1px 7px', fontWeight: 700, letterSpacing: 0.5 }}>DNA LOCK</span>}
+                                    </div>
+                                    <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 12 }} onClick={() => logoFileRef.current?.click()}>
+                                        <Upload size={13} /> Tải
+                                    </button>
+                                    <input ref={logoFileRef} type="file" accept="image/*" multiple hidden onChange={(e) => addLogoImages(e.target.files)} />
+                                </div>
+                                <div style={{ padding: '0 12px 12px' }}>
+                                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '0 0 8px', lineHeight: 1.4 }}>
+                                        Tùy chọn: Logo thương hiệu/cửa hàng — AI khóa logo đồng nhất trên tất cả phân cảnh trong image_prompt.
+                                    </p>
+                                    <div className="nd-img-grid">
+                                        {logoImages.map((img, idx) => (
+                                            <div key={`${img.url}-${idx}`} className="img-slot filled">
+                                                <img src={img.url} alt="" />
+                                                <button className="img-slot-remove" onClick={() => setLogoImages((prev) => prev.filter((_, i) => i !== idx))}>
+                                                    <X size={12} />
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {logoImages.length < 3 && (
+                                            <div className="img-slot empty" onClick={() => setLibraryPicker('logo')}>
+                                                <Plus size={18} style={{ color: 'var(--brand)' }} />
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
                             <div className="design-step">
                                 <div className="design-step-header">
                                     <div className="design-step-number">3</div>
@@ -576,12 +702,24 @@ Output ONLY valid JSON (no markdown):
                                         </div>
                                     </div>
                                     <div className="form-group">
-                                        <label className="nd-label">Số cảnh (khuyến nghị 2 cảnh)</label>
-                                        <select className="nd-input" value={sceneCount} onChange={(e) => setSceneCount(Number(e.target.value))}>
-                                            <option value={2}>2 cảnh (khuyến nghị)</option>
-                                            <option value={3}>3 cảnh</option>
-                                            <option value={4}>4 cảnh</option>
-                                        </select>
+                                        <label className="nd-label">Số phân cảnh</label>
+                                        <div style={{
+                                            display: 'flex', alignItems: 'center', gap: 8,
+                                            padding: '8px 12px',
+                                            borderRadius: 'var(--r-md)',
+                                            border: '1.5px solid var(--border)',
+                                            background: 'var(--bg-input, var(--bg-card))',
+                                            fontSize: 13,
+                                            color: 'var(--text-secondary)',
+                                        }}>
+                                            <Sparkles size={14} style={{ color: 'var(--brand)', flexShrink: 0 }} />
+                                            <span>
+                                                AI tự phân tích kịch bản — tính số cảnh tối ưu (2–6)
+                                            </span>
+                                        </div>
+                                        <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: '5px 0 0', lineHeight: 1.4 }}>
+                                            AI đếm các nhịp nội dung, chia cảnh theo kịch bản, tính từ/cảnh để KOL đọc tự nhiên trong 8 giây.
+                                        </p>
                                     </div>
                                 </div>
                             </div>
@@ -605,8 +743,8 @@ Output ONLY valid JSON (no markdown):
                                             <><Sparkles size={18} /> Tạo kịch bản KOL (Bước 1-2-3)</>
                                         )}
                                     </button>
-                                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>
-                                        Quy tắc đã khóa cứng: 8s/cảnh, 15-20 từ/cảnh, tổng {'<='}40 từ, giữ giọng nói KOL nhất quán.
+                                    <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0, lineHeight: 1.5 }}>
+                                        AI phân tích kịch bản → tự chia số cảnh → tính 12–15 từ/cảnh cho 8s Veo 3.1 tự nhiên. Nền bối cảnh khóa cố định, chỉ góc máy + tư thế KOL thay đổi.
                                     </p>
                                 </div>
                             </div>
@@ -615,7 +753,12 @@ Output ONLY valid JSON (no markdown):
                         <div className="st-timeline">
                             <div className="st-timeline-header">
                                 <h3 className="st-section-title" style={{ margin: 0 }}>
-                                    <Film size={18} style={{ verticalAlign: -3 }} /> Timeline KOL - {scenes.length} cảnh | Tổng {totalWords} từ
+                                    <Film size={18} style={{ verticalAlign: -3 }} /> Timeline KOL
+                                    {scenes.length > 0 && (
+                                        <span style={{ fontWeight: 400, fontSize: 13, color: 'var(--text-muted)', marginLeft: 8 }}>
+                                            {scenes.length} cảnh · {totalWords} từ · {scenes.length * 8}s tổng
+                                        </span>
+                                    )}
                                 </h3>
                             </div>
 
@@ -642,7 +785,22 @@ Output ONLY valid JSON (no markdown):
                                             <div className="st-scene-meta">
                                                 <div><strong>Hành động:</strong> {scene.action}</div>
                                                 <div><strong>Thoại:</strong> {scene.dialogue}</div>
-                                                <div><strong>Số từ:</strong> {scene.wordCount}</div>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                    <strong>Số từ:</strong>
+                                                    <span style={{
+                                                        fontWeight: 700,
+                                                        color: scene.wordCount > 15 ? '#ef4444' : scene.wordCount >= 12 ? '#22c55e' : '#f59e0b',
+                                                        fontSize: 12,
+                                                        background: scene.wordCount > 15 ? 'rgba(239,68,68,0.1)' : scene.wordCount >= 12 ? 'rgba(34,197,94,0.1)' : 'rgba(245,158,11,0.1)',
+                                                        padding: '1px 7px',
+                                                        borderRadius: 5,
+                                                    }}>
+                                                        {scene.wordCount} từ / 8s
+                                                    </span>
+                                                    {scene.wordCount > 15 && <span style={{ fontSize: 11, color: '#ef4444' }}>⚠ Quá nhanh</span>}
+                                                    {scene.wordCount >= 12 && scene.wordCount <= 15 && <span style={{ fontSize: 11, color: '#22c55e' }}>✓ Tự nhiên</span>}
+                                                    {scene.wordCount < 12 && <span style={{ fontSize: 11, color: '#f59e0b' }}>Có thể thêm</span>}
+                                                </div>
                                             </div>
                                             <div className="kol-block">
                                                 <div className="kol-block-header">
@@ -704,7 +862,7 @@ Output ONLY valid JSON (no markdown):
             {libraryPicker && (
                 <Portal>
                     <LibraryPickerModal
-                        title={libraryPicker === 'ref' ? 'Chọn ảnh người mẫu' : 'Chọn ảnh sản phẩm'}
+                        title={libraryPicker === 'ref' ? 'Chọn ảnh người mẫu' : libraryPicker === 'bg' ? 'Chọn ảnh nền cửa hàng' : libraryPicker === 'logo' ? 'Chọn logo thương hiệu' : 'Chọn ảnh sản phẩm'}
                         onClose={() => setLibraryPicker(null)}
                         onSelect={handleLibraryPick}
                     />

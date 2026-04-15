@@ -22,10 +22,31 @@ const ASPECT_OPTIONS = [
   { value: '2:3', label: '2:3' },
 ]
 
+const REALISM_OPTIONS = [
+  { value: 'standard', label: 'Chuẩn' },
+  { value: 'high', label: 'Chân thực cao' },
+  { value: 'ultra', label: 'Ultra Realism' },
+]
+
+const RECREATE_OPTIONS = [
+  {
+    value: 'original',
+    icon: '🔒',
+    label: 'Giữ nguyên bản',
+    desc: 'Giữ đúng trạng thái gốc (kể cả bùn đất, hao mòn)',
+  },
+  {
+    value: 'new',
+    icon: '✨',
+    label: 'Tái tạo như mới',
+    desc: 'Sản phẩm sạch, hoàn hảo, mới tinh như vừa xuất xưởng',
+  },
+]
+
 const CATEGORY_EMOJI = {
   top: '👕', bottom: '👖', dress: '👗', outerwear: '🧥',
   shoes: '👠', bag: '👜', accessory: '💍', other: '🖼',
-  background: '🏞️', model: '🧑',
+  background: '🏞️', model: '🧑', pose: '🤸',
 }
 
 const CATEGORY_PREFIX = {
@@ -36,9 +57,51 @@ const CATEGORY_PREFIX = {
 
 // ─── Build image-gen prompt cho từng item ──────────────────────────────────────
 
-function buildItemPrompt(item, productName, quality, aspect) {
+function buildItemPrompt(item, productName, quality, aspect, realism = 'standard', recreateMode = 'original') {
   const sizeMap = { '1K': '1024x1024', '2K': '2048x2048', '4K': '4096x4096' }
   const res = sizeMap[quality] || '1024x1024'
+
+  // Deep reasoning block — yêu cầu AI phân tích trước khi tạo
+  const realismBlock = {
+    standard: 'Professional product photography quality.',
+    high: `DEEP ANALYSIS BEFORE GENERATING:
+First, carefully study this item in the reference image. Identify:
+- The exact fabric/material type (cotton, silk, lace, leather, denim, polyester blend, etc.)
+- Surface texture characteristics (weave pattern, knit gauge, sheen level, transparency)
+- Color nuances (not just "black" — is it jet black, charcoal, faded black, etc.)
+- Construction details (stitching type, seam placement, hardware finish)
+
+Then recreate with HIGH FIDELITY — every thread, every stitch, every fold must look photographically real. The output must be indistinguishable from a real studio photograph.`,
+    ultra: `ULTRA REALISM — DEEP MATERIAL ANALYSIS PROTOCOL:
+
+STEP 1 — MATERIAL FORENSICS: Before generating anything, perform exhaustive analysis:
+- Identify the EXACT fabric composition (e.g., "95% polyester lace with 5% elastane backing")
+- Map the weave/knit structure at fiber level (jacquard, satin weave, jersey knit, tulle mesh...)
+- Analyze light interaction: how does light scatter, reflect, or transmit through this specific material?
+- Note aging/wear patterns: is the fabric new, softened, distressed, or pre-washed?
+- Catalog every construction detail: blind hem, overlocked seam, French seam, topstitch width
+
+STEP 2 — REFERENCE MATCHING: Cross-reference with real-world equivalent:
+- What would this item look like in a professional e-commerce studio shoot?
+- What lighting setup would best reveal the material's true character? (soft diffused vs. directional)
+- How does gravity affect the drape and fold pattern of this specific fabric weight?
+
+STEP 3 — HYPER-REALISTIC GENERATION:
+- Recreate at MICROSCOPIC textile detail — individual fiber strands visible at close inspection
+- Fabric grain, weave direction, and pile texture must be physically accurate
+- Every fold, crease, and drape must obey real-world physics of this fabric weight/stiffness
+- Hardware (zippers, buttons, clasps) rendered with metallic reflection, patina, and embossing detail
+- Stitching must show actual thread thickness, stitch density, and needle penetration marks
+- Color accuracy: match under D65 daylight illuminant, no color shift, no oversaturation
+
+The result must be INDISTINGUISHABLE from a real photograph taken with a 100MP medium-format camera and macro lens. A textile expert examining this image should believe it is real.`,
+  }
+
+  const realismStr = realismBlock[realism] || realismBlock.standard
+
+  if (item.category === 'pose') {
+    return buildPosePrompt(quality, aspect)
+  }
 
   if (item.category === 'model') {
     return `Looking at the reference image, isolate and recreate the PERSON/MODEL only.
@@ -46,12 +109,13 @@ function buildItemPrompt(item, productName, quality, aspect) {
 CRITICAL RULES FOR MODEL EXTRACTION:
 1. REMOVE ALL PRODUCTS, ITEMS, ACCESSORIES from the model's hands — hands must be EMPTY and posing naturally
 2. Place model on PURE WHITE background (#FFFFFF)
-3. Model MUST be FULL BODY — head to toe, no cropping. If the source image is cropped (missing legs/feet), EXTEND and regenerate the full body naturally
+3. Model MUST be FULL BODY — head to toe, no cropping. If the source image is cropped, EXTEND and regenerate the full body naturally
 4. Face must be looking STRAIGHT AT THE CAMERA (front-facing)
-5. If the model's pose, hands, or fingers look unnatural or ugly, FIX THEM — make hands look natural and beautiful
+5. If hands or fingers look unnatural, FIX THEM — make them look natural and beautiful
 6. Keep exact same clothing, hair color, skin tone, body proportions
 7. Photorealistic studio quality, soft even lighting, slight shadow under feet
-8. Resolution: ${res}, aspect ratio ${aspect}
+8. ${realismStr}
+9. Resolution: ${res}, aspect ratio ${aspect}
 ${productName ? `Collection: "${productName}"` : ''}
 
 Generate the clean isolated full-body model on pure white background now.`
@@ -59,48 +123,133 @@ Generate the clean isolated full-body model on pure white background now.`
 
   if (item.category === 'background') {
     return `Looking at the reference image, isolate and recreate ONLY the background/scene.
-
-Remove all people and objects. Recreate the empty background scene on its own.
-Keep exact same colors, lighting, textures, and architectural elements.
-Photorealistic quality, ${res} resolution, aspect ratio ${aspect}.
-
-Generate the clean background scene now.`
+Remove all people and objects. Recreate the empty scene preserving exact colors, lighting, textures, and architecture.
+Photorealistic quality, ${res} resolution, aspect ratio ${aspect}.`
   }
 
-  return `Looking at the reference image, isolate and extract ONLY this item: "${item.nameVi}"
-${item.description ? `Description: ${item.description}` : ''}
+  // ─── Main garment/accessory prompt with deep reasoning ──────────────
+  const positioningMap = {
+    dress: 'Ghost mannequin positioning — item appears worn on invisible form, showing 3D silhouette and interior construction',
+    outerwear: 'Ghost mannequin positioning — unzipped/unbuttoned, showing lining and collar structure',
+    top: 'Ghost mannequin or clean flat-lay — show neckline, sleeve construction, and hem detail',
+    bottom: 'Clean flat-lay — folded once at natural crease, showing waistband, pocket detail, and hem',
+    shoes: 'Angled 3/4 view — show toe box, heel, sole edge, and interior lining',
+    bag: 'Angled 3/4 view — show front hardware, strap attachment, and interior peek if applicable',
+    accessory: 'Clean centered — show clasp mechanism, surface texture, and scale reference',
+  }
 
-Remove this item completely from the person. Recreate it as a standalone product photograph:
-- Pure white background (#FFFFFF)
-- Soft even studio lighting
-- Maintain EXACT original color, fabric texture, stitching, hardware, proportions
-- ${item.category === 'dress' || item.category === 'outerwear' ? 'Ghost mannequin positioning' : 'Clean flat-lay positioning'}
-- Photorealistic studio quality, ${res} resolution, aspect ratio ${aspect}
+  const positioning = positioningMap[item.category] || 'Clean professional product positioning'
+
+  // Recreate-as-new block (only for fashion items, not model/background)
+  const recreateBlock = recreateMode === 'new'
+    ? `
+CRITICAL — RECREATE AS BRAND NEW & PRISTINE:
+- This item must look COMPLETELY CLEAN and BRAND NEW — as if just taken from the production line
+- Remove ALL signs of dirt, mud, soil, stains, sweat marks, wear, aging, or any damage
+- No earth tones, no watermarks, no use-creases, no fading, no discoloration from outside environment
+- Every thread, surface, seam, and fabric must look fresh, clean, and perfectly unworn
+- This is a professional product catalog image — the item must look store-ready and flawless
+`
+    : ''
+
+  return `TASK: Isolate and recreate this SINGLE ITEM from the reference image: "${item.nameVi}"
+${item.description ? `Visual reference: ${item.description}` : ''}
+
+${realismStr}
+${recreateBlock}
+EXTRACTION & RECREATION RULES:
+- Remove this item completely from the person/scene
+- Recreate as a standalone product photograph on PURE WHITE background (#FFFFFF)
+- Positioning: ${positioning}
+- Studio lighting: large softbox overhead + fill light, no harsh shadows, subtle natural shadow beneath item
+- Maintain EXACT original: color, pattern, print, fabric texture, hardware, proportions, silhouette
+- Do NOT simplify or "clean up" the design — preserve every decorative element, embroidery, print, logo, and detail
+- Resolution: ${res}, aspect ratio ${aspect}
 ${productName ? `- Collection: "${productName}"` : ''}
 
-Generate the isolated product image now.`
+Generate the isolated garment/accessory image now.`
 }
 
-function buildMasterPrompt(items, productName, quality, aspect) {
+function buildMasterPrompt(items, productName, quality, aspect, realism = 'standard') {
   const sizeMap = { '1K': '1024x1024', '2K': '2048x2048', '4K': '4096x4096' }
   const res = sizeMap[quality] || '1024x1024'
-  const itemList = items.map((it, i) => `${i + 1}. ${it.nameVi}`).join('\n')
+  const itemList = items.map((it, i) => `${i + 1}. ${it.nameVi}${it.description ? ` — ${it.description}` : ''}`).join('\n')
 
-  return `Looking at the reference image, create a MASTER COMPOSITE product photograph.
+  const realismHint = realism === 'ultra'
+    ? 'Each item must show microscopic textile detail — individual fiber strands, weave patterns, and stitching at macro lens quality.'
+    : realism === 'high'
+      ? 'Each item must show high-fidelity fabric texture, accurate material sheen, and visible construction details.'
+      : 'Professional e-commerce product photography quality.'
 
-Extract and arrange ALL of the following items together in ONE beautiful flat-lay composition on a PURE WHITE background:
+  return `Create a MASTER COMPOSITE product photograph — extract ALL items below and arrange in ONE beautiful flat-lay composition.
+
+Items to extract and arrange:
 ${itemList}
 
 Requirements:
-- Each item isolated from the person, laid out together in an aesthetic flat-lay arrangement
 - Pure white background (#FFFFFF)
-- Soft even studio lighting, no harsh shadows
+- Soft even studio lighting, subtle natural shadows for depth
+- ${realismHint}
 - Maintain exact original colors, textures, and proportions for every item
-- Professional lookbook/catalogue style composition
+- Professional lookbook/catalogue style composition with intentional spacing and hierarchy
 - ${res} resolution, aspect ratio ${aspect}
-${productName ? `- Collection name: "${productName}"` : ''}
+${productName ? `- Collection: "${productName}"` : ''}
 
 Generate the master composite image now.`
+}
+
+// ─── Pose Template Prompt ─────────────────────────────────────────────────────
+
+function buildPosePrompt(quality, aspect) {
+  const sizeMap = { '1K': '1024x1024', '2K': '2048x2048', '4K': '4096x4096' }
+  const res = sizeMap[quality] || '2048x2048'
+
+  return `TASK: Retouch the model photo — remove background, beautify the body. Keep all clothing exactly as-is.
+
+═══ WHAT TO KEEP — DO NOT CHANGE ═══
+- The OUTFIT: every garment, fabric, color, pattern, texture — copy it 100% exactly
+- The model's face: bone structure, eye shape, brow arch, lip shape, expression — identical
+- Hair: same color, length, style, the way it falls in this exact pose
+- LEGS: copy the exact leg position, angle, length, and shape from the original — do NOT alter legs at all
+
+═══ WHAT TO CHANGE ═══
+
+1. BACKGROUND → Remove completely, replace with pure white seamless #FFFFFF
+   - No shadows on background, no color casts, no gradients
+   - Only a very soft drop shadow directly under the feet for grounding
+
+2. HANDS / ARMS — Natural repose only if stiff:
+   - If hands look awkward or were holding something, gently relax them
+   - Let arms hang naturally at sides OR rest one hand softly on hip
+   - Fingers: softly curved, not clenched — natural editorial elegance
+   - If hands look fine in the original, keep them exactly as-is
+
+3. WAIST → Cinch it in — make it noticeably slimmer than the original:
+   - Ultra-slim hourglass waist, nipped in more than reality
+   - Smooth sides, no rolls or folds
+   - The clothing must conform naturally to the new slimmer waist shape
+
+4. BUST → Fuller and more lifted than the original:
+   - Round, firm, youthful — beautifully shaped
+   - Balanced with the narrower waist
+   - Clothing drapes naturally over the enhanced shape
+
+5. OVERALL BODY → Slight overall elongation and slimming:
+   - Make the model appear a few centimeters taller and lighter
+   - Skin on any exposed areas: porcelain-fair, luminous, flawless
+
+═══ LIGHTING (keep studio mood) ═══
+- Even, flattering soft-box studio lighting
+- Consistent with the original lighting direction
+- No harsh shadows on clothing or skin
+
+═══ FRAMING ═══
+- Full body: top of hair to bottom of feet — nothing cropped
+- Centered, generous breathing room on all sides
+
+Resolution: ${res}, aspect ratio ${aspect}
+
+Output: the same model, same outfit, same pose — but on white background with slimmer waist, fuller bust, relaxed natural hands, and flawless skin.`
 }
 
 // ─── Smart Naming (dùng generateUniqueName từ libraryService) ─────────────────
@@ -309,17 +458,34 @@ function SaveModal({ item, imageSrc, productName, onClose, onSave }) {
 // ─── Detected Item Row ────────────────────────────────────────────────────────
 
 function ItemToggleRow({ item, isOn, onToggle }) {
+  const isPose = item.category === 'pose'
   return (
-    <div className={`item-toggle-row ${isOn ? 'active' : ''}`} onClick={onToggle}>
+    <div
+      className={`item-toggle-row ${isOn ? 'active' : ''}`}
+      onClick={onToggle}
+      style={isPose ? {
+        background: isOn ? 'rgba(139,92,246,0.07)' : undefined,
+        borderTop: '2px dashed rgba(139,92,246,0.25)',
+        marginTop: 4,
+      } : undefined}
+    >
       <div className="item-toggle-info">
-        <div className="item-toggle-name">
+        <div className="item-toggle-name" style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {isPose && (
+            <span style={{
+              fontSize: 10, fontWeight: 700, padding: '1px 7px',
+              borderRadius: 99, background: 'rgba(139,92,246,0.12)',
+              color: '#7c3aed', letterSpacing: 0.4,
+            }}>POSE</span>
+          )}
           {item.nameVi}
         </div>
         {item.description && (
           <div className="item-toggle-desc">{item.description}</div>
         )}
       </div>
-      <div className={`toggle-switch ${isOn ? 'on' : ''}`}>
+      <div className={`toggle-switch ${isOn ? 'on' : ''}`}
+        style={isPose && isOn ? { background: '#7c3aed' } : undefined}>
         <div className="toggle-knob" />
       </div>
     </div>
@@ -328,18 +494,36 @@ function ItemToggleRow({ item, isOn, onToggle }) {
 
 // ─── Result Card ──────────────────────────────────────────────────────────────
 
-function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, onSavePose, onPreview }) {
+function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, onSavePose, onPreview, onRegenerate }) {
+  const [chatInput, setChatInput] = useState('')
+  const [regenLoading, setRegenLoading] = useState(false)
+  const chatRef = useRef(null)
+
+  const handleRegen = async () => {
+    if (!chatInput.trim() || regenLoading || isLoading) return
+    setRegenLoading(true)
+    try {
+      await onRegenerate(item.id, chatInput.trim())
+      setChatInput('')
+    } finally {
+      setRegenLoading(false)
+    }
+  }
+
+  const busy = isLoading || regenLoading
+
   return (
     <div className="result-card">
+      {/* Image area */}
       <div className="result-card-img" style={{ position: 'relative' }}>
-        {isLoading ? (
+        {busy ? (
           <div className="result-loading">
             <div className="spin" style={{
               width: 32, height: 32,
               border: '3px solid var(--brand-15)', borderTopColor: 'var(--brand)', borderRadius: '50%',
             }} />
             <span style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 6 }}>
-              Đang tách {item.nameVi}...
+              {regenLoading ? `Đang vẽ lại...` : `Đang tách ${item.nameVi}...`}
             </span>
           </div>
         ) : errorMsg ? (
@@ -360,15 +544,74 @@ function ResultCard({ item, imageSrc, isLoading, errorMsg, onSave, onDownload, o
           </div>
         )}
       </div>
+
+      {/* Footer: name + actions */}
       <div className="result-card-footer">
         <span className="result-card-name">{item.nameVi}</span>
-        {imageSrc && (
+        {imageSrc && !busy && (
           <div className="result-card-actions">
             <button onClick={onSave} title="Lưu vào Kho" className="icon-btn"><Save size={14} /></button>
             <button onClick={onDownload} title="Tải xuống" className="icon-btn"><Download size={14} /></button>
           </div>
         )}
       </div>
+
+      {/* Chat / Redraw area — hiện khi đã có ảnh hoặc lỗi */}
+      {(imageSrc || errorMsg) && (
+        <div style={{
+          borderTop: '1px solid var(--border-light)',
+          padding: '8px 10px',
+          background: 'var(--bg-page)',
+        }}>
+          <div style={{ fontSize: 10.5, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 5, letterSpacing: 0.3 }}>
+            VẼ LẠI THEO Ý BẠN
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'flex-end' }}>
+            <textarea
+              ref={chatRef}
+              value={chatInput}
+              onChange={e => setChatInput(e.target.value)}
+              placeholder={`VD: làm sạch không bùn đất, đổi màu xanh navy, thêm viền ren...`}
+              rows={2}
+              disabled={busy}
+              onKeyDown={e => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleRegen()
+                }
+              }}
+              style={{
+                flex: 1, resize: 'none', fontSize: 11.5, lineHeight: 1.5,
+                padding: '6px 9px', borderRadius: 'var(--r-sm)',
+                border: '1.5px solid var(--border)',
+                background: 'var(--white)', color: 'var(--text-primary)',
+                outline: 'none', fontFamily: 'inherit',
+                transition: 'border-color 0.15s',
+              }}
+              onFocus={e => { e.target.style.borderColor = 'var(--brand)' }}
+              onBlur={e => { e.target.style.borderColor = 'var(--border)' }}
+            />
+            <button
+              onClick={handleRegen}
+              disabled={!chatInput.trim() || busy}
+              title="Vẽ lại (Enter)"
+              style={{
+                flexShrink: 0, width: 36, height: 36,
+                borderRadius: 'var(--r-sm)',
+                border: 'none', cursor: chatInput.trim() && !busy ? 'pointer' : 'not-allowed',
+                background: chatInput.trim() && !busy ? 'var(--brand)' : 'var(--bg-card)',
+                color: chatInput.trim() && !busy ? '#fff' : 'var(--text-muted)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 16, transition: 'background 0.15s',
+              }}
+            >
+              {regenLoading
+                ? <span className="spin" style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(255,255,255,0.35)', borderTopColor: '#fff', borderRadius: '50%' }} />
+                : '🖌️'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -470,6 +713,8 @@ export default function RemoveClothesPage() {
   // Output config
   const [quality, setQuality] = useState('2K')
   const [aspect, setAspect] = useState('1:1')
+  const [realism, setRealism] = useState('standard')
+  const [recreateMode, setRecreateMode] = useState('new')
   const [masterToggle, setMasterToggle] = useState(true)
 
   // Generation
@@ -507,8 +752,18 @@ export default function RemoveClothesPage() {
       const prompt = getPrompt('OBJECT_DETECTION')
       const items = await detectObjects(file, prompt)
       if (Array.isArray(items) && items.length > 0) {
-        setDetectedItems(items)
-        setSelectedIds(new Set(items.map(i => i.id)))
+        // Auto-add POSE item khi có người mẫu trong ảnh
+        const hasModel = items.some(i => i.category === 'model')
+        const allItems = hasModel
+          ? [...items, {
+              id: 'pose-template',
+              nameVi: 'Pose mẫu gốc',
+              category: 'pose',
+              description: 'Sao chép 100% tư thế, nước da, số đo của mẫu. Nền trắng, không trang phục, không phụ kiện.',
+            }]
+          : items
+        setDetectedItems(allItems)
+        setSelectedIds(new Set(allItems.map(i => i.id)))
       }
     } catch (err) {
       console.error('[Detection Error]', err)
@@ -553,7 +808,7 @@ export default function RemoveClothesPage() {
     // Thêm Master composite nếu toggle ON
     let masterItem = null
     if (masterToggle) {
-      const compositeItems = selected.filter(i => i.category !== 'model' && i.category !== 'background')
+      const compositeItems = selected.filter(i => i.category !== 'model' && i.category !== 'background' && i.category !== 'pose')
       if (compositeItems.length >= 2) {
         masterItem = { id: 'master-composite', nameVi: 'Bộ sưu tập (Flat Lay)', category: 'other', _compositeItems: compositeItems }
         allIds.add('master-composite')
@@ -570,7 +825,7 @@ export default function RemoveClothesPage() {
     // Tạo TẤT CẢ ảnh SONG SONG cùng lúc
     const tasks = selected.map(item => (async () => {
       try {
-        const prompt = buildItemPrompt(item, productName, quality, aspect)
+        const prompt = buildItemPrompt(item, productName, quality, aspect, realism, recreateMode)
         const result = await generateGarmentImage(imageFile, prompt, { quality, aspect })
         const dataUrl = `data:${result.mimeType};base64,${result.base64}`
         setGeneratedImages(prev => ({ ...prev, [item.id]: dataUrl }))
@@ -585,7 +840,7 @@ export default function RemoveClothesPage() {
     if (masterItem) {
       tasks.push((async () => {
         try {
-          const prompt = buildMasterPrompt(masterItem._compositeItems, productName, quality, aspect)
+          const prompt = buildMasterPrompt(masterItem._compositeItems, productName, quality, aspect, realism)
           const result = await generateGarmentImage(imageFile, prompt, { quality, aspect })
           const dataUrl = `data:${result.mimeType};base64,${result.base64}`
           setGeneratedImages(prev => ({ ...prev, ['master-composite']: dataUrl }))
@@ -601,6 +856,39 @@ export default function RemoveClothesPage() {
     await Promise.all(tasks)
     setGenerating(false)
   }
+
+  // ─── Regenerate 1 ảnh theo câu lệnh của người dùng ────────────────────────
+  const handleRegenerate = useCallback(async (itemId, customPrompt) => {
+    const item = detectedItems.find(i => i.id === itemId)
+    if (!item || !imageFile) return
+
+    setGeneratingIds(prev => new Set([...prev, itemId]))
+    setItemErrors(prev => { const n = { ...prev }; delete n[itemId]; return n })
+
+    try {
+      let basePrompt
+      if (itemId === 'master-composite') {
+        const compositeItems = detectedItems.filter(i => selectedIds.has(i.id) && i.category !== 'model' && i.category !== 'background' && i.category !== 'pose')
+        basePrompt = buildMasterPrompt(compositeItems, productName, quality, aspect, realism)
+      } else {
+        basePrompt = buildItemPrompt(item, productName, quality, aspect, realism, recreateMode)
+      }
+
+      const fullPrompt = `${basePrompt}
+
+ADDITIONAL INSTRUCTION FROM USER (apply on top of all previous rules):
+${customPrompt}`
+
+      const result = await generateGarmentImage(imageFile, fullPrompt, { quality, aspect })
+      const dataUrl = `data:${result.mimeType};base64,${result.base64}`
+      setGeneratedImages(prev => ({ ...prev, [itemId]: dataUrl }))
+    } catch (err) {
+      console.error(`[Regen Error] ${item.nameVi}:`, err)
+      setItemErrors(prev => ({ ...prev, [itemId]: err.message }))
+    }
+
+    setGeneratingIds(prev => { const n = new Set(prev); n.delete(itemId); return n })
+  }, [detectedItems, imageFile, productName, quality, aspect, realism, recreateMode, selectedIds])
 
   const downloadImage = (dataUrl, name) => {
     const a = document.createElement('a')
@@ -696,7 +984,7 @@ export default function RemoveClothesPage() {
           {detectedItems.length > 0 && (
             <>
               <div className="td-section-label" style={{ marginTop: 20 }}>Cấu hình xuất file</div>
-              <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 12, marginBottom: 14 }}>
                 <div style={{ flex: 1 }}>
                   <label className="select-label">Chất lượng</label>
                   <div className="select-wrapper">
@@ -716,6 +1004,61 @@ export default function RemoveClothesPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Chế độ tái tạo */}
+              <label className="select-label">Chế độ sản phẩm</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                {RECREATE_OPTIONS.map(o => (
+                  <button
+                    key={o.value}
+                    onClick={() => setRecreateMode(o.value)}
+                    style={{
+                      flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3,
+                      padding: '9px 8px', borderRadius: 'var(--r-md)', cursor: 'pointer',
+                      border: `1.5px solid ${recreateMode === o.value ? 'var(--brand)' : 'var(--border)'}`,
+                      background: recreateMode === o.value ? 'var(--brand-08)' : 'var(--white)',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <span style={{ fontSize: 18 }}>{o.icon}</span>
+                    <span style={{
+                      fontSize: 11, fontWeight: 700, letterSpacing: 0.2,
+                      color: recreateMode === o.value ? 'var(--brand)' : 'var(--text-secondary)',
+                    }}>{o.label}</span>
+                    <span style={{ fontSize: 10, color: 'var(--text-muted)', textAlign: 'center', lineHeight: 1.3 }}>
+                      {o.desc}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {recreateMode === 'new' && (
+                <div style={{
+                  fontSize: 11.5, color: '#16a34a', padding: '7px 11px', marginBottom: 12,
+                  background: 'rgba(22,163,74,0.07)', borderRadius: 'var(--r-sm)', lineHeight: 1.5,
+                  border: '1px solid rgba(22,163,74,0.2)',
+                }}>
+                  ✨ <strong>Tái tạo như mới:</strong> Trang phục sẽ được tái tạo sạch, không bùn đất, không vết bẩn — hoàn hảo như hàng mới xuất xưởng.
+                </div>
+              )}
+
+              {/* Mức độ chân thực */}
+              <label className="select-label">Mức độ chân thực</label>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+                {REALISM_OPTIONS.map(o => (
+                  <button key={o.value} onClick={() => setRealism(o.value)}
+                    className={`toggle-pill ${realism === o.value ? 'active' : ''}`}>
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+              {realism === 'ultra' && (
+                <div style={{
+                  fontSize: 11.5, color: 'var(--brand)', padding: '8px 12px', marginBottom: 12,
+                  background: 'var(--brand-08)', borderRadius: 'var(--r-sm)', lineHeight: 1.5,
+                }}>
+                  🔬 <strong>Ultra Realism:</strong> AI sẽ phân tích chất liệu vải, cấu trúc sợi, kiểu dệt, phản xạ ánh sáng... rồi tái tạo ở mức độ vi mô. Thời gian xử lý lâu hơn nhưng chất lượng cực cao.
+                </div>
+              )}
             </>
           )}
 
@@ -760,7 +1103,8 @@ export default function RemoveClothesPage() {
                   onSave={() => setSaveModalItem({ item, imageSrc: generatedImages[item.id] })}
                   onSavePose={() => setSavePoseItem({ item, imageSrc: generatedImages[item.id] })}
                   onPreview={() => setPreviewZoom({ name: item.nameVi, src: generatedImages[item.id] })}
-                  onDownload={() => downloadImage(generatedImages[item.id], item.nameVi)} />
+                  onDownload={() => downloadImage(generatedImages[item.id], item.nameVi)}
+                  onRegenerate={handleRegenerate} />
               ))}
             </div>
           ) : (

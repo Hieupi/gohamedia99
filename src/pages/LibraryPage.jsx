@@ -6,7 +6,8 @@ import {
 import {
   getLibraryItems, deleteFromLibrary, toggleLikeInLibrary,
   downloadImage, downloadHDImage, saveToLibrary, createLibraryRecord, migrateOldLibrary,
-  getFolders, createFolder, deleteFolder, moveItemToFolder, moveFolderInto
+  getFolders, createFolder, deleteFolder, moveItemToFolder, moveFolderInto,
+  loadLibraryWithCloudSync
 } from '../services/libraryService'
 import { getOriginalImage, saveToFilesystem } from '../services/imageStorageService'
 import { callGemini } from '../services/geminiService'
@@ -26,7 +27,7 @@ function mapCategory(cat) {
   const m = {
     top: 'Trang phục', bottom: 'Trang phục', dress: 'Trang phục',
     outerwear: 'Trang phục', shoes: 'Phụ kiện', bag: 'Phụ kiện',
-    accessory: 'Phụ kiện', model: 'Người mẫu', background: 'Bối cảnh', other: 'Bộ sưu tập',
+    accessory: 'Phụ kiện', model: 'Người mẫu', kol: 'Người mẫu', background: 'Bối cảnh', other: 'Bộ sưu tập',
   }
   return m[cat] || 'Trang phục'
 }
@@ -331,9 +332,23 @@ export default function LibraryPage() {
     setDragItemId(null); setDragFolderId(null); setDragOverFolderId(null)
   }
 
+  const [cloudSyncing, setCloudSyncing] = useState(false)
+
   useEffect(() => {
     migrateOldLibrary()
+    // Hiển thị local ngay (nhanh)
     setItems(getLibraryItems())
+    setFolders(getFolders())
+
+    // Sau đó đồng bộ từ cloud (nếu đã đăng nhập)
+    setCloudSyncing(true)
+    loadLibraryWithCloudSync()
+      .then(({ items: merged, folders: mergedFolders }) => {
+        setItems(merged)
+        setFolders(mergedFolders)
+      })
+      .catch(() => { /* đã xử lý trong service */ })
+      .finally(() => setCloudSyncing(false))
   }, [])
 
   const handleDelete = (e, id) => {
@@ -374,6 +389,11 @@ export default function LibraryPage() {
           <span className="lib-stat">{POSE_LIBRARY.length} tư thế</span>
           <span className="lib-stat">•</span>
           <span className="lib-stat">{PROMPT_TEMPLATES.length} prompt</span>
+          {cloudSyncing && (
+            <span className="lib-stat" style={{ color: '#6366f1', display: 'flex', alignItems: 'center', gap: 4 }}>
+              <Loader size={12} className="spin" /> Đang đồng bộ cloud...
+            </span>
+          )}
         </div>
         {mainTab === 'images' && (
           <button className="btn btn-primary" style={{ marginLeft: 'auto' }}
@@ -655,7 +675,7 @@ export default function LibraryPage() {
         const currentFolder = activeFolder === 'all' ? null : activeFolder
         const childFolders = folders.filter(f => (f.parentId || null) === currentFolder)
         const finishedItems = items.filter(i => {
-          const isFinished = i.source === 'design' || i.source === 'storytelling' || i.category === 'design'
+          const isFinished = i.source === 'design' || i.source === 'storytelling' || i.source === 'kol-creator' || i.category === 'design'
           if (!isFinished) return false
           if (currentFolder) return i.folderId === currentFolder
           return !i.folderId || !folders.some(f => f.id === i.folderId)

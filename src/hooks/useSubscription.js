@@ -1,14 +1,33 @@
 /**
  * useSubscription.js
- * Hook to check user's subscription plan and feature access
+ * Hook to check user's subscription plan, feature access, and expiry status
  */
 import { useAuth } from '../contexts/AuthContext'
 
 const FREE_FEATURES = ['remove-clothes', 'library', 'settings']
-const PRO_FEATURES = ['remove-clothes', 'library', 'settings', 'new-design', 'storytelling', 'video-prompt', 'seo-aeo']
+
+function parseExpiry(planExpiry) {
+    if (!planExpiry) return null
+    if (planExpiry.toDate) return planExpiry.toDate()
+    if (planExpiry.seconds) return new Date(planExpiry.seconds * 1000)
+    if (planExpiry instanceof Date) return planExpiry
+    return null
+}
 
 export default function useSubscription() {
-    const { profile, isAdmin, isPro } = useAuth()
+    const { profile, isAdmin } = useAuth()
+
+    const expiryDate = parseExpiry(profile?.planExpiry)
+    const now = new Date()
+
+    // Pro is valid only if plan='pro' AND (no expiry OR expiry in future)
+    const isPro = profile?.role === 'admin' || (
+        profile?.plan === 'pro' && (!expiryDate || expiryDate > now)
+    )
+
+    const isExpired = profile?.plan === 'pro' && expiryDate && expiryDate <= now
+    const daysRemaining = expiryDate ? Math.max(0, Math.ceil((expiryDate - now) / (1000 * 60 * 60 * 24))) : null
+    const isExpiringSoon = isPro && daysRemaining !== null && daysRemaining <= 7
 
     const canAccess = (feature) => {
         if (isAdmin) return true
@@ -34,6 +53,9 @@ export default function useSubscription() {
         getPlanLabel: getPlanLabel(),
         isAdmin,
         isPro,
-        planExpiry: profile?.planExpiry || null,
+        isExpired: !!isExpired,
+        isExpiringSoon: !!isExpiringSoon,
+        daysRemaining,
+        planExpiry: expiryDate,
     }
 }

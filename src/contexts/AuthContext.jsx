@@ -55,7 +55,20 @@ export default function AuthProvider({ children }) {
         } else {
             // Existing user → update lastLogin
             await updateDoc(ref, { lastLogin: serverTimestamp() })
-            setProfile({ ...snap.data(), id: firebaseUser.uid })
+            const profileData = { ...snap.data(), id: firebaseUser.uid }
+
+            // Auto-downgrade expired Pro users
+            if (profileData.plan === 'pro' && profileData.planExpiry) {
+                const expDate = profileData.planExpiry.toDate
+                    ? profileData.planExpiry.toDate()
+                    : new Date(profileData.planExpiry.seconds * 1000)
+                if (expDate < new Date()) {
+                    await updateDoc(ref, { plan: 'free', expiredAt: serverTimestamp() })
+                    profileData.plan = 'free'
+                }
+            }
+
+            setProfile(profileData)
         }
     }
 
@@ -145,7 +158,17 @@ export default function AuthProvider({ children }) {
         resetPassword,
         refreshProfile,
         isAdmin: profile?.role === 'admin',
-        isPro: profile?.plan === 'pro' || profile?.role === 'admin',
+        isPro: profile?.role === 'admin' || (
+            profile?.plan === 'pro' && (
+                !profile?.planExpiry ||
+                (profile.planExpiry.toDate
+                    ? profile.planExpiry.toDate()
+                    : profile.planExpiry.seconds
+                        ? new Date(profile.planExpiry.seconds * 1000)
+                        : new Date(profile.planExpiry)
+                ) > new Date()
+            )
+        ),
     }
 
     return (

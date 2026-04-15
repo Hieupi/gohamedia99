@@ -1,11 +1,8 @@
 /**
  * sepayService.js
  * SePay.vn integration — auto-detect bank transfers and confirm orders
- * 
- * Uses direct SePay API calls (CORS-enabled by SePay)
- * Future: switch to Cloud Function proxy when Blaze plan is activated
  */
-import { collection, query, where, getDocs, doc, updateDoc, serverTimestamp } from 'firebase/firestore'
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore'
 import { db } from './firebaseConfig'
 
 const SEPAY_API_KEY = '3MO8362TCQDWEBHBADMVXXD4WBMEYV7WNHOCXBKA9UHNZSL5G0AUJ5JUI0NFHKKA'
@@ -36,8 +33,22 @@ export async function fetchSepayTransactions(limit = 20) {
 }
 
 /**
+ * Compute plan expiry, stacking on existing if still active
+ */
+function computePlanExpiry(durationDays, currentExpiry) {
+    if (!durationDays) return null
+
+    const now = new Date()
+    let baseDate = now
+    if (currentExpiry) {
+        const expDate = currentExpiry.toDate ? currentExpiry.toDate() : new Date(currentExpiry.seconds * 1000)
+        if (expDate > now) baseDate = expDate
+    }
+    return new Date(baseDate.getTime() + durationDays * 24 * 60 * 60 * 1000)
+}
+
+/**
  * Auto-match SePay transactions with pending Firestore orders
- * Returns { matched: number, errors: string[] }
  */
 export async function autoConfirmPayments() {
     const results = { matched: 0, errors: [] }
@@ -71,16 +82,24 @@ export async function autoConfirmPayments() {
             for (const [code, order] of Object.entries(pendingOrders)) {
                 if (content.includes(code.toUpperCase()) && amount >= order.amount) {
                     try {
+                        // Get current user data to check existing expiry
+                        const userRef = doc(db, 'users', order.uid)
+                        const userSnap = await getDoc(userRef)
+                        const userData = userSnap.exists() ? userSnap.data() : {}
+
+                        const planExpiry = computePlanExpiry(order.durationDays, userData.planExpiry)
+
                         await updateDoc(doc(db, 'orders', order.docId), {
                             status: 'confirmed',
                             confirmedAt: serverTimestamp(),
                             sepayTxId: tx.id || tx.reference_number || null,
                             autoConfirmed: true,
+                            planExpiryDate: planExpiry,
                         })
 
-                        await updateDoc(doc(db, 'users', order.uid), {
+                        await updateDoc(userRef, {
                             plan: 'pro',
-                            planExpiry: null,
+                            planExpiry: planExpiry,
                             upgradedAt: serverTimestamp(),
                         })
 

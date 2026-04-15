@@ -5,6 +5,7 @@ import {
     ChevronDown, Film, BookOpen, PlusCircle, Check, RotateCcw
 } from 'lucide-react'
 import SeoAeoPanel from '../components/SeoAeoPanel'
+import LibraryPickerModal from '../components/LibraryPickerModal'
 import VideoPromptPanel from '../components/VideoPromptPanel'
 import Portal from '../components/Portal'
 import { generateGarmentImage, callGemini } from '../services/geminiService'
@@ -347,42 +348,6 @@ function ImagePreviewModal({ imageSrc, onClose }) {
 
 // ─── Library Picker Modal ─────────────────────────────────────────────────────
 
-function LibraryPickerModal({ onSelect, onClose, title }) {
-    const items = getLibraryItems()
-    return (
-        <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
-            <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', width: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, flexShrink: 0 }}>
-                    <FolderOpen size={18} style={{ verticalAlign: -3 }} /> {title || 'Chọn từ Kho Thư Viện'}
-                </h3>
-                {items.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 14 }}>
-                        Kho thư viện trống.
-                    </div>
-                ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, overflowY: 'auto', flex: 1, padding: '4px 0' }}>
-                        {items.map(item => (
-                            <div key={item.id} onClick={() => onSelect(item)}
-                                style={{ cursor: 'pointer', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '2px solid var(--border)', transition: 'all 0.15s' }}
-                                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.transform = 'scale(1.03)' }}
-                                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'scale(1)' }}>
-                                <img src={item.imageSrc} alt={item.name}
-                                    style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }} />
-                                <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                                    {item.name}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, flexShrink: 0 }}>
-                    <button className="btn btn-ghost" onClick={onClose}>Đóng</button>
-                </div>
-            </div>
-        </div>
-    )
-}
-
 // ─── Helper: Convert image entry to File ──────────────────────────────────────
 async function entryToFile(entry, name = 'image.png') {
     if (entry.file) return entry.file
@@ -402,10 +367,14 @@ export default function StorytellingPage() {
     const refFileRef = useRef()
     const productFileRef = useRef()
     const poseRefFileRef = useRef()
+    const bgFileRef = useRef()
 
     // Images
     const [refImages, setRefImages] = useState([])
     const [productImages, setProductImages] = useState([])
+    const [bgImages, setBgImages] = useState([])
+
+    const isRemixMode = bgImages.length > 0
 
     // Story
     const [selectedTemplate, setSelectedTemplate] = useState(null)
@@ -449,7 +418,7 @@ export default function StorytellingPage() {
     const [libraryPicker, setLibraryPicker] = useState(null)
 
     // Cached analysis for retry/edit (avoid re-analyzing)
-    const lastAnalysisRef = useRef({ extractedIdentity: '', extractedProduct: '', refFiles: [], productFiles: [] })
+    const lastAnalysisRef = useRef({ extractedIdentity: '', extractedProduct: '', extractedBackground: '', refFiles: [], productFiles: [], bgFiles: [] })
 
     // ─── Auto-save settings to localStorage ────────────────────────────────────
     useEffect(() => {
@@ -498,9 +467,16 @@ export default function StorytellingPage() {
         setProductImages(prev => [...prev, ...newImgs.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
     }
 
+    const addBgImage = (files) => {
+        const newImgs = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 3 - bgImages.length)
+        setBgImages(prev => [...prev, ...newImgs.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
+    }
+
     const handleLibraryPick = (item) => {
         if (libraryPicker === 'ref') {
             setRefImages(prev => [...prev, { url: item.imageSrc }].slice(0, 5))
+        } else if (libraryPicker === 'bg') {
+            setBgImages(prev => [...prev, { url: item.imageSrc }].slice(0, 3))
         } else {
             setProductImages(prev => [...prev, { url: item.imageSrc }].slice(0, 8))
         }
@@ -532,7 +508,22 @@ export default function StorytellingPage() {
         try {
             const productFiles = await entriesToFiles(productImages)
             const refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
-            const allImages = [...refFiles, ...productFiles]
+            const bgFiles = bgImages.length > 0 ? await entriesToFiles(bgImages) : []
+            const allImages = [...refFiles, ...productFiles, ...bgFiles]
+
+            // REMIX: Analyze real background in parallel
+            let extractedBackground = lastAnalysisRef.current.extractedBackground || ''
+            if (bgFiles.length > 0 && !extractedBackground) {
+                try {
+                    extractedBackground = await callGemini({ prompt: getPrompt('BOT_BG_ANALYZER'), images: bgFiles })
+                    lastAnalysisRef.current.extractedBackground = extractedBackground
+                    lastAnalysisRef.current.bgFiles = bgFiles
+                } catch (e) { console.warn('[BG Analyzer ST]', e) }
+            }
+
+            const remixContext = isRemixMode && extractedBackground
+                ? `\n\n=== REAL BACKGROUND (REMIX MODE) ===\n${extractedBackground}\nAll 9 scenes MUST take place in this real store/showroom. Design poses that naturally showcase the KOL in this real commercial space.\n===`
+                : ''
 
             const analyzePrompt = `You are an elite fashion content director creating VIRAL TikTok/Reels videos.
 
@@ -569,7 +560,7 @@ Example Output:
   ... exactly 9 objects ...
 ]
 
-Return ONLY the <think> block followed by the JSON array.`
+Return ONLY the <think> block followed by the JSON array.${remixContext}`
 
             const aiResponse = await callGemini({ prompt: analyzePrompt, images: allImages })
 
@@ -611,7 +602,10 @@ Return ONLY the <think> block followed by the JSON array.`
 
     // ─── Helper: Build shot description for a scene ──────────────────────────
 
-    const buildSceneShotDesc = (scene, idx, totalScenes, extractedIdentity) => {
+    const buildSceneShotDesc = (scene, idx, totalScenes, extractedIdentity, extractedBackground = '') => {
+        const bgLock = extractedBackground
+            ? `BACKGROUND: REAL STORE/SHOWROOM from reference photo — ${extractedBackground.substring(0, 200)}... MUST preserve exact real environment`
+            : 'LOCATION: SAME area style, architecture, color palette'
         return `STORYTELLING SCENE ${idx + 1} of ${totalScenes}: "${scene.title}"
 THIS IS SCENE ${idx + 1} IN A CONTINUOUS STORY. This scene happens IMMEDIATELY AFTER scene ${idx} and BEFORE scene ${idx + 2}.
 Pose & Action: ${scene.pose}
@@ -626,7 +620,7 @@ HAIR: SAME color, length, style, bangs
 OUTFIT: SAME clothes, fabric color, pattern, shoes
 PROP: If bicycle appears, SAME model/basket/color in ALL scenes. If umbrella, SAME umbrella.
 TIME: SAME time of day, lighting direction, shadow angle, weather
-LOCATION: SAME area style, architecture, color palette
+${bgLock}
 ${extractedIdentity ? `\nIdentity DNA: ${extractedIdentity}` : ''}
 
 Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
@@ -646,28 +640,34 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
         try {
             const productFiles = await entriesToFiles(productImages)
             const refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+            const bgFiles = bgImages.length > 0 ? await entriesToFiles(bgImages) : []
 
-            // Bot 1 + Bot 2 analysis
-            const [extractedIdentity, extractedProduct] = await Promise.all([
+            // Bot 1 + Bot 2 + Bot BG — PARALLEL analysis
+            const [extractedIdentity, extractedProduct, extractedBackground] = await Promise.all([
                 refFiles.length > 0
                     ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFiles })
                     : Promise.resolve(''),
                 callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFiles }),
+                bgFiles.length > 0
+                    ? callGemini({ prompt: getPrompt('BOT_BG_ANALYZER'), images: bgFiles })
+                    : Promise.resolve(''),
             ])
 
             console.log('[Story Bot1]', extractedIdentity?.substring(0, 100))
             console.log('[Story Bot2]', extractedProduct?.substring(0, 100))
+            if (extractedBackground) console.log('[Story BotBG]', extractedBackground?.substring(0, 100))
 
             // Cache for retry/edit
-            lastAnalysisRef.current = { extractedIdentity, extractedProduct, refFiles, productFiles }
+            lastAnalysisRef.current = { extractedIdentity, extractedProduct, extractedBackground, refFiles, productFiles, bgFiles }
 
             const mainFile = productFiles[0]
+            const allRefFiles = isRemixMode ? [...refFiles, ...bgFiles] : refFiles
 
             // Generate each scene
             const tasks = scenes.map((scene, idx) =>
                 (async () => {
                     try {
-                        const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, extractedIdentity)
+                        const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, extractedIdentity, extractedBackground)
 
                         const camPreset = CAMERA_PRESETS.find(p => p.name === cameraPreset)
                         const mkpPreset = MAKEUP_STYLES.find(p => p.name === makeupStyle)
@@ -688,11 +688,14 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
                             cameraPreset: camPreset?.prompt || '',
                             makeupStyle: mkpPreset?.prompt || '',
                             referenceImages: refFiles,
+                            extractedBackground,
+                            isRemixMode,
+                            bgCount: bgFiles.length,
                         })
 
                         const result = await generateGarmentImage(mainFile, prompt, {
                             quality, aspect,
-                            referenceFiles: refFiles,  // ★ Send face references to AI
+                            referenceFiles: allRefFiles,
                         })
                         const dataUrl = `data:${result.mimeType};base64,${result.base64}`
                         setResults(prev => ({ ...prev, [idx]: dataUrl }))
@@ -721,30 +724,36 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
         setErrors(prev => { const n = { ...prev }; delete n[idx]; return n })
 
         try {
-            let { extractedIdentity, extractedProduct, refFiles, productFiles } = lastAnalysisRef.current
+            let { extractedIdentity, extractedProduct, extractedBackground, refFiles, productFiles, bgFiles } = lastAnalysisRef.current
 
-            // If no cached analysis, run Bot1 + Bot2
+            // If no cached analysis, run Bot1 + Bot2 + BotBG
             if (!extractedIdentity && !extractedProduct) {
                 productFiles = await entriesToFiles(productImages)
                 refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+                bgFiles = bgImages.length > 0 ? await entriesToFiles(bgImages) : []
 
-                const [id, prod] = await Promise.all([
+                const [id, prod, bg] = await Promise.all([
                     refFiles.length > 0
                         ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFiles })
                         : Promise.resolve(''),
                     callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFiles }),
+                    bgFiles.length > 0
+                        ? callGemini({ prompt: getPrompt('BOT_BG_ANALYZER'), images: bgFiles })
+                        : Promise.resolve(''),
                 ])
                 extractedIdentity = id
                 extractedProduct = prod
-                lastAnalysisRef.current = { extractedIdentity, extractedProduct, refFiles, productFiles }
+                extractedBackground = bg
+                lastAnalysisRef.current = { extractedIdentity, extractedProduct, extractedBackground, refFiles, productFiles, bgFiles }
             }
 
             const scene = scenes[idx]
-            const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, extractedIdentity)
+            const shotDesc = buildSceneShotDesc(scene, idx, scenes.length, extractedIdentity, extractedBackground)
 
             const camPreset = CAMERA_PRESETS.find(p => p.name === cameraPreset)
             const mkpPreset = MAKEUP_STYLES.find(p => p.name === makeupStyle)
             const sknPreset = SKIN_PRESETS.find(p => p.name === skinFilter)
+            const allRefFiles = isRemixMode ? [...(refFiles || []), ...(bgFiles || [])] : (refFiles || [])
 
             const prompt = buildMasterImagePrompt({
                 extractedIdentity,
@@ -760,7 +769,10 @@ Each scene = next moment in a CONTINUOUS story. Same person, same everything.`
                 shotDescription: shotDesc,
                 cameraPreset: camPreset?.prompt || '',
                 makeupStyle: mkpPreset?.prompt || '',
-                referenceImages: refFiles,
+                referenceImages: refFiles || [],
+                extractedBackground,
+                isRemixMode,
+                bgCount: (bgFiles || []).length,
             })
 
             const mainFile = productFiles[0]

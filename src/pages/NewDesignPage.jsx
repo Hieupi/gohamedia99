@@ -4,11 +4,13 @@ import {
   Send, Plus, Image as ImageIcon, Settings2, Loader, FolderOpen, Check, Eye
 } from 'lucide-react'
 import SeoAeoPanel from '../components/SeoAeoPanel'
+import LibraryPickerModal from '../components/LibraryPickerModal'
 import VideoPromptPanel from '../components/VideoPromptPanel'
 import Portal from '../components/Portal'
-import { generateGarmentImage, callGemini } from '../services/geminiService'
+import { generateGarmentImage, callGemini, MODEL_TEXT } from '../services/geminiService'
 import { getPrompt, buildMasterImagePrompt } from '../services/masterPrompts'
 import { saveToLibrary, createLibraryRecord, downloadImage, getLibraryItems, generateUniqueName, getFolders, createFolder } from '../services/libraryService'
+import { downloadImageAsBlob } from '../services/cloudStorageService'
 import { POSE_LIBRARY, POSE_CATEGORIES, getAllPosesByCategory, PROMPT_TEMPLATES } from '../services/poseLibrary'
 import {
   CAMERA_PRESETS, MAKEUP_STYLES, SKIN_PRESETS, KOL_COMBOS,
@@ -59,12 +61,73 @@ const QUICK_EDITS = [
 // ─── Helper: Convert image entry to File ──────────────────────────────────────
 async function entryToFile(entry, name = 'image.png') {
   if (entry.file) return entry.file
-  const resp = await fetch(entry.url)
-  const blob = await resp.blob()
-  return new File([blob], name, { type: blob.type || 'image/png' })
+  const url = entry.url
+  if (!url) throw new Error('Ảnh không có URL hoặc File. Hãy tải lại.')
+  try {
+    // downloadImageAsBlob xử lý: data URL, Firebase Storage URL (SDK), URL thường
+    const blob = await downloadImageAsBlob(url)
+    return new File([blob], name, { type: blob.type || 'image/jpeg' })
+  } catch (e) {
+    throw new Error(`Không thể tải ảnh "${name}": ${e.message}. Hãy xóa và tải lại ảnh này.`)
+  }
 }
 async function entriesToFiles(entries) {
   return Promise.all(entries.map((e, i) => entryToFile(e, `img-${i}.png`)))
+}
+
+const SCRIPT_REF_LIMIT = 2
+const SCRIPT_PRODUCT_LIMIT = 2
+const SCRIPT_BG_LIMIT = 1
+
+const ANALYSIS_REF_LIMIT = 2
+const ANALYSIS_PRODUCT_LIMIT = 2
+const ANALYSIS_BG_LIMIT = 1
+
+const GENERATION_REF_LIMIT = 3
+const GENERATION_BG_LIMIT = 1
+const GENERATION_LOGO_LIMIT = 1
+const GENERATE_CONCURRENCY = 2
+const SCRIPT_MAX_TOKENS = 6144
+
+function isNetworkLikeError(err) {
+  const msg = String(err?.message || '').toLowerCase()
+  return (
+    msg.includes('failed to fetch') ||
+    msg.includes('networkerror') ||
+    msg.includes('network request failed') ||
+    msg.includes('load failed') ||
+    msg.includes('không thể kết nối') ||
+    msg.includes('khong the ket noi')
+  )
+}
+
+function toFriendlyErrorMessage(err) {
+  if (!err) return 'Lỗi không xác định.'
+  const msg = String(err.message || err)
+  // Always log actual error to console for debugging
+  console.error('[NewDesign Error]', msg, err)
+  if (isNetworkLikeError(err)) {
+    return `Lỗi kết nối: ${msg}`
+  }
+  return msg
+}
+
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+async function withRetry(task, { retries = 1, delayMs = 700 } = {}) {
+  let lastErr
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await task(attempt)
+    } catch (err) {
+      lastErr = err
+      if (attempt >= retries || !isNetworkLikeError(err)) throw err
+      await delay(delayMs * (attempt + 1))
+    }
+  }
+  throw lastErr
 }
 
 // ─── 10 Shot Variations — 5 Front/Side + 5 Rear View (Low-Angle Hack Dáng) ───
@@ -133,42 +196,6 @@ function PillSelect({ options, value, onChange }) {
 }
 
 // ─── Library Picker Modal ─────────────────────────────────────────────────────
-
-function LibraryPickerModal({ onSelect, onClose, title }) {
-  const items = getLibraryItems()
-  return (
-    <div className="modal-overlay" onClick={onClose} style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)' }}>
-      <div className="modal-box" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', width: 900, maxHeight: '85vh', display: 'flex', flexDirection: 'column' }}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 14, flexShrink: 0 }}>
-          <FolderOpen size={18} style={{ verticalAlign: -3 }} /> {title || 'Chọn từ Kho Thư Viện'}
-        </h3>
-        {items.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: 'var(--text-muted)', fontSize: 14 }}>
-            Kho thư viện trống. Hãy tải ảnh lên hoặc tách đồ trước.
-          </div>
-        ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12, overflowY: 'auto', flex: 1, padding: '4px 0' }}>
-            {items.map(item => (
-              <div key={item.id} onClick={() => onSelect(item)}
-                style={{ cursor: 'pointer', borderRadius: 'var(--r-md)', overflow: 'hidden', border: '2px solid var(--border)', transition: 'all 0.15s' }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--brand)'; e.currentTarget.style.transform = 'scale(1.03)' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'scale(1)' }}>
-                <img src={item.imageSrc} alt={item.name}
-                  style={{ width: '100%', aspectRatio: '3/4', objectFit: 'cover', display: 'block' }} />
-                <div style={{ padding: '6px 8px', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {item.name}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14, flexShrink: 0 }}>
-          <button className="btn btn-ghost" onClick={onClose}>Đóng</button>
-        </div>
-      </div>
-    </div>
-  )
-}
 
 // ─── Image Slot ───────────────────────────────────────────────────────────────
 
@@ -483,10 +510,17 @@ export default function NewDesignPage() {
   const refFileRef = useRef()
   const productFileRef = useRef()
   const refAddRef = useRef()
+  const bgFileRef = useRef()
+  const logoFileRef = useRef()
 
   // Images
   const [refImages, setRefImages] = useState([])
   const [productImages, setProductImages] = useState([])
+  const [bgImages, setBgImages] = useState([]) // Real store/showroom background
+  const [logoImages, setLogoImages] = useState([]) // Brand/store logos
+
+  // REMIX mode: computed when bgImages are present
+  const isRemixMode = bgImages.length > 0
 
   // Settings — defaults ưu tiên cho user (không phải Auto)
   const [quality, setQuality] = useState('2K (HD)')
@@ -507,7 +541,8 @@ export default function NewDesignPage() {
   const [selectedCombo, setSelectedCombo] = useState(null)
 
   // Results
-  const [results, setResults] = useState(Array(10).fill(null))
+  const [numShots, setNumShots] = useState(10)
+  const [results, setResults] = useState(Array(numShots).fill(null))
   const [loadingIdx, setLoadingIdx] = useState(new Set())
   const [errors, setErrors] = useState({})
   const [generating, setGenerating] = useState(false)
@@ -522,7 +557,7 @@ export default function NewDesignPage() {
   const [libraryPicker, setLibraryPicker] = useState(null)
 
   // Cached analysis for retry (avoid re-analyzing)
-  const lastAnalysisRef = useRef({ extractedIdentity: '', extractedProduct: '', refFiles: [], productFiles: [], masterPrompts: [] })
+  const lastAnalysisRef = useRef({ extractedIdentity: '', extractedProduct: '', extractedBackground: '', refFiles: [], productFiles: [], bgFiles: [], masterPrompts: [] })
 
   // Pose Library
   const [selectedPoses, setSelectedPoses] = useState([])
@@ -544,6 +579,16 @@ export default function NewDesignPage() {
     setProductImages(prev => [...prev, ...newImgs.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
   }
 
+  const addBgImage = (files) => {
+    const newImgs = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 3 - bgImages.length)
+    setBgImages(prev => [...prev, ...newImgs.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
+  }
+
+  const addLogoImage = (files) => {
+    const newImgs = Array.from(files).filter(f => f.type.startsWith('image/')).slice(0, 3 - logoImages.length)
+    setLogoImages(prev => [...prev, ...newImgs.map(f => ({ file: f, url: URL.createObjectURL(f) }))])
+  }
+
   // Chọn ảnh từ Kho Thư Viện
   const handleLibraryPick = (item) => {
     const entry = { url: item.imageSrc, file: null, fromLibrary: true }
@@ -551,6 +596,10 @@ export default function NewDesignPage() {
       setRefImages(prev => [...prev, entry])
     } else if (libraryPicker === 'product' && productImages.length < 8) {
       setProductImages(prev => [...prev, entry])
+    } else if (libraryPicker === 'bg' && bgImages.length < 3) {
+      setBgImages(prev => [...prev, entry])
+    } else if (libraryPicker === 'logo' && logoImages.length < 3) {
+      setLogoImages(prev => [...prev, entry])
     }
     setLibraryPicker(null)
   }
@@ -561,49 +610,75 @@ export default function NewDesignPage() {
     if (productImages.length === 0) return
     setDesignPhase('scripting')
     try {
-      const productFiles = await entriesToFiles(productImages)
-      const refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
-      const allImages = [...refFiles, ...productFiles]
+      let productFiles, refFiles, bgFiles
+      try {
+        productFiles = await entriesToFiles(productImages.slice(0, SCRIPT_PRODUCT_LIMIT))
+        refFiles = refImages.length > 0 ? await entriesToFiles(refImages.slice(0, SCRIPT_REF_LIMIT)) : []
+        bgFiles = bgImages.length > 0 ? await entriesToFiles(bgImages.slice(0, SCRIPT_BG_LIMIT)) : []
+      } catch (imgErr) {
+        throw new Error('Không thể đọc ảnh đã tải lên. Hãy xóa và tải lại ảnh. (' + imgErr.message + ')')
+      }
+      const allImages = [...refFiles, ...productFiles, ...bgFiles]
 
-      const scriptPrompt = `You are an elite fashion photographer planning a 10-shot editorial spread.
+      // REMIX MODE: Analyze real background in parallel with script generation
+      let extractedBackground = lastAnalysisRef.current.extractedBackground || ''
+      if (bgFiles.length > 0 && !extractedBackground) {
+        try {
+          extractedBackground = await callGemini({ prompt: getPrompt('BOT_BG_ANALYZER'), images: bgFiles, model: MODEL_TEXT })
+          lastAnalysisRef.current.extractedBackground = extractedBackground
+          lastAnalysisRef.current.bgFiles = bgFiles
+        } catch (e) {
+          console.warn('[BG Analyzer]', e)
+        }
+      }
+
+      const hookCount = Math.max(1, Math.round(numShots * 0.3))
+      const buildCount = Math.max(1, Math.round(numShots * 0.3))
+      const revealCount = numShots - hookCount - buildCount
+
+      const remixContext = isRemixMode && extractedBackground
+        ? `\n\n=== REAL BACKGROUND CONTEXT (REMIX MODE) ===
+The shots will take place in this REAL store/showroom environment (not AI-generated backgrounds):
+${extractedBackground}
+
+REMIX SCENE PLANNING RULES:
+- ALL ${numShots} shots must be set within this real store/showroom environment
+- Design scenes that make sense for a product review/introduction in this space
+- Vary the positions within the store (entrance area, beside products, near displays, etc.)
+- The KOL should interact naturally with the real store environment
+- Each shot description must specify WHERE in the store the KOL is positioned
+- Lighting and mood must match the real environment's lighting conditions
+===` : ''
+
+      const scriptPrompt = `You are an elite fashion photographer AND commercial video director planning a ${numShots}-shot editorial spread for a PRODUCT INTRODUCTION / STORE SHOWCASE video.
 
 Analyze these images: model features, outfit details, fabric, colors, mood.
 
 CORE DIRECTIVE: CURIOSITY-DRIVEN STORYTELLING & STRICT CONSISTENCY
-You must apply deep critical thinking to craft a 10-shot narrative sequence that hooks the viewer by strategically hiding and revealing the model's face, while keeping the environment absolutely consistent.
+Craft a ${numShots}-shot narrative sequence that hooks the viewer by strategically hiding and revealing the model's face, keeping the environment absolutely consistent.
 
 === CRITICAL RULES ===
-1. STRICT BACKGROUND CONSISTENCY: All 10 shots MUST take place in the EXACT SAME location and lighting. Choose ONE strongly defined background and repeat it verbatim or keep it completely consistent in every shot.
-2. THE CURIOSITY HOOK (Shots 1-3): Start from the BACK. Show her full body, outfit, long legs, and curves from behind. Make the audience burn with curiosity to see her face. NO frontal face shots early on.
-3. THE BUILD-UP (Shots 4-6): Transition to side profiles, over-the-shoulder glances, or dynamic movements (walking, turning slightly). Keep them waiting, just glimpses of the profile.
-4. THE REVEAL/CLIMAX (Shots 7-10): Finally, reveal her stunning front face. Confident strides towards the camera, close-ups, dramatic poses, and a beautiful smile or fierce look.
-5. CONTINUITY: The outfit, hair, and props must remain identical across all 10 shots.
+1. STRICT BACKGROUND CONSISTENCY: All ${numShots} shots MUST take place in the EXACT SAME location and lighting.
+2. THE CURIOSITY HOOK (Shots 1-${hookCount}): Start from the BACK. Face completely hidden.
+3. THE BUILD-UP (Shots ${hookCount + 1}-${hookCount + buildCount}): Side profiles, over-the-shoulder glances, dynamic movements.
+4. THE REVEAL/CLIMAX (Shots ${hookCount + buildCount + 1}-${numShots}): Reveal her stunning front face. Confident poses.
+5. CONTINUITY: The outfit, hair, and props must remain identical across all ${numShots} shots.
 
-Before generating the JSON, you MUST output a <think> block where you reason about:
-- What is the single unifying background for all 10 shots?
-- How to structure the back -> side -> front progression?
-- How to ensure the shot descriptions strictly follow the "hidden face" rule early on?
+Before generating the JSON, output a <think> block reasoning about the background and narrative arc.
 
-After the <think> block, return ONLY a valid JSON array with exactly 10 objects:
-- "title": short Vietnamese name (2-4 words, descriptive)
-- "shotDesc": detailed English shot description (full sentence, 20+ words). Must explicitly enforce the narrative arc (e.g. "shot from behind, face hidden", "side profile", "front view"). Also explicitly include the chosen consistent background here if needed to ensure the image generator keeps it.
-- "category": one of "hook" (back view), "setup" (side/moving), "detail" (closeups), "rear" (low angle back), "twist", "finale" (front reveal)
+After the <think> block, return ONLY a valid JSON array with exactly ${numShots} objects:
+- "title": short Vietnamese name (2-4 words)
+- "shotDesc": detailed English shot description (20+ words). Enforce narrative arc and include consistent background.
+- "category": one of "hook", "setup", "detail", "rear", "twist", "finale"
 
 ${prompt ? '\nUser style note: ' + prompt : ''}
 
-Example Output:
-<think>
-1. Background: Luxury minimalist museum with concrete walls...
-2. Arc: Shots 1-3 from behind. Shots 4-6 side profile. Shots 7-10 front reveal...
-</think>
-[
-  {"title":"Bóng Lưng Gợi Cảm","shotDesc":"Full body shot from completely behind, showing off curves, long legs, walking away slowly, face completely hidden, wearing the exact outfit, luxury minimalist concrete museum background","category":"hook"},
-  ... exactly 10 objects ...
-]
+Return ONLY the <think> block followed by the JSON array.${remixContext}`
 
-Return ONLY the <think> block followed by the JSON array.`
-
-      const aiResponse = await callGemini({ prompt: scriptPrompt, images: allImages })
+      const aiResponse = await withRetry(
+        () => callGemini({ prompt: scriptPrompt, images: allImages, model: MODEL_TEXT, temperature: 0.5, maxTokens: SCRIPT_MAX_TOKENS }),
+        { retries: 1, delayMs: 800 },
+      )
       let parsed
       try {
         const cleanedResponse = aiResponse.replace(/<think>[\s\S]*?<\/think>/gi, '').trim()
@@ -621,18 +696,19 @@ Return ONLY the <think> block followed by the JSON array.`
         return
       }
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const shots = parsed.slice(0, 10).map((s, i) => ({
+        const shots = parsed.slice(0, numShots).map((s, i) => ({
           title: s.title || `Shot ${i + 1}`,
           shotDesc: s.shotDesc || SHOT_VARIATIONS[i] || '',
           category: s.category || 'setup',
         }))
         setShotDescriptions(shots)
+        setResults(Array(numShots).fill(null))
         setDesignPhase('review')
         console.log('[Script] Generated', shots.length, 'shot descriptions — entering review phase')
       }
     } catch (err) {
       console.error('[Script Error]', err)
-      alert('Lỗi tạo kịch bản: ' + err.message)
+      alert('Lỗi tạo kịch bản: ' + toFriendlyErrorMessage(err))
       setDesignPhase('idle')
     }
   }
@@ -644,27 +720,46 @@ Return ONLY the <think> block followed by the JSON array.`
     setGenerating(true)
     setDesignPhase('generating')
     setErrors({})
-    setResults(Array(10).fill(null))
-    setLoadingIdx(new Set([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]))
+    setResults(Array(numShots).fill(null))
+    setLoadingIdx(new Set(Array.from({ length: numShots }, (_, i) => i)))
 
     try {
       // STEP 1: Convert all images to Files
-      const productFiles = await entriesToFiles(productImages)
-      const refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+      let productFiles, refFiles, bgFiles, logoFiles
+      try {
+        productFiles = await entriesToFiles(productImages)
+        refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+        bgFiles = bgImages.length > 0 ? await entriesToFiles(bgImages) : []
+        logoFiles = logoImages.length > 0 ? await entriesToFiles(logoImages) : []
+      } catch (imgErr) {
+        throw new Error('Không thể đọc ảnh đã tải lên. Hãy xóa và tải lại ảnh. (' + imgErr.message + ')')
+      }
 
-      // STEP 2: Bot 1 (Identity) + Bot 2 (Garment) — PARALLEL analysis
-      const [extractedIdentity, extractedProduct] = await Promise.all([
-        refFiles.length > 0
-          ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFiles })
+      const refFilesForAnalysis = refFiles.slice(0, ANALYSIS_REF_LIMIT)
+      const productFilesForAnalysis = productFiles.slice(0, ANALYSIS_PRODUCT_LIMIT)
+      const bgFilesForAnalysis = bgFiles.slice(0, ANALYSIS_BG_LIMIT)
+
+      const refFilesForGeneration = refFiles.slice(0, GENERATION_REF_LIMIT)
+      const bgFilesForGeneration = bgFiles.slice(0, GENERATION_BG_LIMIT)
+      const logoFilesForGeneration = logoFiles.slice(0, GENERATION_LOGO_LIMIT)
+
+      // STEP 2: Bot 1 (Identity) + Bot 2 (Garment) + Bot BG — PARALLEL analysis
+      const [extractedIdentity, extractedProduct, extractedBackground] = await Promise.all([
+        refFilesForAnalysis.length > 0
+          ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFilesForAnalysis, model: MODEL_TEXT })
           : Promise.resolve(''),
-        callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFiles }),
+        callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFilesForAnalysis, model: MODEL_TEXT }),
+        bgFilesForAnalysis.length > 0
+          ? callGemini({ prompt: getPrompt('BOT_BG_ANALYZER'), images: bgFilesForAnalysis, model: MODEL_TEXT })
+          : Promise.resolve(''),
       ])
 
       console.log('[Bot1 Identity]', extractedIdentity?.substring(0, 120))
       console.log('[Bot2 Garment]', extractedProduct?.substring(0, 120))
+      if (extractedBackground) console.log('[Bot BG]', extractedBackground?.substring(0, 120))
 
       // Cache for retry
-      lastAnalysisRef.current = { ...lastAnalysisRef.current, extractedIdentity, extractedProduct, refFiles, productFiles }
+      lastAnalysisRef.current = { ...lastAnalysisRef.current, extractedIdentity, extractedProduct, extractedBackground, refFiles, productFiles, bgFiles, logoFiles }
 
       // STEP 3: Build 8 Master Prompts — CREATIVE POSE SYSTEM
       // Poses = creative inspiration, NOT rigid copy
@@ -682,9 +777,9 @@ Return ONLY the <think> block followed by the JSON array.`
       const sknPreset = SKIN_PRESETS.find(p => p.name === skinFilter)
 
       // Use AI-generated descriptions if in review, else fallback to hardcoded
-      const shotsToUse = shotDescriptions.length >= 10
+      const shotsToUse = shotDescriptions.length >= numShots
         ? shotDescriptions.map(s => s.shotDesc)
-        : SHOT_VARIATIONS
+        : Array.from({ length: numShots }, (_, i) => SHOT_VARIATIONS[i] || `Shot ${i + 1}: Full body fashion editorial shot, creative pose, ${style !== AUTO ? style : 'high fashion'} style.`)
 
       const masterPrompts = shotsToUse.map((shotDesc, idx) => {
         const combinedUserPrompt = [prompt, poseInspiration, creativePoseRule, templateExtra].filter(Boolean).join('\n')
@@ -699,35 +794,54 @@ Return ONLY the <think> block followed by the JSON array.`
           shotDescription: shotDesc,
           cameraPreset: camPreset?.prompt || '',
           makeupStyle: mkpPreset?.prompt || '',
-          referenceImages: refFiles,
+          referenceImages: refFilesForAnalysis,
+          extractedBackground,
+          isRemixMode,
+          bgCount: bgFiles.length,
+          logoCount: logoFiles.length,
         })
       })
 
       // Cache master prompts for retry
       lastAnalysisRef.current.masterPrompts = masterPrompts
 
-      // STEP 4: Generate 4 images in parallel
+      // STEP 4: Generate all images in parallel
+      // Order: face refs → bg refs (REMIX) → logo refs (LAST)
       const mainProductFile = productFiles[0]
-      const tasks = masterPrompts.map((mPrompt, idx) =>
-        (async () => {
-          try {
-            const result = await generateGarmentImage(mainProductFile, mPrompt, {
+      const allRefFiles = [...(isRemixMode ? [...refFilesForGeneration, ...bgFilesForGeneration] : refFilesForGeneration), ...logoFilesForGeneration]
+      const generateOne = async (idx) => {
+        const mPrompt = masterPrompts[idx]
+        try {
+          const result = await withRetry(
+            () => generateGarmentImage(mainProductFile, mPrompt, {
               quality, aspect,
-              referenceFiles: refFiles,  // ★ Send face references to AI
-            })
-            const dataUrl = `data:${result.mimeType};base64,${result.base64}`
-            setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
-          } catch (err) {
-            console.error(`[Design Gen ${idx}]`, err)
-            setErrors(prev => ({ ...prev, [idx]: err.message }))
-          }
-          setLoadingIdx(prev => { const n = new Set(prev); n.delete(idx); return n })
-        })()
-      )
-      await Promise.all(tasks)
+              referenceFiles: allRefFiles,  // ★ Send face refs + bg refs to AI
+            }),
+            { retries: 1, delayMs: 700 },
+          )
+          const dataUrl = `data:${result.mimeType};base64,${result.base64}`
+          setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
+        } catch (err) {
+          console.error(`[Design Gen ${idx}]`, err)
+          setErrors(prev => ({ ...prev, [idx]: toFriendlyErrorMessage(err) }))
+        }
+        setLoadingIdx(prev => { const n = new Set(prev); n.delete(idx); return n })
+      }
+
+      const queue = Array.from({ length: masterPrompts.length }, (_, idx) => idx)
+      const workerCount = Math.min(GENERATE_CONCURRENCY, queue.length || 1)
+      const workers = Array.from({ length: workerCount }, async () => {
+        while (queue.length > 0) {
+          const idx = queue.shift()
+          if (typeof idx !== 'number') break
+          await generateOne(idx)
+        }
+      })
+      await Promise.all(workers)
     } catch (err) {
       console.error('[Pipeline Error]', err)
-      setErrors({ 0: err.message, 1: err.message, 2: err.message, 3: err.message })
+      const friendly = toFriendlyErrorMessage(err)
+      setErrors(Object.fromEntries(Array.from({ length: numShots }, (_, idx) => [idx, friendly])))
       setLoadingIdx(new Set())
     }
     setGenerating(false)
@@ -749,9 +863,9 @@ Return ONLY the <think> block followed by the JSON array.`
         refFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
         const [id, prod] = await Promise.all([
           refFiles.length > 0
-            ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFiles })
+            ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: refFiles, model: MODEL_TEXT })
             : Promise.resolve(''),
-          callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFiles }),
+          callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: productFiles, model: MODEL_TEXT }),
         ])
         extractedIdentity = id
         extractedProduct = prod
@@ -776,14 +890,17 @@ Return ONLY the <think> block followed by the JSON array.`
       })
 
       const mainFile = productFiles[0]
-      const result = await generateGarmentImage(mainFile, mPrompt, {
-        quality, aspect, referenceFiles: refFiles,
-      })
+      const result = await withRetry(
+        () => generateGarmentImage(mainFile, mPrompt, {
+          quality, aspect, referenceFiles: refFiles,
+        }),
+        { retries: 1, delayMs: 700 },
+      )
       const dataUrl = `data:${result.mimeType};base64,${result.base64}`
       setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
     } catch (err) {
       console.error(`[Single Shot ${idx}]`, err)
-      setErrors(prev => ({ ...prev, [idx]: err.message }))
+      setErrors(prev => ({ ...prev, [idx]: toFriendlyErrorMessage(err) }))
     }
     setLoadingIdx(prev => { const n = new Set(prev); n.delete(idx); return n })
   }
@@ -801,41 +918,47 @@ Return ONLY the <think> block followed by the JSON array.`
       let prompts = masterPrompts
       let prodFiles = productFiles
       let rFiles = refFiles
+      let lFiles = lastAnalysisRef.current.logoFiles || []
 
       // Re-analyze if no cached data
       if (!prompts[idx]) {
         prodFiles = await entriesToFiles(productImages)
         rFiles = refImages.length > 0 ? await entriesToFiles(refImages) : []
+        lFiles = logoImages.length > 0 ? await entriesToFiles(logoImages) : []
         const [identity, product] = await Promise.all([
-          rFiles.length > 0 ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: rFiles }) : Promise.resolve(''),
-          callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: prodFiles }),
+          rFiles.length > 0 ? callGemini({ prompt: getPrompt('BOT1_IDENTITY_ANALYZER'), images: rFiles, model: MODEL_TEXT }) : Promise.resolve(''),
+          callGemini({ prompt: getPrompt('BOT2_GARMENT_ANALYZER'), images: prodFiles, model: MODEL_TEXT }),
         ])
 
         const camP = CAMERA_PRESETS.find(p => p.name === cameraPreset)
         const mkP = MAKEUP_STYLES.find(p => p.name === makeupStyle)
         const skP = SKIN_PRESETS.find(p => p.name === skinFilter)
 
-        prompts = SHOT_VARIATIONS.map(shotDesc => {
+        prompts = Array.from({ length: numShots }, (_, i) => SHOT_VARIATIONS[i] || `Shot ${i + 1}: Fashion editorial, creative pose.`).map(shotDesc => {
           return buildMasterImagePrompt({
             extractedIdentity: identity, extractedProduct: product,
             modelType, background, pose, style,
             skinFilter: skP?.prompt || skinFilter, toneFilter, quality, aspect,
             userPrompt: prompt, shotDescription: shotDesc,
             cameraPreset: camP?.prompt || '', makeupStyle: mkP?.prompt || '',
-            referenceImages: rFiles,
+            referenceImages: rFiles, logoCount: lFiles.length,
           })
         })
-        lastAnalysisRef.current = { extractedIdentity: identity, extractedProduct: product, refFiles: rFiles, productFiles: prodFiles, masterPrompts: prompts }
+        lastAnalysisRef.current = { extractedIdentity: identity, extractedProduct: product, refFiles: rFiles, productFiles: prodFiles, masterPrompts: prompts, logoFiles: lFiles }
       }
 
-      const result = await generateGarmentImage(prodFiles[0], prompts[idx], {
-        quality, aspect, referenceFiles: rFiles,
-      })
+      const allRefs = [...(isRemixMode ? [...rFiles, ...(lastAnalysisRef.current.bgFiles || [])] : rFiles), ...lFiles]
+      const result = await withRetry(
+        () => generateGarmentImage(prodFiles[0], prompts[idx], {
+          quality, aspect, referenceFiles: allRefs,
+        }),
+        { retries: 1, delayMs: 700 },
+      )
       const dataUrl = `data:${result.mimeType};base64,${result.base64}`
       setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
     } catch (err) {
       console.error(`[Retry ${idx}]`, err)
-      setErrors(prev => ({ ...prev, [idx]: err.message }))
+      setErrors(prev => ({ ...prev, [idx]: toFriendlyErrorMessage(err) }))
     }
     setLoadingIdx(prev => { const n = new Set(prev); n.delete(idx); return n })
   }
@@ -854,11 +977,14 @@ Return ONLY the <think> block followed by the JSON array.`
 
       // Bot 7: Precision Retoucher
       const retouchPrompt = `${getPrompt('BOT7_PRECISION_RETOUCHER')}\n\nUSER EDIT COMMAND: ${editPrompt}\n\nApply the edit precisely. Return the modified image.`
-      const result = await generateGarmentImage(file, retouchPrompt, { quality, aspect })
+      const result = await withRetry(
+        () => generateGarmentImage(file, retouchPrompt, { quality, aspect }),
+        { retries: 1, delayMs: 700 },
+      )
       const dataUrl = `data:${result.mimeType};base64,${result.base64}`
       setResults(prev => { const n = [...prev]; n[idx] = dataUrl; return n })
     } catch (err) {
-      setErrors(prev => ({ ...prev, [idx]: err.message }))
+      setErrors(prev => ({ ...prev, [idx]: toFriendlyErrorMessage(err) }))
     }
     setLoadingIdx(prev => { const n = new Set(prev); n.delete(idx); return n })
   }
@@ -916,6 +1042,104 @@ Return ONLY the <think> block followed by the JSON array.`
               {productImages.length < 8 && (
                 <ImageSlot onPickLibrary={() => setLibraryPicker('product')} />
               )}
+            </div>
+          </div>
+
+          {/* ── Step BG: Ảnh bối cảnh thật (REMIX MODE) ── */}
+          <div className="design-step" style={{
+            border: isRemixMode ? '2px solid #f59e0b' : '1.5px solid var(--border)',
+            background: isRemixMode ? 'rgba(245,158,11,0.04)' : undefined,
+          }}>
+            <div className="design-step-header">
+              <div className="design-step-number" style={{ background: 'linear-gradient(135deg, #f59e0b, #ef4444)', fontSize: 11, width: 32, height: 32 }}>BG</div>
+              <div className="design-step-title">
+                🏪 BỐI CẢNH THẬT
+                {isRemixMode && (
+                  <span style={{
+                    marginLeft: 8, fontSize: 9, fontWeight: 800, padding: '2px 8px',
+                    background: 'linear-gradient(90deg,#f59e0b,#ef4444)', color: '#fff',
+                    borderRadius: 20, letterSpacing: 0.5, verticalAlign: 'middle',
+                  }}>REMIX ON</span>
+                )}
+              </div>
+              <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 12 }}
+                onClick={() => bgFileRef.current?.click()}>
+                <Upload size={13} /> Tải lên
+              </button>
+              <input ref={bgFileRef} type="file" accept="image/*" multiple hidden
+                onChange={e => addBgImage(e.target.files)} />
+            </div>
+
+            <div style={{ padding: '0 12px 14px' }}>
+              {!isRemixMode && (
+                <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 10 }}>
+                  Tải ảnh thật của <strong>cửa hàng, showroom, kho hàng</strong>... vào đây.<br />
+                  AI sẽ đặt KOL vào bối cảnh thật — sản phẩm & nền là thật, chỉ KOL là AI.
+                </div>
+              )}
+              {isRemixMode && (
+                <div style={{
+                  fontSize: 11, color: '#92400e', lineHeight: 1.6, marginBottom: 10,
+                  padding: '8px 10px', background: 'rgba(245,158,11,0.1)', borderRadius: 8,
+                  border: '1px solid rgba(245,158,11,0.3)',
+                }}>
+                  ✅ <strong>REMIX MODE đang bật</strong> — AI sẽ phân tích bối cảnh thật và đặt KOL vào cửa hàng/showroom của bạn. Sản phẩm, tường, biển hiệu đều giữ nguyên thật.
+                </div>
+              )}
+              <div className="nd-img-grid">
+                {bgImages.map((img, i) => (
+                  <ImageSlot key={i} src={img.url}
+                    onRemove={() => setBgImages(prev => prev.filter((_, j) => j !== i))} />
+                ))}
+                {bgImages.length < 3 && (
+                  <ImageSlot onPickLibrary={() => setLibraryPicker('bg')} />
+                )}
+              </div>
+              {bgImages.length > 0 && (
+                <div style={{ fontSize: 10.5, color: 'var(--text-muted)', marginTop: 6 }}>
+                  💡 {bgImages.length}/3 ảnh bối cảnh — AI sẽ dùng làm tham chiếu cho toàn bộ {numShots} shot
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* ── Step Logo: Brand/Store Logo DNA LOCK ── */}
+          <div className="design-step" style={{
+            border: logoImages.length > 0 ? '2px solid #6366f1' : '1.5px solid var(--border)',
+            background: logoImages.length > 0 ? 'rgba(99,102,241,0.04)' : undefined,
+          }}>
+            <div className="design-step-header">
+              <div className="design-step-number" style={{ background: 'linear-gradient(135deg,#6366f1,#8b5cf6)', fontSize: 11, width: 32, height: 32 }}>LG</div>
+              <div className="design-step-title">
+                🏷️ LOGO THƯƠNG HIỆU
+                {logoImages.length > 0 && (
+                  <span style={{
+                    marginLeft: 8, fontSize: 9, fontWeight: 800, padding: '2px 8px',
+                    background: 'linear-gradient(90deg,#6366f1,#8b5cf6)', color: '#fff',
+                    borderRadius: 20, letterSpacing: 0.5, verticalAlign: 'middle',
+                  }}>DNA LOCK</span>
+                )}
+              </div>
+              <button className="btn btn-ghost" style={{ marginLeft: 'auto', fontSize: 12 }}
+                onClick={() => logoFileRef.current?.click()}>
+                <Upload size={13} /> Tải lên
+              </button>
+              <input ref={logoFileRef} type="file" accept="image/*" multiple hidden
+                onChange={e => addLogoImage(e.target.files)} />
+            </div>
+            <div style={{ padding: '0 12px 14px' }}>
+              <div style={{ fontSize: 11.5, color: 'var(--text-muted)', lineHeight: 1.6, marginBottom: 10 }}>
+                Tùy chọn: Logo thương hiệu/cửa hàng — AI khóa logo đồng nhất trên tất cả ảnh, tránh mỗi shot ra logo khác nhau.
+              </div>
+              <div className="nd-img-grid">
+                {logoImages.map((img, i) => (
+                  <ImageSlot key={i} src={img.url}
+                    onRemove={() => setLogoImages(prev => prev.filter((_, j) => j !== i))} />
+                ))}
+                {logoImages.length < 3 && (
+                  <ImageSlot onPickLibrary={() => setLibraryPicker('logo')} />
+                )}
+              </div>
             </div>
           </div>
 
@@ -1072,8 +1296,18 @@ Return ONLY the <think> block followed by the JSON array.`
                   <Dropdown options={MODEL_TYPES} value={modelType} onChange={setModelType} placeholder="Chọn kiểu model..." />
                 </div>
                 <div className="form-group">
-                  <label className="nd-label">PHÔNG NỀN</label>
-                  <Dropdown options={BACKGROUNDS} value={background} onChange={setBackground} placeholder="Chọn phông nền..." />
+                  <label className="nd-label">PHÔNG NỀN {isRemixMode && <span style={{ color: '#f59e0b', fontWeight: 700, fontSize: 10 }}>— REMIX (ảnh thật)</span>}</label>
+                  {isRemixMode ? (
+                    <div style={{
+                      padding: '8px 12px', borderRadius: 'var(--r-sm)', fontSize: 12, fontWeight: 600,
+                      background: 'rgba(245,158,11,0.1)', border: '1.5px solid rgba(245,158,11,0.4)',
+                      color: '#92400e',
+                    }}>
+                      🏪 Bối cảnh thật từ ảnh ({bgImages.length} ảnh)
+                    </div>
+                  ) : (
+                    <Dropdown options={BACKGROUNDS} value={background} onChange={setBackground} placeholder="Chọn phông nền..." />
+                  )}
                 </div>
               </div>
 
@@ -1155,9 +1389,9 @@ Return ONLY the <think> block followed by the JSON array.`
                     disabled={!canGenerate || generating}
                     style={{ background: generating ? undefined : 'linear-gradient(135deg, #10b981, #059669)' }}>
                     {generating ? (
-                      <><Loader size={18} className="spin" /> Đang tạo 10 ảnh...</>
+                      <><Loader size={18} className="spin" /> Đang tạo {numShots} ảnh...</>
                     ) : (
-                      <><Sparkles size={18} /> 🚀 Tạo TẤT CẢ 10 ảnh cùng lúc</>
+                      <><Sparkles size={18} /> 🚀 Tạo TẤT CẢ {numShots} ảnh cùng lúc</>
                     )}
                   </button>
                   <p style={{ fontSize: 10, color: 'var(--text-muted)', margin: 0, textAlign: 'center' }}>
@@ -1166,22 +1400,41 @@ Return ONLY the <think> block followed by the JSON array.`
                 </div>
               ) : designPhase === 'scripting' ? (
                 <button className="nd-generate-btn" disabled>
-                  <Loader size={18} className="spin" /> 🧠 AI đang tạo kịch bản 10 shot...
+                  <Loader size={18} className="spin" /> 🧠 AI đang tạo kịch bản {numShots} shot...
                 </button>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {/* Shot count selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--bg-secondary)', borderRadius: 8, padding: '6px 10px' }}>
+                    <span style={{ fontSize: 12, color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>📸 Số phân cảnh:</span>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', flex: 1 }}>
+                      {[3, 4, 5, 6, 7, 8, 10, 12, 15].map(n => (
+                        <button key={n} type="button"
+                          onClick={() => { setNumShots(n); setResults(Array(n).fill(null)); setShotDescriptions([]); setDesignPhase('idle') }}
+                          style={{
+                            padding: '3px 10px', borderRadius: 6, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                            background: numShots === n ? 'var(--primary)' : 'var(--bg-tertiary)',
+                            color: numShots === n ? '#fff' : 'var(--text-secondary)',
+                            transition: 'all 0.15s',
+                          }}>
+                          {n}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <button className="nd-generate-btn" onClick={handleGenerateScript}
                     disabled={productImages.length === 0}
                     style={{ background: productImages.length > 0 ? 'linear-gradient(135deg, #8b5cf6, #6366f1)' : undefined }}>
-                    <Sparkles size={18} /> 🧠 Tạo Kịch Bản 10 Shot (AI suy luận)
+                    <Sparkles size={18} /> 🧠 Tạo Kịch Bản {numShots} Shot (AI suy luận)
                   </button>
                   <button className="nd-generate-btn" onClick={handleGenerate}
                     disabled={!canGenerate}
-                    style={{ background: canGenerate ? undefined : undefined, opacity: canGenerate ? 0.8 : 0.4, fontSize: 13 }}>
+                    style={{ opacity: canGenerate ? 0.8 : 0.4, fontSize: 13 }}>
                     {generating ? (
-                      <><Loader size={18} className="spin" /> Đang tạo 10 ảnh...</>
+                      <><Loader size={18} className="spin" /> Đang tạo {numShots} ảnh...</>
                     ) : (
-                      <><Sparkles size={16} /> Tạo nhanh 10 ảnh (bỏ qua kịch bản)</>
+                      <><Sparkles size={16} /> Tạo nhanh {numShots} ảnh (bỏ qua kịch bản)</>
                     )}
                   </button>
                 </div>
@@ -1195,10 +1448,10 @@ Return ONLY the <think> block followed by the JSON array.`
           <div className="design-step" style={{ height: '100%' }}>
             <div className="design-step-header">
               <div className="design-step-number">4</div>
-              <div className="design-step-title">Kết quả ({results.filter(Boolean).length}/10)</div>
+              <div className="design-step-title">Kết quả ({results.filter(Boolean).length}/{numShots})</div>
             </div>
             <div className="nd-results-grid">
-              {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map(idx => (
+              {Array.from({ length: numShots }, (_, idx) => idx).map(idx => (
                 <ResultCard key={idx} idx={idx}
                   imageSrc={results[idx]}
                   isLoading={loadingIdx.has(idx)}

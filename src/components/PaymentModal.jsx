@@ -1,34 +1,46 @@
 /**
  * PaymentModal.jsx
  * QR Code payment modal — shows VietQR, bank info, and auto-polls for confirmation
+ * Now supports dynamic plan selection (monthly/quarterly/yearly)
  */
 import { useState, useEffect, useRef } from 'react'
-import { X, Copy, Check, Loader, QrCode, CreditCard, Clock, Sparkles } from 'lucide-react'
+import { X, Copy, Check, Loader, CreditCard, Clock, Sparkles } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { createPaymentOrder, checkOrderStatus, BANK_DISPLAY, PRICING } from '../services/paymentService'
+import { createPaymentOrder, checkOrderStatus, getBankDisplay } from '../services/paymentService'
 
-export default function PaymentModal({ onClose, onSuccess }) {
+export default function PaymentModal({ selectedPlan = 'monthly', onClose, onSuccess }) {
     const { user, refreshProfile } = useAuth()
     const [order, setOrder] = useState(null)
+    const [bankDisplay, setBankDisplay] = useState(null)
     const [loading, setLoading] = useState(true)
-    const [status, setStatus] = useState('pending') // pending | checking | confirmed
+    const [status, setStatus] = useState('pending')
     const [copied, setCopied] = useState(null)
     const pollRef = useRef(null)
 
     // Create order on mount
     useEffect(() => {
         if (!user) return
-        createPaymentOrder(user.uid, user.email)
-            .then(o => { setOrder(o); setLoading(false) })
-            .catch(err => { console.error(err); setLoading(false) })
-    }, [user])
+        const init = async () => {
+            try {
+                const [o, bank] = await Promise.all([
+                    createPaymentOrder(user.uid, user.email, selectedPlan),
+                    getBankDisplay()
+                ])
+                setOrder(o)
+                setBankDisplay(bank)
+            } catch (err) {
+                console.error('Order creation error:', err)
+            }
+            setLoading(false)
+        }
+        init()
+    }, [user, selectedPlan])
 
-    // Poll for confirmation: check Firestore + SePay every 15s
+    // Poll for confirmation
     useEffect(() => {
         if (!order?.code) return
         const checkPayment = async () => {
             try {
-                // 1. Check Firestore (admin may have confirmed manually)
                 const data = await checkOrderStatus(order.code)
                 if (data?.status === 'confirmed') {
                     setStatus('confirmed')
@@ -37,11 +49,9 @@ export default function PaymentModal({ onClose, onSuccess }) {
                     setTimeout(() => onSuccess?.(), 2000)
                     return
                 }
-                // 2. Check SePay for matching bank transfer
                 const { autoConfirmPayments } = await import('../services/sepayService')
                 const result = await autoConfirmPayments()
                 if (result.matched > 0) {
-                    // Re-check this specific order
                     const updated = await checkOrderStatus(order.code)
                     if (updated?.status === 'confirmed') {
                         setStatus('confirmed')
@@ -50,9 +60,8 @@ export default function PaymentModal({ onClose, onSuccess }) {
                         setTimeout(() => onSuccess?.(), 2000)
                     }
                 }
-            } catch (e) { /* ignore polling errors */ }
+            } catch (e) { /* ignore */ }
         }
-        // First check after 10s, then every 15s
         const timer = setTimeout(() => {
             checkPayment()
             pollRef.current = setInterval(checkPayment, 15000)
@@ -79,10 +88,11 @@ export default function PaymentModal({ onClose, onSuccess }) {
                         <Sparkles size={36} color="#fff" />
                     </div>
                     <h2 style={{ margin: '0 0 8px', fontSize: 24, fontWeight: 900, color: 'var(--text-main)' }}>
-                        🎉 Nâng cấp thành công!
+                        Nâng cấp thành công!
                     </h2>
                     <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
-                        Tài khoản của bạn đã được kích hoạt gói <strong style={{ color: '#f59e0b' }}>Pro vĩnh viễn</strong>.
+                        Gói <strong style={{ color: '#f59e0b' }}>
+                        {order?.durationLabel || 'Pro'}</strong> đã được kích hoạt.
                         <br />Toàn bộ tính năng AI đã được mở khóa!
                     </p>
                 </div>
@@ -97,7 +107,7 @@ export default function PaymentModal({ onClose, onSuccess }) {
 
                 <h2 style={{ margin: '0 0 4px', fontSize: 20, fontWeight: 900, textAlign: 'center', color: 'var(--text-main)' }}>
                     <CreditCard size={20} style={{ marginRight: 6, verticalAlign: -3 }} />
-                    Thanh toán nâng cấp Pro
+                    Thanh toán {order?.durationLabel || 'Pro'}
                 </h2>
                 <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--text-muted)', margin: '0 0 16px' }}>
                     Quét QR hoặc chuyển khoản ngân hàng
@@ -108,9 +118,8 @@ export default function PaymentModal({ onClose, onSuccess }) {
                         <Loader size={32} className="spin" style={{ color: 'var(--brand)' }} />
                         <p style={{ color: 'var(--text-muted)', fontSize: 13, marginTop: 12 }}>Đang tạo đơn hàng...</p>
                     </div>
-                ) : order ? (
+                ) : order && bankDisplay ? (
                     <>
-                        {/* QR Code */}
                         <div style={{
                             background: '#fff', borderRadius: 12, padding: 12,
                             display: 'flex', justifyContent: 'center', marginBottom: 16
@@ -123,20 +132,19 @@ export default function PaymentModal({ onClose, onSuccess }) {
                             />
                         </div>
 
-                        {/* Bank Info */}
                         <div style={{
                             background: 'var(--bg-main)', borderRadius: 12, padding: 14,
                             fontSize: 13, display: 'flex', flexDirection: 'column', gap: 8,
                             border: '1px solid var(--border-color)', marginBottom: 16
                         }}>
-                            <InfoRow label="Ngân hàng" value={BANK_DISPLAY.bankName} />
+                            <InfoRow label="Ngân hàng" value={bankDisplay.bankName} />
                             <InfoRow
                                 label="Số tài khoản"
-                                value={BANK_DISPLAY.accountNo}
-                                onCopy={() => copyText(BANK_DISPLAY.accountNo, 'account')}
+                                value={bankDisplay.accountNo}
+                                onCopy={() => copyText(bankDisplay.accountNo, 'account')}
                                 copied={copied === 'account'}
                             />
-                            <InfoRow label="Chủ TK" value={BANK_DISPLAY.accountName} />
+                            <InfoRow label="Chủ TK" value={bankDisplay.accountName} />
                             <InfoRow
                                 label="Số tiền"
                                 value={`${order.amount.toLocaleString('vi-VN')}đ`}
@@ -153,7 +161,6 @@ export default function PaymentModal({ onClose, onSuccess }) {
                             />
                         </div>
 
-                        {/* Status */}
                         <div style={{
                             textAlign: 'center', fontSize: 12, color: 'var(--text-muted)',
                             display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6
@@ -166,7 +173,7 @@ export default function PaymentModal({ onClose, onSuccess }) {
                             textAlign: 'center', fontSize: 11, color: 'var(--text-muted)',
                             margin: '8px 0 0', opacity: 0.7
                         }}>
-                            ⚠️ Ghi đúng nội dung chuyển khoản: <strong>{order.code}</strong>
+                            Ghi đúng nội dung chuyển khoản: <strong>{order.code}</strong>
                             <br />Hệ thống sẽ tự động kích hoạt trong 1-5 phút sau khi thanh toán.
                         </p>
                     </>
@@ -178,7 +185,6 @@ export default function PaymentModal({ onClose, onSuccess }) {
     )
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 function InfoRow({ label, value, onCopy, copied, highlight }) {
     return (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

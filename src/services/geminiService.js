@@ -6,9 +6,9 @@
  *
  * Gemini endpoint: https://generativelanguage.googleapis.com/v1beta/models/...
  *
- * Models (verified from nano-banana-2 CLI source):
- *   - gemini-3.1-flash-image-preview → Nano Banana 2 (text+vision+image gen)
- *   - gemini-3-pro-image-preview     → Nano Banana Pro (highest quality)
+ * Models đang dùng (verified):
+ *   - gemini-3.1-flash-image-preview → Nano Banana 2 — text + vision + image gen (MODEL_TEXT)
+ *   - gemini-3-pro-image-preview     → Nano Banana Pro — image gen chất lượng cao (MODEL_IMAGE)
  * ─────────────────────────────────────────────────────────────────────────────
  */
 
@@ -16,8 +16,27 @@ import { getNextApiKey } from './apiKeyService'
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models'
-const MODEL_FLASH = 'gemini-3.1-flash-image-preview'  // Nano Banana 2
-const MODEL_IMAGE = 'gemini-3.1-flash-image-preview'  // Same model for image gen
+
+// 2 model được xác nhận hoạt động:
+const MODEL_TEXT  = 'gemini-3.1-flash-image-preview'  // Nano Banana 2 — text+vision (verified)
+const MODEL_IMAGE = 'gemini-3-pro-image-preview'       // Nano Banana Pro — vẽ ảnh chất lượng cao
+
+export { MODEL_TEXT }
+
+// ── Kiểm tra lỗi có phải do model không tồn tại ──────────────────────────────
+function isModelNotFoundError(status, msg) {
+  if (status === 404) return true
+  const m = typeof msg === 'string' ? msg.toLowerCase() : ''
+  return (
+    m.includes('not found') ||
+    m.includes('does not exist') ||
+    m.includes('is not supported') ||
+    m.includes('not supported for generatecontent') ||
+    m.includes('model is not available') ||
+    m.includes('deprecated') ||
+    m.includes('invalid model')
+  )
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -40,6 +59,32 @@ function getMimeType(file) {
   return file.type || 'image/jpeg'
 }
 
+/**
+ * Nén ảnh xuống maxPx (cạnh dài nhất) trước khi gửi API text analysis.
+ * Tránh request quá lớn khi ảnh gốc từ điện thoại (10-20MB/ảnh).
+ * Trả về base64 string (không có prefix data:...).
+ */
+function resizeToBase64(file, maxPx = 768) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    const url = URL.createObjectURL(file)
+    img.onload = () => {
+      URL.revokeObjectURL(url)
+      const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h)
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+      resolve(dataUrl.split(',')[1])
+    }
+    img.onerror = reject
+    img.src = url
+  })
+}
+
 // ─── Core call ────────────────────────────────────────────────────────────────
 
 /**
@@ -53,21 +98,20 @@ function getMimeType(file) {
  * @param {number}  [opts.maxTokens]   — Mặc định 8192
  * @returns {Promise<string>}           — Text response từ Gemini
  */
-export async function callGemini({ prompt, images = [], model = MODEL_FLASH, temperature = 0.3, maxTokens = 8192 }) {
+export async function callGemini({ prompt, images = [], model = MODEL_TEXT, temperature = 0.3, maxTokens = 8192 }) {
   const apiKey = getNextApiKey()
   if (!apiKey) {
     throw new Error('Chưa có API key nào. Vui lòng thêm key trong Cài đặt → API Keys.')
   }
 
-  // Build parts
+  // Build parts — nén ảnh xuống 768px để tránh request quá lớn
   const parts = []
 
-  // Thêm ảnh trước (best practice multimodal)
   for (const img of images) {
-    const base64 = await fileToBase64(img)
+    const base64 = await resizeToBase64(img, 768).catch(() => fileToBase64(img))
     parts.push({
       inline_data: {
-        mime_type: getMimeType(img),
+        mime_type: 'image/jpeg',
         data: base64,
       },
     })
@@ -102,8 +146,6 @@ export async function callGemini({ prompt, images = [], model = MODEL_FLASH, tem
   }
 
   const data = await res.json()
-
-  // Lấy text từ response
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text
   if (!text) throw new Error('Gemini không trả về nội dung. Hãy thử lại.')
   return text
@@ -180,17 +222,16 @@ export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
   const imageParts = []
 
   // Add reference face images FIRST (img1, img2...) for identity lock
+  // Resize to 1024px max to keep payload manageable (avoids "failed to fetch" with large phone photos)
   const refFiles = opts.referenceFiles || []
   for (const refFile of refFiles) {
-    const refBase64 = await fileToBase64(refFile)
-    const refMime = getMimeType(refFile)
-    imageParts.push({ inline_data: { mime_type: refMime, data: refBase64 } })
+    const refBase64 = await resizeToBase64(refFile, 1024).catch(() => fileToBase64(refFile))
+    imageParts.push({ inline_data: { mime_type: 'image/jpeg', data: refBase64 } })
   }
 
-  // Add product image AFTER references
-  const base64Img = await fileToBase64(imageFile)
-  const mime = getMimeType(imageFile)
-  imageParts.push({ inline_data: { mime_type: mime, data: base64Img } })
+  // Add product image AFTER references — also resize to avoid huge payloads
+  const base64Img = await resizeToBase64(imageFile, 1024).catch(() => fileToBase64(imageFile))
+  imageParts.push({ inline_data: { mime_type: 'image/jpeg', data: base64Img } })
 
   // Gemini Image Gen: IMAGEs before TEXT
   const body = {
@@ -215,9 +256,6 @@ export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
   }
 
   const url = `${BASE_URL}/${MODEL_IMAGE}:generateContent?key=${apiKey}`
-
-  console.log('[GarmentGen] Calling model:', MODEL_IMAGE, '| imageSize:', apiImageSize, '| aspectRatio:', apiAspectRatio, '| prompt length:', itemPrompt.length)
-
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -226,7 +264,6 @@ export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => res.statusText)
-    console.error('[GarmentGen] API Error:', res.status, errText)
     let errMsg = `Gemini Image API lỗi (${res.status})`
     try {
       const errJson = JSON.parse(errText)
@@ -236,28 +273,18 @@ export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
   }
 
   const data = await res.json()
-  console.log('[GarmentGen] Response candidates:', data?.candidates?.length)
+  const responseParts = data?.candidates?.[0]?.content?.parts || []
 
-  const parts = data?.candidates?.[0]?.content?.parts || []
-
-  // Tìm phần image trong response
-  for (const part of parts) {
-    if (part.inlineData) {
+  for (const part of responseParts) {
+    const imgData = part.inlineData || part.inline_data
+    if (imgData) {
       return {
-        base64: part.inlineData.data,
-        mimeType: part.inlineData.mimeType || 'image/png',
-      }
-    }
-    if (part.inline_data) {
-      return {
-        base64: part.inline_data.data,
-        mimeType: part.inline_data.mime_type || 'image/png',
+        base64: imgData.data,
+        mimeType: imgData.mimeType || imgData.mime_type || 'image/jpeg',
       }
     }
   }
 
-  // Log full response nếu không tìm thấy ảnh
-  console.error('[GarmentGen] No image in response. Parts:', JSON.stringify(parts).slice(0, 500))
   throw new Error('Gemini không trả về ảnh. Hãy thử lại hoặc đổi prompt.')
 }
 

@@ -2,7 +2,7 @@
  * cloudStorageService.js
  * Upload/download images to Firebase Storage (cloud)
  */
-import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage'
+import { ref, uploadString, getDownloadURL, deleteObject, getBlob } from 'firebase/storage'
 import { storage } from './firebaseConfig'
 
 /**
@@ -42,4 +42,38 @@ export async function getCloudImageUrl(userId, imageId) {
     } catch {
         return null
     }
+}
+
+/**
+ * Download ảnh từ bất kỳ URL nào thành Blob.
+ * - data URL  → decode trực tiếp (không fetch, không CORS)
+ * - Firebase Storage URL → dùng Firebase SDK getBlob() (auth + CORS tự động)
+ * - URL khác → fetch() thông thường
+ */
+export async function downloadImageAsBlob(url) {
+    if (!url) throw new Error('Không có URL ảnh.')
+
+    // Data URL — decode trực tiếp
+    if (url.startsWith('data:')) {
+        const [header, b64] = url.split(',')
+        const mime = header.match(/:(.*?);/)?.[1] || 'image/jpeg'
+        const bytes = atob(b64)
+        const arr = new Uint8Array(bytes.length)
+        for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i)
+        return new Blob([arr], { type: mime })
+    }
+
+    // Firebase Storage URL — dùng SDK (xử lý auth + CORS, không bị chặn)
+    if (url.includes('firebasestorage.googleapis.com')) {
+        const match = url.match(/\/o\/(.+?)(\?|$)/)
+        if (match) {
+            const path = decodeURIComponent(match[1])
+            return await getBlob(ref(storage, path))
+        }
+    }
+
+    // URL thông thường — fetch
+    const resp = await fetch(url)
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+    return await resp.blob()
 }
