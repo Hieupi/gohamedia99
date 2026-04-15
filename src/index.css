@@ -4196,7 +4196,7 @@ textarea {
   --brand-08: rgba(192, 132, 252, 0.08);
 
   --white: #1a1a2e;
-  --bg-page: #0f0f1e;
+  --bg-page: #555b66;
   --bg-card: #171728;
   --surface: #1e1e35;
   --border: #28284a;
@@ -4215,7 +4215,7 @@ textarea {
 }
 
 [data-theme="dark"] body {
-  background: #0f0f1e;
+  background: #555b66;
   color: #f0f0f8;
 }
 
@@ -4400,7 +4400,7 @@ textarea {
   --brand-08: rgba(201, 168, 76, 0.08);
 
   --white: #181816;
-  --bg-page: #0c0c0a;
+  --bg-page: #5a5a54;
   --bg-card: #141412;
   --surface: #1c1c18;
   --border: #2a2a24;
@@ -4418,7 +4418,7 @@ textarea {
   color-scheme: dark;
 }
 
-[data-theme="luxury"] body { background: #0c0c0a; color: #f0ead6; }
+[data-theme="luxury"] body { background: #5a5a54; color: #f0ead6; }
 
 /* Sidebar — noir with gold accent */
 [data-theme="luxury"] .sidebar {
