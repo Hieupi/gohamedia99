@@ -126,6 +126,11 @@ SCENE DESIGN PRINCIPLES (NON-NEGOTIABLE):
 3. Background is IDENTICAL across all 4 scenes — only KOL pose/expression changes
 4. Each scene MUST have built-in motion dynamics: fabric flow, hair movement, implied kinetic energy
 5. All 4 scenes must feel like frames from ONE coherent fashion film
+6. MANDATORY SHOT FRAMING (strictly enforce camera distance):
+   - Scene 1 (Opening Hero): FULL BODY — frame head to toe, complete figure and outfit fully visible, no cropping at legs/feet
+   - Scene 2 (Dynamic Energy): FULL BODY — frame head to toe, dynamic full-figure movement, complete silhouette
+   - Scene 3 (Emotional Climax): MEDIUM SHOT — frame from waist up, focus on face expression and upper outfit detail
+   - Scene 4 (Rear Silhouette): FULL BODY REAR — frame head to toe from behind, complete rear silhouette
 
 OUTPUT strictly as valid JSON (no extra text, no markdown):
 {
@@ -140,7 +145,14 @@ OUTPUT strictly as valid JSON (no extra text, no markdown):
   ]
 }`
 
-function buildScenePrompt(plan, sceneIdx, quality, aspect, bgPreset, mood, hasBgImage, hasPoseImage) {
+const SHOT_FRAMES = [
+  'FULL BODY SHOT — frame from head to toe. Show the COMPLETE figure: face, torso, arms, legs, and feet fully visible. Do NOT crop at the knees or waist.',
+  'FULL BODY SHOT — frame from head to toe. Show the COMPLETE figure in dynamic motion: face, torso, arms, legs, and feet all in frame. No cropping below the waist.',
+  'MEDIUM SHOT — frame from waist/hip up. Fill the frame with the upper body, emphasize the face expression, shoulder/neckline detail, and upper outfit.',
+  'FULL BODY REAR SHOT — frame from head to toe from behind. Complete rear silhouette fully visible from head to feet.',
+]
+
+function buildScenePrompt(plan, sceneIdx, quality, aspect, bgPreset, mood, hasBgImage, hasPoseImage, editInstruction) {
   const sc     = plan.scenes[sceneIdx]
   const kol    = plan.kol
   const outfit = plan.outfit
@@ -219,12 +231,16 @@ Image must feel ALIVE — not static — perfect for Kling AI video input.
 ${beautyBlock}
 ${mood && mood !== '🤖 AI tự chọn' ? `\n═══ MOOD ═══\nAesthetic direction: ${mood}.` : ''}
 
+═══ SHOT FRAMING — MANDATORY ═══
+${SHOT_FRAMES[sceneIdx]}
+This is the camera framing rule — do not override it.
+
 ═══ TECHNICAL QUALITY ═══
 Hyper-photorealistic 8K commercial fashion photography. Shot on Sony A7IV + 85mm f/1.4 lens.
 ISO 100, perfect exposure, cinematic color grading. Zero AI artifacts. Skin pores visible.
 Image must look like a real high-end fashion magazine photo — indistinguishable from reality.
 Aspect ratio: ${rawA}. Resolution: ${rawQ}.
-
+${editInstruction ? `\n═══ EDIT INSTRUCTION (PRIORITY — APPLY THIS) ═══\n${editInstruction}` : ''}
 Generate Scene ${sc.num} now.`
 }
 
@@ -393,12 +409,24 @@ function Slot({ src, onRemove, onUpload, onLibrary, label }) {
 /* ═══════════════════════════════════════════════════════════════════════════
    SCENE CARD
    ═══════════════════════════════════════════════════════════════════════════ */
-function SceneCard({ idx, scene, result, isLoading, error, klingSelected, onToggleKling, onRetry, onDownload }) {
-  const [saveOk, setSaveOk] = useState(false)
-  const [saving, setSaving] = useState(false)
+function SceneCard({ idx, scene, result, isLoading, error, klingSelected, onToggleKling, onRetry, onEditRedraw, onDownload }) {
+  const [saveOk, setSaveOk]       = useState(false)
+  const [saving, setSaving]       = useState(false)
+  const [editText, setEditText]   = useState('')
+  const [editOpen, setEditOpen]   = useState(false)
+  const [editBusy, setEditBusy]   = useState(false)
   const NAMES = ['Opening Hero', 'Dynamic Energy', 'Emotional Climax', 'Rear Silhouette']
   const accent = [C.s1, C.s2, C.s3, C.green][idx]
   const dataUrl = result ? `data:${result.mimeType};base64,${result.base64}` : null
+
+  async function handleEditRedraw() {
+    if (!editText.trim() || editBusy) return
+    setEditBusy(true)
+    await onEditRedraw(idx, editText.trim())
+    setEditBusy(false)
+    setEditText('')
+    setEditOpen(false)
+  }
 
   async function handleSave() {
     if (!dataUrl) return
@@ -520,6 +548,60 @@ function SceneCard({ idx, scene, result, isLoading, error, klingSelected, onTogg
               {b.icon} {b.label}
             </button>
           ))}
+        </div>
+      )}
+
+      {/* Edit / Redraw chat */}
+      {(dataUrl || error) && (
+        <div style={{ borderTop: `1px solid ${C.b1}` }}>
+          {!editOpen ? (
+            <button onClick={() => setEditOpen(true)} className="pd-action" style={{
+              width: '100%', padding: '8px 14px',
+              background: 'none', border: 'none', cursor: 'pointer',
+              color: C.t3, fontSize: 11, fontWeight: 600,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            }}>
+              <Zap size={11} color={C.or} />
+              Yêu cầu chỉnh sửa / Vẽ lại
+            </button>
+          ) : (
+            <div style={{ padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <textarea
+                value={editText}
+                onChange={e => setEditText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleEditRedraw() }}
+                placeholder="Mô tả chỉnh sửa... (vd: thay nền thành biển, váy đỏ hơn, nhìn sang trái...)"
+                rows={2}
+                style={{
+                  width: '100%', background: C.bg0, border: `1px solid ${C.b2}`,
+                  borderRadius: 8, padding: '8px 10px', color: C.t1,
+                  fontSize: 12, lineHeight: 1.5, resize: 'none', outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+                autoFocus
+              />
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button onClick={() => { setEditOpen(false); setEditText('') }} style={{
+                  flex: 1, padding: '7px 0', borderRadius: 7,
+                  border: `1px solid ${C.b2}`, background: 'none',
+                  color: C.t3, cursor: 'pointer', fontSize: 11, fontWeight: 600,
+                }}>Huỷ</button>
+                <button onClick={handleEditRedraw} disabled={!editText.trim() || editBusy} style={{
+                  flex: 2, padding: '7px 0', borderRadius: 7, border: 'none',
+                  background: editBusy ? C.b2 : `linear-gradient(90deg, ${C.or}, ${C.re})`,
+                  color: '#fff', cursor: editText.trim() && !editBusy ? 'pointer' : 'not-allowed',
+                  fontSize: 11, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+                  opacity: !editText.trim() ? 0.5 : 1,
+                }}>
+                  {editBusy
+                    ? <><div style={{ width: 10, height: 10, borderRadius: '50%', border: `1.5px solid rgba(255,255,255,0.4)`, borderTopColor: '#fff', animation: 'spin 0.8s linear infinite' }} /> Đang vẽ...</>
+                    : <><Zap size={11} /> Vẽ lại</>
+                  }
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -651,7 +733,7 @@ export default function PhoiDoPage() {
     }
   }
 
-  async function retryScene(idx) {
+  async function retryScene(idx, editInstruction = '') {
     if (!plan) return
     const refFiles    = await Promise.all(refEntries.map((e, i) => entryToFile(e, `ref-${i}.jpg`)))
     const outfitFiles = await Promise.all(outfitEntries.map((e, i) => entryToFile(e, `outfit-${i}.jpg`)))
@@ -662,7 +744,7 @@ export default function PhoiDoPage() {
     setLoading(p => { const n = [...p]; n[idx] = true; return n })
     setErrors(p => { const n = [...p]; n[idx] = null; return n })
     try {
-      const prompt = buildScenePrompt(plan, idx, quality, aspect, bgPreset, mood, !!bgFile, !!poseFileR)
+      const prompt = buildScenePrompt(plan, idx, quality, aspect, bgPreset, mood, !!bgFile, !!poseFileR, editInstruction)
       const result = await generateGarmentImage(mainImg, prompt, { quality, aspect, referenceFiles: genRefs })
       setResults(p => { const n = [...p]; n[idx] = result; return n })
     } catch (err) { setErrors(p => { const n = [...p]; n[idx] = err.message; return n }) }
@@ -1087,6 +1169,7 @@ export default function PhoiDoPage() {
                 klingSelected={klingSelected.includes(i)}
                 onToggleKling={() => toggleKling(i)}
                 onRetry={() => retryScene(i)}
+                onEditRedraw={(idx, instruction) => retryScene(idx, instruction)}
                 onDownload={() => results[i] && downloadImage(
                   `data:${results[i].mimeType};base64,${results[i].base64}`,
                   `phoi-do-${i + 1}-${Date.now()}.jpg`
