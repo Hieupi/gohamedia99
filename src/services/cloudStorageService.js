@@ -44,6 +44,23 @@ export async function getCloudImageUrl(userId, imageId) {
     }
 }
 
+async function fetchBlobWithTimeout(url, timeoutMs = 25000) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+        const resp = await fetch(url, { signal: controller.signal, cache: 'no-store' })
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
+        return await resp.blob()
+    } catch (err) {
+        if (err?.name === 'AbortError') {
+            throw new Error(`Timeout loading image (${Math.round(timeoutMs / 1000)}s)`)
+        }
+        throw err
+    } finally {
+        clearTimeout(timer)
+    }
+}
+
 /**
  * Download ảnh từ bất kỳ URL nào thành Blob.
  * - data URL  → decode trực tiếp (không fetch, không CORS)
@@ -64,16 +81,23 @@ export async function downloadImageAsBlob(url) {
     }
 
     // Firebase Storage URL — dùng SDK (xử lý auth + CORS, không bị chặn)
-    if (url.includes('firebasestorage.googleapis.com')) {
+    if (url.includes('firebasestorage.googleapis.com') || url.includes('storage.googleapis.com')) {
         const match = url.match(/\/o\/(.+?)(\?|$)/)
         if (match) {
             const path = decodeURIComponent(match[1])
-            return await getBlob(ref(storage, path))
+            try {
+                return await getBlob(ref(storage, path))
+            } catch (sdkErr) {
+                try {
+                    return await fetchBlobWithTimeout(url)
+                } catch {
+                    const code = sdkErr?.code ? `${sdkErr.code}: ` : ''
+                    throw new Error(`${code}${sdkErr?.message || 'Không tải được ảnh từ Firebase Storage.'}`)
+                }
+            }
         }
     }
 
     // URL thông thường — fetch
-    const resp = await fetch(url)
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`)
-    return await resp.blob()
+    return await fetchBlobWithTimeout(url)
 }
