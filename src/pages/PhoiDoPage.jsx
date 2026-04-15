@@ -17,23 +17,29 @@ import { downloadImageAsBlob } from '../services/cloudStorageService'
    Black base · Orange primary · Blue & Fuchsia accents
    ═══════════════════════════════════════════════════════════════════════════ */
 const C = {
-  // Backgrounds (layered zinc)
-  bg0: '#09090b',     // page
-  bg1: '#111113',     // card
-  bg2: '#1a1a1f',     // elevated
-  bg3: '#232329',     // highest
+  // Backgrounds (layered — slightly lighter dark)
+  bg0: '#131318',     // page
+  bg1: '#1c1c24',     // card
+  bg2: '#25252f',     // elevated
+  bg3: '#2e2e3a',     // highest
 
   // Borders
-  b1: '#27272a',      // subtle
-  b2: '#3f3f46',      // medium
-  b3: '#52525b',      // strong (hover)
+  b1: '#2e2e38',      // subtle
+  b2: '#45455a',      // medium
+  b3: '#5a5a72',      // strong (hover)
 
   // Text
   t1: '#fafafa',      // primary
   t2: '#a1a1aa',      // secondary
   t3: '#71717a',      // muted
 
-  // Orange — primary action, energy
+  // Red — primary hero accent
+  re:   '#dc2626',
+  reL:  '#ef4444',
+  reBg: 'rgba(220,38,38,0.10)',
+  reBd: 'rgba(220,38,38,0.30)',
+
+  // Orange — action, energy
   or:   '#f97316',
   orL:  '#fb923c',
   orBg: 'rgba(249,115,22,0.08)',
@@ -100,80 +106,123 @@ const MOOD_OPTS = [
 const BRAIN_PHOIDО_PLAN = `You are a professional fashion film director and creative director specializing in KOL content for Vietnamese social media.
 
 You receive:
-- KOL reference photo(s): face, hair, skin tone, body
+- KOL reference photo(s): face, hair, skin tone, body — MUST be replicated with absolute 100% accuracy
 - Outfit/product photo(s): what is being showcased
 - Optional: background reference image (highest priority — use this exact location/scene)
 
-YOUR MISSION: Create a PRECISE SHOOTING PLAN for 3 coherent scenes optimized for Kling AI video input.
+YOUR MISSION: Create a PRECISE SHOOTING PLAN for 4 coherent scenes optimized for Kling AI video input.
 
 ANALYSIS RULES:
-- Detect KOL gender, skin tone, hair, body proportions accurately
+- Detect and METICULOUSLY describe KOL: gender, skin tone (exact hex-like description), hair (color+length+texture+style), face (eye shape+color, nose shape, lip shape, jaw, cheekbones, eyebrows — every detail for identity lock)
+- KOL body: waist-to-hip ratio, leg length, chest, overall figure proportions
 - Identify the outfit: type, color palette, material, key detail to feature
 - If a background reference image was provided, describe it precisely and use it as the locked background
 - Otherwise, choose ONE perfect background that matches the outfit's mood
-- Design 3 scenes forming a narrative arc: Opening → Movement → Emotional Climax
+- Design 4 scenes forming a narrative arc: Opening Hero → Dynamic Energy → Emotional Climax → Rear Silhouette
 
 SCENE DESIGN PRINCIPLES (NON-NEGOTIABLE):
-1. KOL ALWAYS faces camera in all 3 scenes — direct eye contact with lens
-2. Background is IDENTICAL across all 3 scenes — only the KOL's pose/expression changes
-3. Each scene MUST have built-in motion dynamics: fabric flow, hair movement, implied kinetic energy
-4. All 3 scenes must feel like frames from ONE coherent fashion film
+1. Scenes 1–3: KOL faces camera with DIRECT eye contact with lens
+2. Scene 4 ONLY: KOL turns her BACK fully to the camera — rear silhouette shot — NO face visible
+3. Background is IDENTICAL across all 4 scenes — only KOL pose/expression changes
+4. Each scene MUST have built-in motion dynamics: fabric flow, hair movement, implied kinetic energy
+5. All 4 scenes must feel like frames from ONE coherent fashion film
 
 OUTPUT strictly as valid JSON (no extra text, no markdown):
 {
-  "kol": { "gender": "male/female", "skinTone": "description", "hair": "color, length, texture, style", "face": "key facial features for identity lock" },
+  "kol": { "gender": "male/female", "skinTone": "description", "hair": "color, length, texture, style", "face": "EXTREMELY DETAILED: eye shape+color+lashes, nose shape, lip color+shape, jaw+chin, cheekbones, skin texture, eyebrows — every feature needed to reproduce this exact face", "body": "figure description: height impression, waist, hips, legs, chest, overall silhouette" },
   "outfit": { "description": "full outfit description", "colors": "color palette", "keyDetail": "most photogenic feature", "material": "fabric feel" },
-  "lockedBackground": "VERY SPECIFIC description of the ONE background for all 3 scenes — lighting, colors, textures, depth, atmosphere.",
+  "lockedBackground": "VERY SPECIFIC description of the ONE background for all 4 scenes — lighting, colors, textures, depth, atmosphere.",
   "scenes": [
     { "num": 1, "name": "Opening Hero", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "klingNote": "..." },
     { "num": 2, "name": "Dynamic Energy", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "klingNote": "..." },
-    { "num": 3, "name": "Emotional Climax", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "klingNote": "..." }
+    { "num": 3, "name": "Emotional Climax", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "klingNote": "..." },
+    { "num": 4, "name": "Rear Silhouette", "poseEN": "KOL standing with back fully turned to camera, slight hip tilt for elegance", "motionEN": "hair gently blowing, fabric of outfit visible from behind, full rear silhouette", "expressionEN": "NO face visible — back of head and hair only", "outfitFocusEN": "Full back view of outfit — back design, silhouette, drape, back details", "klingNote": "Rear-view signature shot — back of outfit showcase" }
   ]
 }`
 
-function buildScenePrompt(plan, sceneIdx, quality, aspect, bgPreset, mood, hasBgImage) {
+function buildScenePrompt(plan, sceneIdx, quality, aspect, bgPreset, mood, hasBgImage, hasPoseImage) {
   const sc     = plan.scenes[sceneIdx]
   const kol    = plan.kol
   const outfit = plan.outfit
   const rawQ   = quality.match(/([124]K)/i)?.[1]?.toUpperCase() || '2K'
   const rawA   = typeof aspect === 'string' ? (aspect.match(/\d+:\d+/)?.[0] || '9:16') : aspect
+  const isRearScene = sceneIdx === 3
 
   const bgLine = hasBgImage
     ? 'Background: Use the EXACT background from the reference photo provided (last image in the reference set). Replicate its location, lighting, colors, and atmosphere precisely.'
     : `Background: ${plan.lockedBackground}`
 
-  return `TASK: Generate a high-fashion KOL outfit photo — Scene ${sc.num}/3 "${sc.name}".
+  const faceBlock = isRearScene
+    ? `═══ FACE / IDENTITY ═══
+KOL BACK IS FULLY TURNED TO CAMERA — rear silhouette only.
+NO face visible whatsoever. Show only the back of the head, hair, and the outfit from behind.
+Hair: ${kol.hair}. Skin tone (back/arms): ${kol.skinTone}.`
+    : `═══ ABSOLUTE FACE IDENTITY LOCK — CRITICAL ═══
+You MUST reproduce the EXACT face from the reference photos with 100% accuracy. This is non-negotiable.
+• Eye shape: ${kol.face}
+• Hair: ${kol.hair}
+• Skin tone: ${kol.skinTone} — porcelain-smooth, luminous, flawless
+• Every facial feature (eyes, nose, lips, jaw, cheekbones, eyebrows) must be IDENTICAL to the reference photo
+• DO NOT simplify, generalize, or alter ANY facial feature — copy it pixel-perfect
+• Same face, same identity, same person as in the reference — viewers must recognize her instantly
+BODY: ${kol.body || 'tall, slender hourglass figure — long legs, slim waist, feminine curves'}`
 
-═══ IDENTITY LOCK ═══
-KOL: ${kol.gender}, skin tone: ${kol.skinTone}, hair: ${kol.hair}. Face: ${kol.face}.
-Keep all features identical to the reference photos. DO NOT alter face, hair, or skin tone.
+  const cameraBlock = isRearScene
+    ? `═══ CAMERA DIRECTION — REAR SHOT ═══
+Full rear silhouette. KOL's back to lens. Slight hip tilt for elegance.
+Capture the complete back of the outfit — drape, back design, silhouette line.
+Hair flowing naturally down the back. Arms relaxed at sides or one hand on hip.`
+    : `═══ CAMERA EYE CONTACT — NON-NEGOTIABLE ═══
+KOL looks DIRECTLY into the camera lens. Confident, direct gaze at the viewer.
+Eyes fully open, engaging, magnetic — the viewer must feel seen.`
+
+  const beautyBlock = isRearScene ? '' : `
+═══ COMMERCIAL BEAUTY STANDARD ═══
+• Skin: porcelain white, glowing, flawless — zero blemishes, ultra smooth texture
+• Figure: tall statuesque model proportions — hourglass silhouette, slim waist, long elegant legs
+• Hair: perfectly styled, lustrous, natural movement
+• Overall: she looks stunning, elegant, naturally beautiful — ready for high-end commercial sales`
+
+  const poseBlock = (hasPoseImage && !isRearScene) ? `
+═══ POSE REFERENCE — REPLICATE EXACTLY ═══
+A body pose reference photo is provided. You MUST replicate the EXACT body posture:
+• Stance and weight distribution (which leg bears weight, hip tilt)
+• Arm positions and hand placement
+• Torso angle and shoulder line
+• Head tilt and neck angle
+Maintain this fundamental pose structure while naturally fitting the scene's energy.` : ''
+
+  return `TASK: Generate a hyper-realistic commercial fashion KOL photo — Scene ${sc.num}/4 "${sc.name}".
+
+${faceBlock}
+${poseBlock}
 
 ═══ OUTFIT ═══
 ${outfit.description}. Colors: ${outfit.colors}. Material: ${outfit.material}.
-Key visual focus: ${outfit.keyDetail}.
+Key visual focus: ${sc.outfitFocusEN || outfit.keyDetail}.
 
 ═══ SCENE DIRECTION ═══
 ${sc.poseEN}
 ${sc.motionEN}
 ${sc.expressionEN}
-${sc.outfitFocusEN}
 
-═══ CRITICAL — CAMERA EYE CONTACT ═══
-KOL MUST look DIRECTLY into the camera lens. Eyes locked on viewer. Non-negotiable in every scene.
+${cameraBlock}
 
-═══ BACKGROUND (LOCKED — SAME ALL 3 SCENES) ═══
+═══ BACKGROUND (LOCKED — SAME ALL 4 SCENES) ═══
 ${bgLine}
 Do NOT change background between scenes.
 
-═══ MOTION DYNAMICS ═══
+═══ MOTION & LIFE ═══
 ${sc.motionEN}
-Additional: fabric movement suggesting model just arrived at pose, natural breath movement, hair subtly lifted.
-Image must feel alive — not static — perfect for Kling AI video input.
-
-${mood && mood !== '🤖 AI tự chọn' ? `═══ MOOD ═══\nAesthetic direction: ${mood}.` : ''}
+Fabric movement suggesting model just settled into pose. Natural breath. Hair subtly lifted by air.
+Image must feel ALIVE — not static — perfect for Kling AI video input.
+${beautyBlock}
+${mood && mood !== '🤖 AI tự chọn' ? `\n═══ MOOD ═══\nAesthetic direction: ${mood}.` : ''}
 
 ═══ TECHNICAL QUALITY ═══
-Ultra photorealistic 8K fashion photography. Sony A7IV + 85mm f/1.4, ISO 100.
+Hyper-photorealistic 8K commercial fashion photography. Shot on Sony A7IV + 85mm f/1.4 lens.
+ISO 100, perfect exposure, cinematic color grading. Zero AI artifacts. Skin pores visible.
+Image must look like a real high-end fashion magazine photo — indistinguishable from reality.
 Aspect ratio: ${rawA}. Resolution: ${rawQ}.
 
 Generate Scene ${sc.num} now.`
@@ -235,6 +284,7 @@ const CSS = `
   }
   .pd-scene:nth-child(2) { animation-delay: 80ms }
   .pd-scene:nth-child(3) { animation-delay: 160ms }
+  .pd-scene:nth-child(4) { animation-delay: 240ms }
   .pd-scene:hover {
     transform: translateY(-6px);
     box-shadow: 0 20px 48px rgba(0,0,0,0.5);
@@ -245,7 +295,7 @@ const CSS = `
   }
   .pd-gen:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 10px 32px rgba(249,115,22,0.35);
+    box-shadow: 0 10px 32px rgba(220,38,38,0.45);
     filter: brightness(1.08);
   }
   .pd-gen:active:not(:disabled) {
@@ -346,8 +396,8 @@ function Slot({ src, onRemove, onUpload, onLibrary, label }) {
 function SceneCard({ idx, scene, result, isLoading, error, klingSelected, onToggleKling, onRetry, onDownload }) {
   const [saveOk, setSaveOk] = useState(false)
   const [saving, setSaving] = useState(false)
-  const NAMES = ['Opening Hero', 'Dynamic Energy', 'Emotional Climax']
-  const accent = [C.s1, C.s2, C.s3][idx]
+  const NAMES = ['Opening Hero', 'Dynamic Energy', 'Emotional Climax', 'Rear Silhouette']
+  const accent = [C.s1, C.s2, C.s3, C.green][idx]
   const dataUrl = result ? `data:${result.mimeType};base64,${result.base64}` : null
 
   async function handleSave() {
@@ -482,6 +532,7 @@ function SceneCard({ idx, scene, result, isLoading, error, klingSelected, onTogg
 export default function PhoiDoPage() {
   const [refEntries, setRefEntries]       = useState([])
   const [outfitEntries, setOutfitEntries] = useState([])
+  const [poseEntries, setPoseEntries]     = useState([])
   const [bgEntry, setBgEntry]             = useState(null)
   const [bgPreset, setBgPreset]           = useState('')
   const [bgPresetExpanded, setBgPresetExpanded] = useState(false)
@@ -493,9 +544,9 @@ export default function PhoiDoPage() {
   const [plan, setPlan]               = useState(null)
   const [planning, setPlanning]       = useState(false)
   const [planExpanded, setPlanExpanded] = useState(false)
-  const [results, setResults]         = useState([null, null, null])
-  const [loading, setLoading]         = useState([false, false, false])
-  const [errors, setErrors]           = useState([null, null, null])
+  const [results, setResults]         = useState([null, null, null, null])
+  const [loading, setLoading]         = useState([false, false, false, false])
+  const [errors, setErrors]           = useState([null, null, null, null])
   const [generating, setGenerating]   = useState(false)
   const [planError, setPlanError]     = useState('')
   const [klingSelected, setKlingSelected] = useState([])
@@ -505,6 +556,7 @@ export default function PhoiDoPage() {
 
   const refInput    = useRef()
   const outfitInput = useRef()
+  const poseInput   = useRef()
   const bgInput     = useRef()
   const generateBusyRef = useRef(false)
 
@@ -513,6 +565,7 @@ export default function PhoiDoPage() {
     const entries = Array.from(files).map(f => ({ file: f, url: URL.createObjectURL(f) }))
     if (type === 'ref')    setRefEntries(p => [...p, ...entries].slice(0, 3))
     if (type === 'outfit') setOutfitEntries(p => [...p, ...entries].slice(0, 2))
+    if (type === 'pose')   setPoseEntries(p => [...p, ...entries].slice(0, 1))
     if (type === 'bg')     setBgEntry(entries[0] || null)
   }
   function openPicker(type) { setPickerTarget(type); setPickerOpen(true) }
@@ -520,6 +573,7 @@ export default function PhoiDoPage() {
     const entry = { url: item.imageSrc || item.url, file: null }
     if (pickerTarget === 'ref')    setRefEntries(p => [...p, entry].slice(0, 3))
     if (pickerTarget === 'outfit') setOutfitEntries(p => [...p, entry].slice(0, 2))
+    if (pickerTarget === 'pose')   setPoseEntries(p => [...p, entry].slice(0, 1))
     if (pickerTarget === 'bg')     setBgEntry(entry)
     setPickerOpen(false)
   }
@@ -536,17 +590,19 @@ export default function PhoiDoPage() {
     if (refEntries.length === 0 && outfitEntries.length === 0) return
     generateBusyRef.current = true
     setPlanError(''); setPlan(null)
-    setResults([null, null, null]); setErrors([null, null, null]); setKlingSelected([])
-    setLoading([false, false, false])
+    setResults([null, null, null, null]); setErrors([null, null, null, null]); setKlingSelected([])
+    setLoading([false, false, false, false])
 
     setPlanning(true)
 
     let refFiles
     let outfitFiles
+    let poseFile
     let bgFile
     try {
       refFiles    = await Promise.all(refEntries.map((e, i) => entryToFile(e, `ref-${i}.jpg`)))
       outfitFiles = await Promise.all(outfitEntries.map((e, i) => entryToFile(e, `outfit-${i}.jpg`)))
+      poseFile    = poseEntries[0] ? await entryToFile(poseEntries[0], 'pose.jpg') : null
       bgFile      = bgEntry ? await entryToFile(bgEntry, 'bg.jpg') : null
     } catch (err) {
       setPlanError(`Lỗi xử lý ảnh đầu vào: ${err.message}`)
@@ -554,15 +610,16 @@ export default function PhoiDoPage() {
       generateBusyRef.current = false
       return
     }
-    const analysisImgs = [...refFiles, ...outfitFiles, ...(bgFile ? [bgFile] : [])].slice(0, 6)
+    const analysisImgs = [...refFiles, ...outfitFiles, ...(poseFile ? [poseFile] : []), ...(bgFile ? [bgFile] : [])].slice(0, 6)
 
     let scenePlan
     try {
       const bgNote = bgFile
         ? '\n\nBACKGROUND: User has provided a background reference photo (last image). Use it as the locked background for all 3 scenes — describe it precisely and replicate it exactly.'
         : bgPreset ? `\n\nBACKGROUND INSTRUCTION: User wants: "${bgPreset}". Use this as the locked background.` : ''
+      const poseNote = poseFile ? '\n\nPOSE REFERENCE: A body pose reference photo is included. Use this pose as the base body positioning for all scenes — the stance, arm positions, leg placement, and overall posture structure. Adapt naturally to each scene energy but keep the fundamental pose.' : ''
       const moodNote = mood !== '🤖 AI tự chọn' ? `\n\nMOOD: "${mood}"` : ''
-      const raw = await callGemini({ prompt: BRAIN_PHOIDО_PLAN + bgNote + moodNote, images: analysisImgs, temperature: 0.3, maxTokens: 4096 })
+      const raw = await callGemini({ prompt: BRAIN_PHOIDО_PLAN + bgNote + poseNote + moodNote, images: analysisImgs, temperature: 0.3, maxTokens: 4096 })
       scenePlan = parseJSON(raw)
       setPlan(scenePlan)
       setPlanExpanded(true)
@@ -576,12 +633,12 @@ export default function PhoiDoPage() {
 
     setGenerating(true)
     try {
-      const genRefs = [...refFiles, ...outfitFiles, ...(bgFile ? [bgFile] : [])].slice(0, 5)
+      const genRefs = [...refFiles, ...outfitFiles, ...(poseFile ? [poseFile] : []), ...(bgFile ? [bgFile] : [])].slice(0, 5)
       const mainImg = outfitFiles[0] || refFiles[0]
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < 4; i++) {
         setLoading(p => { const n = [...p]; n[i] = true; return n })
         try {
-          const prompt = buildScenePrompt(scenePlan, i, quality, aspect, bgPreset, mood, !!bgFile)
+          const prompt = buildScenePrompt(scenePlan, i, quality, aspect, bgPreset, mood, !!bgFile, !!poseFile)
           const result = await generateGarmentImage(mainImg, prompt, { quality, aspect, referenceFiles: genRefs })
           setResults(p => { const n = [...p]; n[i] = result; return n })
           setErrors(p => { const n = [...p]; n[i] = null; return n })
@@ -598,13 +655,14 @@ export default function PhoiDoPage() {
     if (!plan) return
     const refFiles    = await Promise.all(refEntries.map((e, i) => entryToFile(e, `ref-${i}.jpg`)))
     const outfitFiles = await Promise.all(outfitEntries.map((e, i) => entryToFile(e, `outfit-${i}.jpg`)))
+    const poseFileR   = poseEntries[0] ? await entryToFile(poseEntries[0], 'pose.jpg') : null
     const bgFile      = bgEntry ? await entryToFile(bgEntry, 'bg.jpg') : null
-    const genRefs = [...refFiles, ...outfitFiles, ...(bgFile ? [bgFile] : [])].slice(0, 5)
+    const genRefs = [...refFiles, ...outfitFiles, ...(poseFileR ? [poseFileR] : []), ...(bgFile ? [bgFile] : [])].slice(0, 5)
     const mainImg = outfitFiles[0] || refFiles[0]
     setLoading(p => { const n = [...p]; n[idx] = true; return n })
     setErrors(p => { const n = [...p]; n[idx] = null; return n })
     try {
-      const prompt = buildScenePrompt(plan, idx, quality, aspect, bgPreset, mood, !!bgFile)
+      const prompt = buildScenePrompt(plan, idx, quality, aspect, bgPreset, mood, !!bgFile, !!poseFileR)
       const result = await generateGarmentImage(mainImg, prompt, { quality, aspect, referenceFiles: genRefs })
       setResults(p => { const n = [...p]; n[idx] = result; return n })
     } catch (err) { setErrors(p => { const n = [...p]; n[idx] = err.message; return n }) }
@@ -632,52 +690,83 @@ export default function PhoiDoPage() {
 
   /* ─── RENDER ──────────────────────────────────────────────────────────── */
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '28px 18px 100px' }}>
+    <div style={{ background: C.bg0, minHeight: '100vh', margin: '-32px', padding: '0 0 100px' }}>
       <style>{CSS}</style>
 
       {pickerOpen && <LibraryPickerModal onSelect={handlePickLibrary} onClose={() => setPickerOpen(false)} />}
       <input ref={refInput}    type="file" accept="image/*" multiple hidden onChange={e => { addFiles(e.target.files, 'ref');    e.target.value = '' }} />
       <input ref={outfitInput} type="file" accept="image/*" multiple hidden onChange={e => { addFiles(e.target.files, 'outfit'); e.target.value = '' }} />
+      <input ref={poseInput}   type="file" accept="image/*"          hidden onChange={e => { addFiles(e.target.files, 'pose');   e.target.value = '' }} />
       <input ref={bgInput}     type="file" accept="image/*"          hidden onChange={e => { addFiles(e.target.files, 'bg');     e.target.value = '' }} />
 
-      {/* ═══ HEADER ═══ */}
-      <div style={{ marginBottom: 28, display: 'flex', alignItems: 'center', gap: 14 }}>
+      {/* ═══ HERO HEADER ═══ */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.re} 0%, #a01010 30%, #1a0808 60%, ${C.bg0} 100%)`,
+        padding: '36px 32px 28px',
+        marginBottom: 0,
+        position: 'relative',
+        overflow: 'hidden',
+      }}>
+        {/* Decorative glows */}
         <div style={{
-          width: 46, height: 46, borderRadius: 12, flexShrink: 0,
-          background: `linear-gradient(135deg, ${C.or}, #ea580c)`,
-          display: 'grid', placeItems: 'center',
-          boxShadow: '0 4px 20px rgba(249,115,22,0.25)',
-        }}>
-          <Sparkles size={20} color="#fff" />
-        </div>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 800, color: C.t1, letterSpacing: '-0.02em' }}>
-            Phối Đồ
-          </h1>
-          <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
-            {[
-              { t: '3 phân cảnh', c: C.or },
-              { t: 'Nền cố định', c: C.bl },
-              { t: 'KOL → Ống kính', c: C.fu },
-              { t: 'Motion', c: C.or },
-              { t: 'Kling-ready', c: C.fu },
-            ].map(tag => (
-              <span key={tag.t} style={{
-                fontSize: 9, fontWeight: 700, letterSpacing: '0.05em',
-                color: tag.c, background: `${tag.c}12`, border: `1px solid ${tag.c}30`,
-                padding: '2px 8px', borderRadius: 6,
-              }}>{tag.t}</span>
-            ))}
+          position: 'absolute', top: -40, right: -40,
+          width: 200, height: 200, borderRadius: '50%',
+          background: 'rgba(249,115,22,0.15)', filter: 'blur(60px)', pointerEvents: 'none',
+        }} />
+        <div style={{
+          position: 'absolute', bottom: -30, left: 80,
+          width: 140, height: 140, borderRadius: '50%',
+          background: 'rgba(220,38,38,0.12)', filter: 'blur(50px)', pointerEvents: 'none',
+        }} />
+
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, maxWidth: 760, margin: '0 auto' }}>
+          <div style={{
+            width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+            background: 'rgba(255,255,255,0.12)',
+            backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'grid', placeItems: 'center',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+          }}>
+            <Sparkles size={22} color="#fff" />
+          </div>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+              Phối Đồ
+            </h1>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {[
+                { t: '4 phân cảnh', c: '#fb923c' },
+                { t: 'Face Lock 100%', c: '#f87171' },
+                { t: 'Nền cố định', c: '#60a5fa' },
+                { t: 'POSE tham chiếu', c: '#fbbf24' },
+                { t: 'KOL → Ống kính', c: '#e879f9' },
+                { t: 'Quay lưng Scene 4', c: '#4ade80' },
+                { t: 'Kling-ready', c: '#e879f9' },
+              ].map(tag => (
+                <span key={tag.t} style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+                  color: tag.c,
+                  background: 'rgba(255,255,255,0.08)',
+                  border: `1px solid rgba(255,255,255,0.15)`,
+                  padding: '3px 9px', borderRadius: 20,
+                  backdropFilter: 'blur(4px)',
+                }}>{tag.t}</span>
+              ))}
+            </div>
           </div>
         </div>
       </div>
+
+      {/* ═══ CONTENT ═══ */}
+      <div style={{ maxWidth: 760, margin: '0 auto', padding: '24px 18px 0' }}>
 
       {/* ═══ SECTION 1: ASSETS ═══ */}
       <div className="pd-card" style={{ padding: '20px 18px', marginBottom: 12 }}>
         <p style={{ margin: '0 0 14px', fontSize: 11, fontWeight: 700, color: C.t2, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
           Tài nguyên đầu vào
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 0.6fr', gap: 20 }}>
           {/* KOL */}
           <div>
             <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: C.t1 }}>
@@ -711,6 +800,30 @@ export default function PhoiDoPage() {
                 />
               ))}
             </div>
+          </div>
+          {/* Pose */}
+          <div>
+            <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: C.t1, display: 'flex', alignItems: 'center', gap: 6 }}>
+              Dáng Pose
+              <span style={{
+                fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+                color: '#fbbf24', background: 'rgba(251,191,36,0.12)',
+                border: '1px solid rgba(251,191,36,0.3)',
+                padding: '2px 7px', borderRadius: 20,
+              }}>TUỲ CHỌN</span>
+            </p>
+            <div style={{ maxWidth: 90 }}>
+              <Slot
+                src={poseEntries[0]?.url}
+                label={poseEntries[0] ? 'POSE' : null}
+                onRemove={() => setPoseEntries([])}
+                onUpload={() => poseInput.current.click()}
+                onLibrary={() => openPicker('pose')}
+              />
+            </div>
+            <p style={{ margin: '8px 0 0', fontSize: 10, color: C.t3, lineHeight: 1.5 }}>
+              Ảnh tham chiếu dáng đứng / tư thế của KOL
+            </p>
           </div>
         </div>
       </div>
@@ -871,22 +984,22 @@ export default function PhoiDoPage() {
         width: '100%', padding: '16px 0', borderRadius: 14, border: 'none',
         cursor: canGenerate ? 'pointer' : 'not-allowed',
         background: canGenerate
-          ? `linear-gradient(135deg, #ea580c, ${C.or}, #fb923c)`
+          ? `linear-gradient(135deg, ${C.re}, #c02020, ${C.or}, #fb923c)`
           : C.bg2,
         backgroundSize: '200% auto',
         animation: (planning || generating) ? 'shimmer 2s linear infinite' : 'none',
         color: canGenerate ? '#fff' : C.t3,
         fontWeight: 800, fontSize: 14, letterSpacing: '0.06em',
         display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-        boxShadow: canGenerate ? '0 4px 24px rgba(249,115,22,0.25)' : 'none',
+        boxShadow: canGenerate ? '0 4px 28px rgba(220,38,38,0.35)' : 'none',
         marginBottom: 20,
       }}>
         {planning ? (
           <><div style={{ width: 16, height: 16, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,.3)', borderTopColor: '#fff', animation: 'spin .8s linear infinite' }} />Đang lên kế hoạch...</>
         ) : generating ? (
-          <><div style={{ width: 16, height: 16, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,.3)', borderTopColor: '#fff', animation: 'spin .8s linear infinite' }} />Rendering {results.filter(Boolean).length}/3...</>
+          <><div style={{ width: 16, height: 16, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,.3)', borderTopColor: '#fff', animation: 'spin .8s linear infinite' }} />Rendering {results.filter(Boolean).length}/4...</>
         ) : (
-          <><Zap size={16} />Tạo 3 Phân Cảnh · {quality} · {aspect}</>
+          <><Zap size={16} />Tạo 4 Phân Cảnh · {quality} · {aspect}</>
         )}
       </button>
 
@@ -966,8 +1079,8 @@ export default function PhoiDoPage() {
             </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 16 }}>
-            {[0,1,2].map(i => (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 16 }}>
+            {[0,1,2,3].map(i => (
               <SceneCard key={i} idx={i}
                 scene={plan?.scenes?.[i]} result={results[i]}
                 isLoading={loading[i]} error={errors[i]}
@@ -1015,6 +1128,7 @@ export default function PhoiDoPage() {
           )}
         </div>
       )}
+      </div>{/* end content wrapper */}
     </div>
   )
 }
