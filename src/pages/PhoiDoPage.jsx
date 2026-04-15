@@ -506,6 +506,7 @@ export default function PhoiDoPage() {
   const refInput    = useRef()
   const outfitInput = useRef()
   const bgInput     = useRef()
+  const generateBusyRef = useRef(false)
 
   /* ─── handlers ────────────────────────────────────────────────────────── */
   function addFiles(files, type) {
@@ -531,16 +532,30 @@ export default function PhoiDoPage() {
   }
 
   async function handleGenerate() {
+    if (generateBusyRef.current) return
     if (refEntries.length === 0 && outfitEntries.length === 0) return
+    generateBusyRef.current = true
     setPlanError(''); setPlan(null)
     setResults([null, null, null]); setErrors([null, null, null]); setKlingSelected([])
-
-    const refFiles    = await Promise.all(refEntries.map((e, i) => entryToFile(e, `ref-${i}.jpg`)))
-    const outfitFiles = await Promise.all(outfitEntries.map((e, i) => entryToFile(e, `outfit-${i}.jpg`)))
-    const bgFile      = bgEntry ? await entryToFile(bgEntry, 'bg.jpg') : null
-    const analysisImgs = [...refFiles, ...outfitFiles, ...(bgFile ? [bgFile] : [])].slice(0, 6)
+    setLoading([false, false, false])
 
     setPlanning(true)
+
+    let refFiles
+    let outfitFiles
+    let bgFile
+    try {
+      refFiles    = await Promise.all(refEntries.map((e, i) => entryToFile(e, `ref-${i}.jpg`)))
+      outfitFiles = await Promise.all(outfitEntries.map((e, i) => entryToFile(e, `outfit-${i}.jpg`)))
+      bgFile      = bgEntry ? await entryToFile(bgEntry, 'bg.jpg') : null
+    } catch (err) {
+      setPlanError(`Lỗi xử lý ảnh đầu vào: ${err.message}`)
+      setPlanning(false)
+      generateBusyRef.current = false
+      return
+    }
+    const analysisImgs = [...refFiles, ...outfitFiles, ...(bgFile ? [bgFile] : [])].slice(0, 6)
+
     let scenePlan
     try {
       const bgNote = bgFile
@@ -553,24 +568,30 @@ export default function PhoiDoPage() {
       setPlanExpanded(true)
     } catch (err) {
       setPlanError(`Lỗi lên kế hoạch: ${err.message}`)
-      setPlanning(false); return
+      setPlanning(false)
+      generateBusyRef.current = false
+      return
     }
     setPlanning(false)
 
     setGenerating(true)
-    const genRefs = [...refFiles, ...outfitFiles, ...(bgFile ? [bgFile] : [])].slice(0, 5)
-    const mainImg = outfitFiles[0] || refFiles[0]
-    for (let i = 0; i < 3; i++) {
-      setLoading(p => { const n = [...p]; n[i] = true; return n })
-      try {
-        const prompt = buildScenePrompt(scenePlan, i, quality, aspect, bgPreset, mood, !!bgFile)
-        const result = await generateGarmentImage(mainImg, prompt, { quality, aspect, referenceFiles: genRefs })
-        setResults(p => { const n = [...p]; n[i] = result; return n })
-        setErrors(p => { const n = [...p]; n[i] = null; return n })
-      } catch (err) { setErrors(p => { const n = [...p]; n[i] = err.message; return n }) }
-      setLoading(p => { const n = [...p]; n[i] = false; return n })
+    try {
+      const genRefs = [...refFiles, ...outfitFiles, ...(bgFile ? [bgFile] : [])].slice(0, 5)
+      const mainImg = outfitFiles[0] || refFiles[0]
+      for (let i = 0; i < 3; i++) {
+        setLoading(p => { const n = [...p]; n[i] = true; return n })
+        try {
+          const prompt = buildScenePrompt(scenePlan, i, quality, aspect, bgPreset, mood, !!bgFile)
+          const result = await generateGarmentImage(mainImg, prompt, { quality, aspect, referenceFiles: genRefs })
+          setResults(p => { const n = [...p]; n[i] = result; return n })
+          setErrors(p => { const n = [...p]; n[i] = null; return n })
+        } catch (err) { setErrors(p => { const n = [...p]; n[i] = err.message; return n }) }
+        setLoading(p => { const n = [...p]; n[i] = false; return n })
+      }
+    } finally {
+      setGenerating(false)
+      generateBusyRef.current = false
     }
-    setGenerating(false)
   }
 
   async function retryScene(idx) {
