@@ -16,21 +16,21 @@
   --brand: #F37021;
   --brand-dark: #C85A0A;
   --brand-light: #FF8C42;
-  --brand-bg: #FFF3EA;
+  --brand-bg: rgba(243, 112, 33, 0.12);
   --brand-15: rgba(243, 112, 33, 0.15);
   --brand-08: rgba(243, 112, 33, 0.08);
 
   /* Neutrals */
-  --white: #FFFFFF;
-  --bg-page: #F5F5F7;
-  --bg-card: #FFFFFF;
-  --border: #E8E8EC;
-  --border-light: #F0F0F5;
+  --white: #1c1c24;
+  --bg-page: #131318;
+  --bg-card: #1c1c24;
+  --border: #2e2e38;
+  --border-light: #25252f;
 
   /* Typography */
-  --text-primary: #1A1A1A;
-  --text-secondary: #6B6B6B;
-  --text-muted: #9B9B9B;
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-muted: #71717a;
   --text-on-brand: #FFFFFF;
 
   /* Layout */
@@ -38,9 +38,9 @@
   --header-height: 0px;
 
   /* Shadows */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.10);
-  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.12);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 8px 30px rgba(0, 0, 0, 0.50);
 
   /* Radius */
   --r-sm: 6px;
@@ -99,12 +99,12 @@ textarea {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #D0D0D0;
+  background: #45455a;
   border-radius: 99px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #ABABAB;
+  background: #5a5a72;
 }
 
 /* =============================================
@@ -207,12 +207,12 @@ textarea {
 
 .sidebar-nav-item.active {
   background: var(--brand);
-  color: var(--white);
+  color: #ffffff;
   box-shadow: 0 3px 10px rgba(243, 112, 33, 0.30);
 }
 
 .sidebar-nav-item.active svg {
-  color: var(--white);
+  color: #ffffff;
 }
 
 .sidebar-nav-item svg {
