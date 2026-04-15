@@ -103,45 +103,89 @@ const MOOD_OPTS = [
 /* ═══════════════════════════════════════════════════════════════════════════
    AI BRAIN
    ═══════════════════════════════════════════════════════════════════════════ */
-const BRAIN_PHOIDО_PLAN = `You are a professional fashion film director and creative director specializing in KOL content for Vietnamese social media.
+const BRAIN_PHOIDО_PLAN = `You are a world-class creative director, cinematographer, colorist, and visual physicist. You reason step by step like a scientist before making any creative decision. Your output must be internally consistent, physically plausible, and cinematically perfect.
 
-You receive:
-- KOL reference photo(s): face, hair, skin tone, body — MUST be replicated with absolute 100% accuracy
-- Outfit/product photo(s): what is being showcased
-- Optional: background reference image (highest priority — use this exact location/scene)
+You receive images of: KOL reference, outfit/product, optional pose reference, optional background.
 
-YOUR MISSION: Create a PRECISE SHOOTING PLAN for 4 coherent scenes optimized for Kling AI video input.
+═══════════════════════════════════════════
+MANDATORY REASONING CHAIN — execute in order:
+═══════════════════════════════════════════
 
-ANALYSIS RULES:
-- Detect and METICULOUSLY describe KOL: gender, skin tone (exact hex-like description), hair (color+length+texture+style), face (eye shape+color, nose shape, lip shape, jaw, cheekbones, eyebrows — every detail for identity lock)
-- KOL body: waist-to-hip ratio, leg length, chest, overall figure proportions
-- Identify the outfit: type, color palette, material, key detail to feature
-- If a background reference image was provided, describe it precisely and use it as the locked background
-- Otherwise, choose ONE perfect background that matches the outfit's mood
-- Design 4 scenes forming a narrative arc: Opening Hero → Dynamic Energy → Emotional Climax → Rear Silhouette
+▸ STEP 1 — BACKGROUND PHYSICS ANALYSIS
+Examine the background (provided photo or choose one that fits):
+- PRIMARY LIGHT SOURCE: direction (clock position + angle), color temperature in Kelvin, intensity (harsh sun / soft overcast / studio softbox / artificial)
+- SECONDARY LIGHTS: sky fill, bounce from ground/walls, practical lights visible
+- SHADOW ANALYSIS: direction shadows fall, softness/hardness of shadow edges
+- TIME OF DAY / ENVIRONMENT: morning / golden hour / midday / blue hour / night / indoor
+- GROUND/SURFACE: what does light bounce off (concrete, grass, marble, sand, water reflection)?
+- BACKGROUND QUALITY AUDIT: are there distracting elements — clutter, random people, ugly signs, trash, noise? Rate cleanliness 1–10. If < 7, plan what to clean/remove/blur.
+- DEPTH OF FIELD: should background be blurred (bokeh) to separate KOL cleanly? Specify f-stop logic.
 
-SCENE DESIGN PRINCIPLES (NON-NEGOTIABLE):
-1. Scenes 1–3: KOL faces camera with DIRECT eye contact with lens
-2. Scene 4 ONLY: KOL turns her BACK fully to the camera — rear silhouette shot — NO face visible
-3. Background is IDENTICAL across all 4 scenes — only KOL pose/expression changes
-4. Each scene MUST have built-in motion dynamics: fabric flow, hair movement, implied kinetic energy
-5. All 4 scenes must feel like frames from ONE coherent fashion film
-6. MANDATORY SHOT FRAMING (strictly enforce camera distance):
-   - Scene 1 (Opening Hero): FULL BODY — frame head to toe, complete figure and outfit fully visible, no cropping at legs/feet
-   - Scene 2 (Dynamic Energy): FULL BODY — frame head to toe, dynamic full-figure movement, complete silhouette
-   - Scene 3 (Emotional Climax): MEDIUM SHOT — frame from waist up, focus on face expression and upper outfit detail
-   - Scene 4 (Rear Silhouette): FULL BODY REAR — frame head to toe from behind, complete rear silhouette
+▸ STEP 2 — KOL IDENTITY EXTRACTION
+- Skin tone: precise description (e.g. "warm ivory with peach undertone", "golden caramel", "cool porcelain")
+- Hair: color + length + texture + style (every detail for perfect replication)
+- Face: METICULOUSLY detail — eye shape+lid crease+lash thickness+iris color, nose bridge+tip+nostrils, lip thickness+cupid's bow+color, jaw shape+chin, cheekbones, eyebrow arch+thickness+color, skin pore texture, any distinctive feature
+- Body: height impression, shoulder width, waist-to-hip ratio, leg length, chest, overall silhouette and proportions
+
+▸ STEP 3 — PHOTOPHYSICS HARMONIZATION (critical reasoning)
+Reason through HOW to make the KOL physically belong in this background:
+- KEY LIGHT SETUP: mirror the background's primary light source exactly. If outdoor sun at 2 o'clock from right at 45° → key light on KOL from same angle at matching Kelvin
+- SHADOW LOGIC: KOL's cast shadows must fall in the same direction as background shadows
+- RIM / SEPARATION LIGHT: if bright sky/background behind KOL → rim light on hair/shoulders matching background ambient
+- GROUND BOUNCE: light color reflected from the ground surface onto KOL's lower half
+- COLOR SPILL: if colored environment (warm sunset, green forest) → subtle color spill on KOL's skin and clothes
+- CRITICAL CHECK: does the light make physical sense? Would a real photographer achieve this look in this location?
+
+▸ STEP 4 — COLOR SCIENCE & GRADING
+- Identify the dominant color temperature of the background scene (warm/cool/neutral)
+- Specify color corrections needed so KOL's skin tone reads naturally in this light
+- Define the unified color grade: highlights temperature, shadow tint, mid-tone saturation, overall LUT style (e.g. "warm orange-teal Hollywood", "clean editorial neutral", "golden hour filmic")
+- Ensure outfit colors remain true while harmonizing with scene color palette
+- Define skin tone rendering in this specific ambient (e.g. "warm peachy glow" / "cool blue-tinted shadows")
+
+▸ STEP 5 — BACKGROUND CLEANUP PLAN
+If background cleanliness < 7 or has distracting elements:
+- LIST precisely what to remove or simplify
+- Specify if foreground separation / vignette needed
+- Specify if background should be color-shifted to better complement outfit
+- Describe the CLEANED version of the background in detail
+
+▸ STEP 6 — SCENE DESIGN
+Design 4 scenes forming a narrative arc. Apply all physics/lighting/color decisions from Steps 1–5.
+
+SCENE RULES (NON-NEGOTIABLE):
+1. Scenes 1–3: KOL faces camera — DIRECT eye contact with lens
+2. Scene 4: KOL's BACK fully to camera — rear silhouette, NO face
+3. Same background all 4 scenes — only pose/expression changes
+4. Motion dynamics in every scene: fabric flow, hair movement, kinetic energy
+5. Shot framing mandatory:
+   - Scene 1 (Opening Hero): FULL BODY head to toe — no cropping
+   - Scene 2 (Dynamic Energy): FULL BODY head to toe — dynamic movement
+   - Scene 3 (Emotional Climax): MEDIUM SHOT waist up — face and upper outfit
+   - Scene 4 (Rear Silhouette): FULL BODY REAR head to toe
 
 OUTPUT strictly as valid JSON (no extra text, no markdown):
 {
-  "kol": { "gender": "male/female", "skinTone": "description", "hair": "color, length, texture, style", "face": "EXTREMELY DETAILED: eye shape+color+lashes, nose shape, lip color+shape, jaw+chin, cheekbones, skin texture, eyebrows — every feature needed to reproduce this exact face", "body": "figure description: height impression, waist, hips, legs, chest, overall silhouette" },
-  "outfit": { "description": "full outfit description", "colors": "color palette", "keyDetail": "most photogenic feature", "material": "fabric feel" },
-  "lockedBackground": "VERY SPECIFIC description of the ONE background for all 4 scenes — lighting, colors, textures, depth, atmosphere.",
+  "backgroundPhysics": {
+    "primaryLight": "direction clock+angle, Kelvin temp, intensity — e.g. '2 o'clock from right, 45° down, 5500K daylight, soft'",
+    "secondaryLights": "fill light description, bounce, practical lights",
+    "shadowDirection": "which direction shadows fall, edge hardness",
+    "timeAndEnvironment": "e.g. golden hour outdoor / studio / night city",
+    "groundBounce": "surface color and bounce quality",
+    "cleanlinessRating": 8,
+    "cleanupPlan": "none | specific: remove X, blur Y, vignette Z",
+    "depthOfField": "e.g. f/2.8 shallow to isolate KOL from background"
+  },
+  "lightingHarmonization": "CINEMATOGRAPHER BRIEF: exact key light angle+Kelvin, fill ratio, rim light specs, color spill, shadow rendering — everything needed to physically place KOL in this background",
+  "colorGrading": "COLORIST BRIEF: LUT style, color temperature of highlights/shadows/midtones, skin tone rendering in this ambient, saturation levels, any color correction for outfit harmony",
+  "kol": { "gender": "male/female", "skinTone": "precise tone with undertone", "hair": "color+length+texture+style — all detail", "face": "EXTREME DETAIL: every feature for identity lock", "body": "full proportions description" },
+  "outfit": { "description": "full outfit", "colors": "palette", "keyDetail": "hero visual feature", "material": "fabric feel" },
+  "lockedBackground": "CLEAN detailed description of background after applying cleanup plan — lighting, colors, textures, depth, atmosphere, as it should appear in the final images",
   "scenes": [
-    { "num": 1, "name": "Opening Hero", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "klingNote": "..." },
-    { "num": 2, "name": "Dynamic Energy", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "klingNote": "..." },
-    { "num": 3, "name": "Emotional Climax", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "klingNote": "..." },
-    { "num": 4, "name": "Rear Silhouette", "poseEN": "KOL standing with back fully turned to camera, slight hip tilt for elegance", "motionEN": "hair gently blowing, fabric of outfit visible from behind, full rear silhouette", "expressionEN": "NO face visible — back of head and hair only", "outfitFocusEN": "Full back view of outfit — back design, silhouette, drape, back details", "klingNote": "Rear-view signature shot — back of outfit showcase" }
+    { "num": 1, "name": "Opening Hero", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "lightingNote": "scene-specific lighting nuance", "klingNote": "..." },
+    { "num": 2, "name": "Dynamic Energy", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "lightingNote": "...", "klingNote": "..." },
+    { "num": 3, "name": "Emotional Climax", "poseEN": "...", "motionEN": "...", "expressionEN": "...", "outfitFocusEN": "...", "lightingNote": "...", "klingNote": "..." },
+    { "num": 4, "name": "Rear Silhouette", "poseEN": "back fully turned, slight hip tilt", "motionEN": "hair blowing, rear silhouette", "expressionEN": "no face — back of head only", "outfitFocusEN": "full back view of outfit", "lightingNote": "rim light on hair from background ambient, back of outfit lit", "klingNote": "rear signature shot" }
   ]
 }`
 
@@ -160,9 +204,29 @@ function buildScenePrompt(plan, sceneIdx, quality, aspect, bgPreset, mood, hasBg
   const rawA   = typeof aspect === 'string' ? (aspect.match(/\d+:\d+/)?.[0] || '9:16') : aspect
   const isRearScene = sceneIdx === 3
 
+  const bp   = plan.backgroundPhysics || {}
   const bgLine = hasBgImage
-    ? 'Background: Use the EXACT background from the reference photo provided (last image in the reference set). Replicate its location, lighting, colors, and atmosphere precisely.'
+    ? 'Background: Use the EXACT background from the reference photo provided. Replicate its location, lighting, colors, and atmosphere with pixel-perfect accuracy. Apply the cleanup plan below before compositing.'
     : `Background: ${plan.lockedBackground}`
+
+  const physicsBlock = `═══ PHOTOPHYSICS — LIGHTING HARMONIZATION ═══
+${plan.lightingHarmonization || ''}
+• Primary light: ${bp.primaryLight || 'match background light source'}
+• Secondary lights: ${bp.secondaryLights || 'natural fill'}
+• Shadows on KOL must fall in direction: ${bp.shadowDirection || 'match background'}
+• Ground bounce onto KOL lower body: ${bp.groundBounce || 'natural'}
+• Depth of field: ${bp.depthOfField || 'appropriate for scene'}
+The KOL must look like she was PHYSICALLY PRESENT in this location — same light, same physics, zero compositing artifacts.`
+
+  const colorBlock = `═══ COLOR SCIENCE & GRADING ═══
+${plan.colorGrading || ''}
+Apply consistent color grade across KOL and background so they read as ONE unified image — not as separate composited layers.`
+
+  const cleanupBlock = bp.cleanupPlan && bp.cleanupPlan !== 'none'
+    ? `═══ BACKGROUND CLEANUP ═══
+Apply before rendering: ${bp.cleanupPlan}
+Result must be a clean, professional backdrop appropriate for luxury fashion.`
+    : ''
 
   const faceBlock = isRearScene
     ? `═══ FACE / IDENTITY ═══
@@ -223,6 +287,12 @@ ${cameraBlock}
 ═══ BACKGROUND (LOCKED — SAME ALL 4 SCENES) ═══
 ${bgLine}
 Do NOT change background between scenes.
+${cleanupBlock}
+
+${physicsBlock}
+
+${colorBlock}
+${sc.lightingNote ? `\n═══ SCENE LIGHTING NOTE ═══\n${sc.lightingNote}` : ''}
 
 ═══ MOTION & LIFE ═══
 ${sc.motionEN}
@@ -238,7 +308,8 @@ This is the camera framing rule — do not override it.
 ═══ TECHNICAL QUALITY ═══
 Hyper-photorealistic 8K commercial fashion photography. Shot on Sony A7IV + 85mm f/1.4 lens.
 ISO 100, perfect exposure, cinematic color grading. Zero AI artifacts. Skin pores visible.
-Image must look like a real high-end fashion magazine photo — indistinguishable from reality.
+Image must look like a real high-end fashion magazine editorial — indistinguishable from reality.
+The KOL and background must appear as ONE unified photograph — not composited layers.
 Aspect ratio: ${rawA}. Resolution: ${rawQ}.
 ${editInstruction ? `\n═══ EDIT INSTRUCTION (PRIORITY — APPLY THIS) ═══\n${editInstruction}` : ''}
 Generate Scene ${sc.num} now.`
@@ -645,16 +716,16 @@ export default function PhoiDoPage() {
   /* ─── handlers ────────────────────────────────────────────────────────── */
   function addFiles(files, type) {
     const entries = Array.from(files).map(f => ({ file: f, url: URL.createObjectURL(f) }))
-    if (type === 'ref')    setRefEntries(p => [...p, ...entries].slice(0, 3))
-    if (type === 'outfit') setOutfitEntries(p => [...p, ...entries].slice(0, 2))
+    if (type === 'ref')    setRefEntries(p => [...p, ...entries].slice(0, 2))
+    if (type === 'outfit') setOutfitEntries(p => [...p, ...entries].slice(0, 4))
     if (type === 'pose')   setPoseEntries(p => [...p, ...entries].slice(0, 1))
     if (type === 'bg')     setBgEntry(entries[0] || null)
   }
   function openPicker(type) { setPickerTarget(type); setPickerOpen(true) }
   function handlePickLibrary(item) {
     const entry = { url: item.imageSrc || item.url, file: null }
-    if (pickerTarget === 'ref')    setRefEntries(p => [...p, entry].slice(0, 3))
-    if (pickerTarget === 'outfit') setOutfitEntries(p => [...p, entry].slice(0, 2))
+    if (pickerTarget === 'ref')    setRefEntries(p => [...p, entry].slice(0, 2))
+    if (pickerTarget === 'outfit') setOutfitEntries(p => [...p, entry].slice(0, 4))
     if (pickerTarget === 'pose')   setPoseEntries(p => [...p, entry].slice(0, 1))
     if (pickerTarget === 'bg')     setBgEntry(entry)
     setPickerOpen(false)
@@ -852,10 +923,10 @@ export default function PhoiDoPage() {
           {/* KOL */}
           <div>
             <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: C.t1 }}>
-              KOL / Người mẫu <span style={{ color: C.t3, fontWeight: 400, fontSize: 11 }}>(tối đa 3)</span>
+              KOL / Người mẫu <span style={{ color: C.t3, fontWeight: 400, fontSize: 11 }}>(tối đa 2)</span>
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8 }}>
-              {[0,1,2].map(i => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
+              {[0,1].map(i => (
                 <Slot key={i}
                   src={refEntries[i]?.url}
                   label={i === 0 && refEntries[0] ? 'KOL' : null}
@@ -866,13 +937,13 @@ export default function PhoiDoPage() {
               ))}
             </div>
           </div>
-          {/* Outfit */}
+          {/* Outfit & Accessories */}
           <div>
             <p style={{ margin: '0 0 10px', fontSize: 12, fontWeight: 600, color: C.t1 }}>
-              Trang phục <span style={{ color: C.t3, fontWeight: 400, fontSize: 11 }}>(tối đa 2)</span>
+              Trang phục & Phụ kiện <span style={{ color: C.t3, fontWeight: 400, fontSize: 11 }}>(tối đa 4)</span>
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 8 }}>
-              {[0,1].map(i => (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+              {[0,1,2,3].map(i => (
                 <Slot key={i}
                   src={outfitEntries[i]?.url}
                   label={i === 0 && outfitEntries[0] ? 'OUTFIT' : null}
