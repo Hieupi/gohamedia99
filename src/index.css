@@ -178,66 +178,70 @@ textarea {
 
 .sidebar-nav {
   flex: 1;
-  padding: 10px 10px;
+  padding: 12px 10px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
   overflow-y: auto;
 }
 
 .sidebar-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
-  border-radius: 10px;
-  color: #a0a0c0;
+  gap: 11px;
+  padding: 10px 13px;
+  border-radius: 9px;
+  color: #ededf5;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: 0.01em;
-  transition: all 0.18s ease;
+  transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, transform 0.16s ease;
   cursor: pointer;
-  border: 1px solid transparent;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
   width: 100%;
   text-align: left;
-  position: relative;
 }
 
 .sidebar-nav-item:hover {
-  background: rgba(255, 255, 255, 0.07);
-  border-color: rgba(255, 255, 255, 0.09);
-  color: #e8e8f8;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09) 0%, rgba(255, 255, 255, 0.04) 100%);
+  border-color: rgba(255, 255, 255, 0.18);
+  color: #ffffff;
   transform: translateX(2px);
 }
 
 .sidebar-nav-item.active {
-  background: rgba(243, 112, 33, 0.14);
-  border-color: rgba(243, 112, 33, 0.30);
-  color: #ffad6a;
+  background: linear-gradient(180deg, rgba(243, 112, 33, 0.22) 0%, rgba(243, 112, 33, 0.08) 100%);
+  border-color: rgba(243, 112, 33, 0.55);
+  color: #ffffff;
   font-weight: 700;
   box-shadow:
-    0 4px 16px rgba(243, 112, 33, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    inset 3px 0 0 0 #F37021,
+    inset 0 1px 0 rgba(255, 255, 255, 0.14),
+    0 6px 20px rgba(243, 112, 33, 0.22);
   transform: none;
 }
 
 .sidebar-nav-item.active svg {
-  color: #F37021;
+  color: #ffb070;
   opacity: 1;
 }
 
 .sidebar-nav-item svg {
-  width: 16px;
-  height: 16px;
+  width: 17px;
+  height: 17px;
   flex-shrink: 0;
-  stroke-width: 1.8px;
-  opacity: 0.45;
-  transition: opacity 0.18s ease, color 0.18s ease;
+  stroke-width: 2px;
+  opacity: 0.85;
+  color: #ededf5;
+  transition: opacity 0.16s ease, color 0.16s ease;
 }
 
 .sidebar-nav-item:hover svg {
-  opacity: 0.9;
+  opacity: 1;
+  color: #ffffff;
 }
 
 .sidebar-footer {
@@ -4629,10 +4633,7 @@ textarea {
   box-shadow: 4px 0 30px rgba(0, 0, 0, 0.04);
 }
 
-/* Sidebar nav polish */
-[data-theme="light"] .sidebar-nav-item.active, body:not([data-theme]) .sidebar-nav-item.active {
-  box-shadow: 0 2px 10px rgba(243, 112, 33, 0.2);
-}
+/* Sidebar nav polish — defers to base .sidebar-nav-item.active layered shadow */
 
 /* Cards — layered shadow, hover lift + glow ring */
 [data-theme="light"] .card, body:not([data-theme]) .card,
