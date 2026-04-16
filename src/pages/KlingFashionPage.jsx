@@ -5,6 +5,58 @@ import {
   Clapperboard, Zap, Layers, Camera, AlertCircle, RefreshCw, X
 } from 'lucide-react'
 
+/* ═══ DESIGN TOKENS — đồng bộ với PhoiDoPage ═══ */
+const C = {
+  bg0: '#131318', bg1: '#1c1c24', bg2: '#25252f', bg3: '#2e2e3a',
+  b1: '#2e2e38', b2: '#45455a', b3: '#5a5a72',
+  t1: '#fafafa', t2: '#a1a1aa', t3: '#71717a',
+  re: '#dc2626', reL: '#ef4444', reBg: 'rgba(220,38,38,0.10)', reBd: 'rgba(220,38,38,0.30)',
+  or: '#f97316', orL: '#fb923c', orBg: 'rgba(249,115,22,0.08)', orBd: 'rgba(249,115,22,0.25)',
+  bl: '#3b82f6', blBg: 'rgba(59,130,246,0.08)', blBd: 'rgba(59,130,246,0.25)',
+  fu: '#d946ef', fuL: '#e879f9', fuBg: 'rgba(217,70,239,0.08)', fuBd: 'rgba(217,70,239,0.25)',
+  green: '#22c55e', greenBg: 'rgba(34,197,94,0.08)',
+}
+
+const CSS_KLING = `
+  @keyframes spin-k { to { transform: rotate(360deg) } }
+  @keyframes fadeUp-k {
+    from { opacity: 0; transform: translateY(10px) }
+    to   { opacity: 1; transform: translateY(0) }
+  }
+  @keyframes shimmer-k {
+    0%   { background-position: -200% center }
+    100% { background-position:  200% center }
+  }
+  .kf-card {
+    background: ${C.bg1};
+    border: 1px solid ${C.b1};
+    border-radius: 14px;
+    overflow: hidden;
+    transition: border-color .25s, box-shadow .25s;
+  }
+  .kf-card:hover { border-color: ${C.b2}; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+  .kf-section { animation: fadeUp-k .4s ease both; }
+  .kf-btn-gen {
+    transition: transform .15s, box-shadow .25s, filter .2s;
+  }
+  .kf-btn-gen:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 32px rgba(217,70,239,0.4);
+    filter: brightness(1.08);
+  }
+  .kf-pill {
+    transition: all .2s ease;
+  }
+  .kf-pill:hover {
+    border-color: ${C.b3} !important;
+    background: ${C.bg3} !important;
+  }
+  .kf-copy-btn {
+    transition: all .2s;
+  }
+  .kf-copy-btn:hover { opacity: .85; }
+`
+
 // ─── Full Kling 3.0 System Instruction ───────────────────────────────────────
 const KLING_BRAIN = `# SYSTEM INSTRUCTION — FASHION VIDEO PROMPT ARCHITECT FOR KLING 3.0 MULTISHOTS
 
@@ -127,42 +179,46 @@ function CopyBtn({ text, label = 'Copy', style }) {
     setTimeout(() => setCopied(false), 2000)
   }
   return (
-    <button onClick={handle} style={{
-      display: 'flex', alignItems: 'center', gap: 5, padding: '6px 14px',
-      borderRadius: 7, border: '1px solid rgba(99,179,237,0.35)',
-      background: copied ? 'rgba(72,187,120,0.18)' : 'rgba(99,179,237,0.12)',
-      color: copied ? '#68d391' : '#90cdf4',
-      fontSize: 12, fontWeight: 700, cursor: 'pointer', transition: 'all .2s',
+    <button onClick={handle} className="kf-copy-btn" style={{
+      display: 'flex', alignItems: 'center', gap: 5, padding: '5px 12px',
+      borderRadius: 7,
+      border: `1px solid ${copied ? C.green + '50' : C.b2}`,
+      background: copied ? C.greenBg : C.bg3,
+      color: copied ? C.green : C.t2,
+      fontSize: 11, fontWeight: 700, cursor: 'pointer',
       ...style
     }}>
-      {copied ? <Check size={13} /> : <Copy size={13} />}
+      {copied ? <Check size={12} /> : <Copy size={12} />}
       {copied ? 'Đã copy!' : label}
     </button>
   )
 }
 
 // ─── Section wrapper ──────────────────────────────────────────────────────────
-function Section({ icon: Icon, title, color = '#63b3ed', children, defaultOpen = true }) {
+function Section({ icon: Icon, title, color = C.bl, children, defaultOpen = true }) {
   const [open, setOpen] = useState(defaultOpen)
   return (
-    <div style={{
-      background: 'rgba(255,255,255,0.04)', border: `1px solid rgba(255,255,255,0.10)`,
-      borderRadius: 12, overflow: 'hidden', marginBottom: 12
-    }}>
+    <div className="kf-card kf-section" style={{ marginBottom: 10 }}>
       <button
         onClick={() => setOpen(o => !o)}
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-          padding: '13px 16px', background: 'rgba(255,255,255,0.02)', border: 'none',
-          color: '#f0f4ff', cursor: 'pointer', textAlign: 'left',
-          borderBottom: open ? '1px solid rgba(255,255,255,0.06)' : 'none'
+          padding: '13px 16px', background: 'transparent', border: 'none',
+          cursor: 'pointer', textAlign: 'left',
+          borderBottom: open ? `1px solid ${C.b1}` : 'none',
         }}
       >
-        <Icon size={16} style={{ color }} />
-        <span style={{ fontWeight: 700, fontSize: 13, flex: 1, color: '#f0f4ff' }}>{title}</span>
+        <div style={{
+          width: 28, height: 28, borderRadius: 8, flexShrink: 0,
+          background: color + '18', border: `1px solid ${color}30`,
+          display: 'grid', placeItems: 'center',
+        }}>
+          <Icon size={14} style={{ color }} />
+        </div>
+        <span style={{ fontWeight: 700, fontSize: 13, flex: 1, color: C.t1 }}>{title}</span>
         {open
-          ? <ChevronUp size={14} style={{ color: '#a0aec0' }} />
-          : <ChevronDown size={14} style={{ color: '#a0aec0' }} />}
+          ? <ChevronUp size={14} style={{ color: C.t3 }} />
+          : <ChevronDown size={14} style={{ color: C.t3 }} />}
       </button>
       {open && <div style={{ padding: '14px 16px' }}>{children}</div>}
     </div>
@@ -170,29 +226,34 @@ function Section({ icon: Icon, title, color = '#63b3ed', children, defaultOpen =
 }
 
 // ─── Shot Card ────────────────────────────────────────────────────────────────
+const SHOT_ACCENTS = [C.or, C.fu, C.bl, C.green, C.reL, C.orL]
 function ShotCard({ shot }) {
+  const accent = SHOT_ACCENTS[(shot.num - 1) % SHOT_ACCENTS.length]
   return (
     <div style={{
-      background: 'rgba(99,179,237,0.06)', border: '1px solid rgba(99,179,237,0.18)',
-      borderRadius: 10, padding: 14, marginBottom: 10
+      background: C.bg2, border: `1px solid ${C.b1}`,
+      borderLeft: `3px solid ${accent}`,
+      borderRadius: 10, padding: 14, marginBottom: 8,
+      transition: 'border-color .2s',
     }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
-            background: 'rgba(99,179,237,0.25)', color: '#90cdf4',
-            borderRadius: 20, padding: '3px 11px', fontSize: 11, fontWeight: 800
+            background: accent + '22', color: accent,
+            borderRadius: 20, padding: '3px 11px', fontSize: 10, fontWeight: 800,
+            border: `1px solid ${accent}40`, letterSpacing: '0.05em',
           }}>
             SHOT {shot.num} · {shot.duration}s
           </span>
-          <span style={{ color: '#cbd5e0', fontSize: 12, fontWeight: 600 }}>"{shot.name}"</span>
+          <span style={{ color: C.t2, fontSize: 12, fontWeight: 600 }}>"{shot.name}"</span>
         </div>
         <CopyBtn text={shot.prompt} />
       </div>
-      <p style={{ color: '#e8edf5', fontSize: 12, lineHeight: 1.8, margin: '0 0 8px', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+      <p style={{ color: C.t1, fontSize: 12, lineHeight: 1.85, margin: '0 0 8px', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
         {shot.prompt}
       </p>
       {shot.note && (
-        <p style={{ color: '#a0aec0', fontSize: 11, margin: 0, borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+        <p style={{ color: C.t3, fontSize: 11, margin: 0, borderTop: `1px solid ${C.b1}`, paddingTop: 8 }}>
           → {shot.note}
         </p>
       )}
@@ -271,31 +332,54 @@ export default function KlingFashionPage() {
   ]
 
   return (
-    <div style={{ padding: '24px 28px', maxWidth: 860, margin: '0 auto' }}>
+    <div style={{ background: C.bg0, minHeight: '100vh', margin: '-32px', padding: '0 0 100px' }}>
+      <style>{CSS_KLING}</style>
 
-      {/* ── Header ── */}
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+      {/* ══ HERO HEADER ══ */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.fu} 0%, #7c1fa8 25%, #1a0828 60%, ${C.bg0} 100%)`,
+        padding: '36px 32px 28px',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        <div style={{ position: 'absolute', top: -50, right: -30, width: 220, height: 220, borderRadius: '50%', background: 'rgba(217,70,239,0.15)', filter: 'blur(70px)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -30, left: 60, width: 160, height: 160, borderRadius: '50%', background: 'rgba(249,115,22,0.10)', filter: 'blur(55px)', pointerEvents: 'none' }} />
+
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 16, maxWidth: 860, margin: '0 auto' }}>
           <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center'
+            width: 52, height: 52, borderRadius: 14, flexShrink: 0,
+            background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(10px)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            display: 'grid', placeItems: 'center',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
           }}>
-            <Clapperboard size={20} color="#fff" />
+            <Clapperboard size={22} color="#fff" />
           </div>
           <div>
-            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: '#e2e8f0' }}>
-              KLING AI FASHION
+            <h1 style={{ margin: 0, fontSize: 26, fontWeight: 900, color: '#fff', letterSpacing: '-0.03em', textShadow: '0 2px 12px rgba(0,0,0,0.4)' }}>
+              Kling AI Fashion
             </h1>
-            <p style={{ margin: 0, fontSize: 11, color: '#718096' }}>
-              Fashion Video Prompt Architect · Kling 3.0 Multi-Shot
-            </p>
+            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+              {[
+                { t: 'Multi-Shot 15s', c: '#e879f9' },
+                { t: 'Smart Storyboard', c: '#4ade80' },
+                { t: 'Custom Storyboard', c: '#60a5fa' },
+                { t: 'Element Binding', c: '#fb923c' },
+                { t: 'Kling 3.0', c: '#e879f9' },
+              ].map(tag => (
+                <span key={tag.t} style={{
+                  fontSize: 9, fontWeight: 700, letterSpacing: '0.06em',
+                  color: tag.c, background: 'rgba(255,255,255,0.08)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  padding: '3px 9px', borderRadius: 20, backdropFilter: 'blur(4px)',
+                }}>{tag.t}</span>
+              ))}
+            </div>
           </div>
         </div>
-        <p style={{ margin: 0, fontSize: 12, color: '#a0aec0', lineHeight: 1.6 }}>
-          Upload ảnh thời trang → AI phân tích → Tạo prompt Smart + Custom Storyboard chuyên nghiệp cho Kling 3.0
-        </p>
       </div>
+
+      {/* ══ CONTENT ══ */}
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '24px 24px 0' }}>
 
       {/* ── Upload Zone ── */}
       <div
@@ -303,53 +387,46 @@ export default function KlingFashionPage() {
         onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
         onDragLeave={() => setDragOver(false)}
         onClick={() => !image && fileRef.current?.click()}
+        className="kf-card"
         style={{
-          border: `2px dashed ${dragOver ? '#667eea' : image ? 'rgba(102,126,234,0.4)' : 'rgba(255,255,255,0.12)'}`,
-          borderRadius: 14, minHeight: image ? 'auto' : 180,
+          border: `2px dashed ${dragOver ? C.fu : image ? C.b2 : C.b1}`,
+          minHeight: image ? 'auto' : 180,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           cursor: image ? 'default' : 'pointer',
-          background: dragOver ? 'rgba(102,126,234,0.08)' : 'rgba(255,255,255,0.02)',
-          transition: 'all .2s', marginBottom: 16, overflow: 'hidden', position: 'relative'
+          background: dragOver ? C.fuBg : C.bg1,
+          transition: 'all .2s', marginBottom: 12, overflow: 'hidden', position: 'relative',
         }}
       >
         <input ref={fileRef} type="file" accept="image/*" onChange={handleFileInput} style={{ display: 'none' }} />
 
         {image ? (
           <div style={{ width: '100%', position: 'relative' }}>
-            <img
-              src={image.url}
-              alt="Fashion"
-              style={{ width: '100%', maxHeight: 320, objectFit: 'contain', display: 'block' }}
-            />
-            <button
-              onClick={(e) => { e.stopPropagation(); clearImage() }}
-              style={{
-                position: 'absolute', top: 10, right: 10,
-                background: 'rgba(0,0,0,0.6)', border: 'none', borderRadius: '50%',
-                width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                cursor: 'pointer', color: '#fff'
-              }}
-            >
-              <X size={14} />
-            </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }}
-              style={{
-                position: 'absolute', bottom: 10, right: 10,
-                background: 'rgba(102,126,234,0.8)', border: 'none', borderRadius: 8,
-                padding: '5px 12px', fontSize: 11, color: '#fff', cursor: 'pointer', fontWeight: 600
-              }}
-            >
-              Đổi ảnh
-            </button>
+            <img src={image.url} alt="Fashion" style={{ width: '100%', maxHeight: 320, objectFit: 'contain', display: 'block' }} />
+            <button onClick={(e) => { e.stopPropagation(); clearImage() }} style={{
+              position: 'absolute', top: 10, right: 10,
+              background: 'rgba(0,0,0,0.7)', border: 'none', borderRadius: '50%',
+              width: 28, height: 28, display: 'grid', placeItems: 'center',
+              cursor: 'pointer', color: '#fff',
+            }}><X size={14} /></button>
+            <button onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }} style={{
+              position: 'absolute', bottom: 10, right: 10,
+              background: C.fuBg, border: `1px solid ${C.fuBd}`, borderRadius: 8,
+              padding: '5px 12px', fontSize: 11, color: C.fuL, cursor: 'pointer', fontWeight: 700,
+            }}>Đổi ảnh</button>
           </div>
         ) : (
-          <div style={{ textAlign: 'center', padding: 32 }}>
-            <Upload size={32} style={{ color: '#718096', marginBottom: 10 }} />
-            <p style={{ color: '#cbd5e0', fontWeight: 600, margin: '0 0 6px', fontSize: 14 }}>
+          <div style={{ textAlign: 'center', padding: 36 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: 14, background: C.fuBg,
+              border: `1px solid ${C.fuBd}`, display: 'grid', placeItems: 'center',
+              margin: '0 auto 12px',
+            }}>
+              <Upload size={22} style={{ color: C.fu }} />
+            </div>
+            <p style={{ color: C.t1, fontWeight: 700, margin: '0 0 6px', fontSize: 14 }}>
               Kéo thả hoặc click để upload ảnh thời trang
             </p>
-            <p style={{ color: '#a0aec0', fontSize: 12, margin: 0 }}>
+            <p style={{ color: C.t3, fontSize: 12, margin: 0 }}>
               Ảnh rõ nét, thấy đủ outfit → video càng đẹp · JPG / PNG / WEBP
             </p>
           </div>
@@ -357,26 +434,22 @@ export default function KlingFashionPage() {
       </div>
 
       {/* ── Shot Selector ── */}
-      <div style={{ marginBottom: 16 }}>
-        <p style={{ color: '#cbd5e0', fontSize: 12, fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 1 }}>
-          Số shots / Video (15 giây)
+      <div style={{ marginBottom: 12 }}>
+        <p style={{ color: C.t3, fontSize: 10, fontWeight: 700, marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+          Số shots / video (15 giây)
         </p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 }}>
           {SHOT_OPTS.map(({ n, label, sub, note }) => (
-            <button
-              key={n}
-              onClick={() => setNumShots(n)}
-              style={{
-                padding: '10px 12px', borderRadius: 10, border: '2px solid',
-                borderColor: numShots === n ? '#667eea' : 'rgba(255,255,255,0.08)',
-                background: numShots === n ? 'rgba(102,126,234,0.15)' : 'rgba(255,255,255,0.02)',
-                color: numShots === n ? '#e2e8f0' : '#718096',
-                cursor: 'pointer', transition: 'all .2s', textAlign: 'center'
-              }}
-            >
-              <div style={{ fontSize: 15, fontWeight: 700 }}>{label}</div>
-              <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>{sub}</div>
-              <div style={{ fontSize: 10, color: numShots === n ? '#a78bfa' : '#4a5568', marginTop: 2 }}>{note}</div>
+            <button key={n} onClick={() => setNumShots(n)} className="kf-pill" style={{
+              padding: '11px 12px', borderRadius: 10,
+              border: `2px solid ${numShots === n ? C.fu : C.b1}`,
+              background: numShots === n ? C.fuBg : C.bg1,
+              color: numShots === n ? C.t1 : C.t3,
+              cursor: 'pointer', textAlign: 'center',
+            }}>
+              <div style={{ fontSize: 14, fontWeight: 800 }}>{label}</div>
+              <div style={{ fontSize: 10, color: numShots === n ? C.fuL : C.t3, marginTop: 2 }}>{sub}</div>
+              <div style={{ fontSize: 10, color: numShots === n ? C.fu : C.t3, marginTop: 2 }}>{note}</div>
             </button>
           ))}
         </div>
@@ -386,20 +459,25 @@ export default function KlingFashionPage() {
       <button
         onClick={generate}
         disabled={!image || loading}
+        className="kf-btn-gen"
         style={{
-          width: '100%', padding: '14px 20px', borderRadius: 12, border: 'none',
-          background: !image || loading
-            ? 'rgba(255,255,255,0.05)'
-            : 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-          color: !image || loading ? '#4a5568' : '#fff',
-          fontSize: 14, fontWeight: 700, cursor: !image || loading ? 'not-allowed' : 'pointer',
-          transition: 'all .3s', marginBottom: 20,
-          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+          width: '100%', padding: '16px 0', borderRadius: 14, border: 'none',
+          background: (!image || loading)
+            ? C.bg2
+            : `linear-gradient(135deg, ${C.re}, #8b14b0, ${C.fu}, #e879f9)`,
+          backgroundSize: '200% auto',
+          animation: loading ? 'shimmer-k 2s linear infinite' : 'none',
+          color: (!image || loading) ? C.t3 : '#fff',
+          fontSize: 14, fontWeight: 800, letterSpacing: '0.05em',
+          cursor: (!image || loading) ? 'not-allowed' : 'pointer',
+          marginBottom: 20,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          boxShadow: (!image || loading) ? 'none' : '0 4px 28px rgba(217,70,239,0.35)',
         }}
       >
         {loading ? (
           <>
-            <RefreshCw size={16} style={{ animation: 'spin 1s linear infinite' }} />
+            <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2.5px solid rgba(255,255,255,.3)', borderTopColor: '#fff', animation: 'spin-k .8s linear infinite' }} />
             Đang phân tích & viết prompt...
           </>
         ) : (
@@ -413,9 +491,9 @@ export default function KlingFashionPage() {
       {/* ── Error ── */}
       {error && (
         <div style={{
-          background: 'rgba(245,101,101,0.1)', border: '1px solid rgba(245,101,101,0.3)',
+          background: C.reBg, border: `1px solid ${C.reBd}`,
           borderRadius: 10, padding: '12px 16px', marginBottom: 16,
-          display: 'flex', alignItems: 'flex-start', gap: 8, color: '#fc8181', fontSize: 12
+          display: 'flex', alignItems: 'flex-start', gap: 8, color: C.reL, fontSize: 12,
         }}>
           <AlertCircle size={16} style={{ flexShrink: 0, marginTop: 1 }} />
           <span>{error}</span>
@@ -426,15 +504,17 @@ export default function KlingFashionPage() {
       {result && (
         <div>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16,
-            paddingBottom: 12, borderBottom: '1px solid rgba(255,255,255,0.06)'
+            display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14,
+            paddingBottom: 12, borderBottom: `1px solid ${C.b1}`,
           }}>
-            <Film size={16} style={{ color: '#a78bfa' }} />
-            <span style={{ color: '#a78bfa', fontSize: 13, fontWeight: 700 }}>KẾT QUẢ PHÂN TÍCH</span>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: C.fuBg, border: `1px solid ${C.fuBd}`, display: 'grid', placeItems: 'center' }}>
+              <Film size={14} style={{ color: C.fu }} />
+            </div>
+            <span style={{ color: C.fu, fontSize: 13, fontWeight: 800, letterSpacing: '0.05em' }}>KẾT QUẢ PHÂN TÍCH</span>
           </div>
 
           {/* Analysis */}
-          <Section icon={Camera} title="📸 Phân tích ảnh" color="#68d391">
+          <Section icon={Camera} title="📸 Phân tích ảnh" color={C.green}>
             {result.analysis && (
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                 {[
@@ -446,9 +526,9 @@ export default function KlingFashionPage() {
                   ['Bối cảnh', result.analysis.background],
                   ['Highlight', result.analysis.highlight],
                 ].map(([label, val]) => val && (
-                  <div key={label} style={{ background: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: '10px 12px' }}>
-                    <div style={{ color: '#90cdf4', fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>{label}</div>
-                    <div style={{ color: '#e8edf5', fontSize: 12, marginTop: 4, lineHeight: 1.6 }}>{val}</div>
+                  <div key={label} style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 8, padding: '10px 12px' }}>
+                    <div style={{ color: C.green, fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</div>
+                    <div style={{ color: C.t1, fontSize: 12, marginTop: 4, lineHeight: 1.6 }}>{val}</div>
                   </div>
                 ))}
               </div>
@@ -456,95 +536,55 @@ export default function KlingFashionPage() {
           </Section>
 
           {/* Scenarios */}
-          <Section icon={Layers} title="🎬 Kịch bản đề xuất" color="#f6ad55">
+          <Section icon={Layers} title="🎬 Kịch bản đề xuất" color={C.or}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               {result.scenarioMain && (
-                <div style={{
-                  background: 'rgba(246,173,85,0.08)', border: '1px solid rgba(246,173,85,0.25)',
-                  borderRadius: 10, padding: 12
-                }}>
+                <div style={{ background: C.orBg, border: `1px solid ${C.orBd}`, borderRadius: 10, padding: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <span style={{
-                      background: '#f6ad55', color: '#1a202c',
-                      borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 800
-                    }}>
+                    <span style={{ background: C.or, color: '#fff', borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 800 }}>
                       CHÍNH · {result.scenarioMain.id}
                     </span>
                   </div>
-                  <div style={{ color: '#f6ad55', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
-                    {result.scenarioMain.name}
-                  </div>
-                  <div style={{ color: '#a0aec0', fontSize: 11, lineHeight: 1.5 }}>
-                    {result.scenarioMain.reason}
-                  </div>
+                  <div style={{ color: C.orL, fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{result.scenarioMain.name}</div>
+                  <div style={{ color: C.t3, fontSize: 11, lineHeight: 1.5 }}>{result.scenarioMain.reason}</div>
                 </div>
               )}
               {result.scenarioAlt && (
-                <div style={{
-                  background: 'rgba(160,174,192,0.05)', border: '1px solid rgba(160,174,192,0.15)',
-                  borderRadius: 10, padding: 12
-                }}>
+                <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, padding: 12 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                    <span style={{
-                      background: 'rgba(160,174,192,0.2)', color: '#a0aec0',
-                      borderRadius: 4, padding: '1px 7px', fontSize: 10, fontWeight: 800
-                    }}>
+                    <span style={{ background: C.bg3, color: C.t2, borderRadius: 5, padding: '2px 8px', fontSize: 10, fontWeight: 800 }}>
                       PHỤ · {result.scenarioAlt.id}
                     </span>
                   </div>
-                  <div style={{ color: '#cbd5e0', fontWeight: 700, fontSize: 13, marginBottom: 4 }}>
-                    {result.scenarioAlt.name}
-                  </div>
-                  <div style={{ color: '#718096', fontSize: 11, lineHeight: 1.5 }}>
-                    {result.scenarioAlt.reason}
-                  </div>
+                  <div style={{ color: C.t2, fontWeight: 700, fontSize: 13, marginBottom: 4 }}>{result.scenarioAlt.name}</div>
+                  <div style={{ color: C.t3, fontSize: 11, lineHeight: 1.5 }}>{result.scenarioAlt.reason}</div>
                 </div>
               )}
             </div>
           </Section>
 
           {/* Smart Storyboard */}
-          <Section icon={Zap} title="🟢 Smart Storyboard — 1 Prompt duy nhất (15s)" color="#68d391">
+          <Section icon={Zap} title="🟢 Smart Storyboard — 1 Prompt duy nhất (15s)" color={C.green}>
             {result.smartPrompt && (
               <>
                 {result.smartNote && (
-                  <p style={{ color: '#a0aec0', fontSize: 12, marginBottom: 12, lineHeight: 1.6, fontStyle: 'italic' }}>
+                  <p style={{ color: C.t3, fontSize: 12, marginBottom: 12, lineHeight: 1.6, fontStyle: 'italic' }}>
                     {result.smartNote}
                   </p>
                 )}
-                {/* Combined prompt + negative prompt block */}
-                <div style={{
-                  background: 'rgba(26,32,44,0.6)', border: '1px solid rgba(104,211,145,0.2)',
-                  borderRadius: 10, overflow: 'hidden'
-                }}>
-                  {/* Label row */}
-                  <div style={{
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                    padding: '8px 14px', background: 'rgba(104,211,145,0.08)',
-                    borderBottom: '1px solid rgba(104,211,145,0.12)'
-                  }}>
-                    <span style={{ color: '#68d391', fontSize: 11, fontWeight: 800, letterSpacing: 0.5 }}>
-                      PROMPT + NEGATIVE PROMPT
-                    </span>
-                    <CopyBtn
-                      text={`${result.smartPrompt}\n\nNegative prompt: ${result.negativePrompt || ''}`}
-                      label="Copy tất cả"
-                    />
+                <div style={{ background: C.bg2, border: `1px solid ${C.b1}`, borderRadius: 10, overflow: 'hidden' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 14px', background: C.greenBg, borderBottom: `1px solid ${C.b1}` }}>
+                    <span style={{ color: C.green, fontSize: 10, fontWeight: 800, letterSpacing: '0.05em' }}>PROMPT + NEGATIVE PROMPT</span>
+                    <CopyBtn text={`${result.smartPrompt}\n\nNegative prompt: ${result.negativePrompt || ''}`} label="Copy tất cả" />
                   </div>
-                  {/* Prompt */}
-                  <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div style={{ color: '#68d391', fontSize: 10, fontWeight: 700, marginBottom: 6, letterSpacing: 0.5 }}>PROMPT</div>
-                    <p style={{ color: '#e8edf5', fontSize: 12, lineHeight: 1.8, margin: 0, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                      {result.smartPrompt}
-                    </p>
+                  <div style={{ padding: '12px 14px', borderBottom: `1px solid ${C.b1}` }}>
+                    <div style={{ color: C.green, fontSize: 10, fontWeight: 700, marginBottom: 6, letterSpacing: '0.05em' }}>PROMPT</div>
+                    <p style={{ color: C.t1, fontSize: 12, lineHeight: 1.8, margin: 0, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>{result.smartPrompt}</p>
                   </div>
-                  {/* Negative prompt */}
                   {result.negativePrompt && (
                     <div style={{ padding: '12px 14px' }}>
-                      <div style={{ color: '#fc8181', fontSize: 10, fontWeight: 700, marginBottom: 6, letterSpacing: 0.5 }}>NEGATIVE PROMPT</div>
-                      <p style={{ color: '#e8edf5', fontSize: 12, lineHeight: 1.8, margin: 0, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                        {result.negativePrompt}
-                      </p>
+                      <div style={{ color: C.reL, fontSize: 10, fontWeight: 700, marginBottom: 6, letterSpacing: '0.05em' }}>NEGATIVE PROMPT</div>
+                      <p style={{ color: C.t2, fontSize: 12, lineHeight: 1.8, margin: 0, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>{result.negativePrompt}</p>
                     </div>
                   )}
                 </div>
@@ -553,36 +593,25 @@ export default function KlingFashionPage() {
           </Section>
 
           {/* Custom Storyboard */}
-          <Section icon={Film} title="🔵 Custom Storyboard (chuyên nghiệp)" color="#63b3ed">
+          <Section icon={Film} title="🔵 Custom Storyboard (chuyên nghiệp)" color={C.bl}>
             {result.masterPrompt && (
               <div style={{ marginBottom: 14 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span style={{ color: '#90cdf4', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-                    Master Prompt
-                  </span>
+                  <span style={{ color: C.bl, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Master Prompt</span>
                   <CopyBtn text={result.masterPrompt} />
                 </div>
-                <div style={{
-                  background: 'rgba(26,32,44,0.6)', border: '1px solid rgba(99,179,237,0.18)',
-                  borderRadius: 10, padding: 14
-                }}>
-                  <p style={{ color: '#e8edf5', fontSize: 12, lineHeight: 1.8, margin: 0, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
-                    {result.masterPrompt}
-                  </p>
+                <div style={{ background: C.bg2, border: `1px solid ${C.blBd}`, borderRadius: 10, padding: 14 }}>
+                  <p style={{ color: C.t1, fontSize: 12, lineHeight: 1.8, margin: 0, fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>{result.masterPrompt}</p>
                 </div>
               </div>
             )}
-
             {result.shots && result.shots.length > 0 && (
               <div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                  <span style={{ color: '#90cdf4', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  <span style={{ color: C.bl, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                     {result.shots.length} Shots · Tổng {result.shots.reduce((s, sh) => s + (sh.duration || 0), 0)}s
                   </span>
-                  <CopyBtn
-                    label="Copy tất cả shots"
-                    text={result.shots.map(s => `SHOT ${s.num} | ${s.duration}s — "${s.name}"\n${s.prompt}`).join('\n\n')}
-                  />
+                  <CopyBtn label="Copy tất cả shots" text={result.shots.map(s => `SHOT ${s.num} | ${s.duration}s — "${s.name}"\n${s.prompt}`).join('\n\n')} />
                 </div>
                 {result.shots.map((shot, i) => <ShotCard key={i} shot={shot} />)}
               </div>
@@ -590,26 +619,21 @@ export default function KlingFashionPage() {
           </Section>
 
           {/* Instructions */}
-          <Section icon={Clapperboard} title="📋 Hướng dẫn thực hiện trên Kling" color="#a78bfa" defaultOpen={false}>
+          <Section icon={Clapperboard} title="📋 Hướng dẫn thực hiện trên Kling" color={C.fu} defaultOpen={false}>
             {result.instructions && (
-              <ol style={{ margin: 0, paddingLeft: 16, color: '#a0aec0', fontSize: 12, lineHeight: 2 }}>
+              <ol style={{ margin: 0, paddingLeft: 18, color: C.t3, fontSize: 12, lineHeight: 2.2 }}>
                 {result.instructions.map((step, i) => (
-                  <li key={i} style={{ color: '#e2e8f0' }}>{step.replace(/^\d+\.\s*/, '')}</li>
+                  <li key={i} style={{ color: C.t1 }}>{step.replace(/^\d+\.\s*/, '')}</li>
                 ))}
               </ol>
             )}
-            <div style={{
-              marginTop: 12, background: 'rgba(167,139,250,0.08)', border: '1px solid rgba(167,139,250,0.2)',
-              borderRadius: 8, padding: '10px 12px', fontSize: 11, color: '#a78bfa'
-            }}>
+            <div style={{ marginTop: 12, background: C.fuBg, border: `1px solid ${C.fuBd}`, borderRadius: 8, padding: '10px 14px', fontSize: 11, color: C.fuL }}>
               💡 Mẹo: Có thể cần generate 2–3 lần để đạt kết quả tốt nhất. Upload 2–4 ảnh từ nhiều góc làm Element cho kết quả ổn định hơn.
             </div>
           </Section>
         </div>
       )}
-
-      {/* CSS keyframe for spinner */}
-      <style>{`@keyframes spin { from { transform: rotate(0deg) } to { transform: rotate(360deg) } }`}</style>
+      </div>{/* end content */}
     </div>
   )
 }

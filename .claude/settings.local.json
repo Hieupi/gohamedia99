@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm run:*)",
-      "Bash(firebase deploy:*)"
+      "Bash(firebase deploy:*)",
+      "Bash(file src/pages/PhoiDoPage.jsx)",
+      "Bash(python3 -c \"import chardet; data=open\\('src/pages/PhoiDoPage.jsx','rb'\\).read\\(\\); print\\(chardet.detect\\(data\\)\\)\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(ls \"D:/00 VIBE CODING/TOOL FASHION STUDIO AI/src/components/AppLayout\".*)",
+      "Bash(curl -s https://gohaaff.click/)",
+      "Bash(curl -s \"https://gohaaff.click/assets/index-DJEdbKsw.css\")",
+      "Bash(grep -oE 'sidebar-nav-item[^}]{0,400}')"
     ]
   }
 }
