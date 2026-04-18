@@ -14,11 +14,13 @@ import VideoPromptPage from '../pages/VideoPromptPage'
 import KOLCreatorPage from '../pages/KOLCreatorPage'
 import KlingFashionPage from '../pages/KlingFashionPage'
 import PhoiDoPage from '../pages/PhoiDoPage'
+import PhoiDoLotPage from '../pages/PhoiDoLotPage'
 
 const NAV_ITEMS = [
   { path: '/home', label: 'Trang chủ', icon: Home, feature: null },
   { path: '/kol-creator', label: 'Tạo KOL AI', icon: UserCircle2, feature: 'storytelling' },
   { path: '/phoi-do', label: 'Phối Đồ', icon: Sparkles, feature: 'storytelling' },
+  { path: '/phoi-do-lot', label: 'Phối Đồ Lót', icon: Sparkles, feature: 'storytelling' },
   { path: '/kling-fashion', label: 'Kling AI Fashion', icon: Clapperboard, feature: 'storytelling' },
   { path: '/new-design', label: 'Thiết kế mới', icon: Wand2, feature: 'new-design' },
   { path: '/storytelling', label: 'Storytelling', icon: BookOpen, feature: 'storytelling' },
@@ -40,6 +42,7 @@ const NAV_ITEMS = [
 const KEEP_ALIVE_PAGES = [
   { path: '/kol-creator', Component: KOLCreatorPage, feature: 'storytelling' },
   { path: '/phoi-do', Component: PhoiDoPage, feature: 'storytelling' },
+  { path: '/phoi-do-lot', Component: PhoiDoLotPage, feature: 'storytelling' },
   { path: '/kling-fashion', Component: KlingFashionPage, feature: 'storytelling' },
   { path: '/new-design', Component: NewDesignPage, feature: 'new-design' },
   { path: '/storytelling', Component: StorytellingPage, feature: 'storytelling' },

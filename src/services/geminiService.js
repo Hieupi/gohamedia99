@@ -64,25 +64,43 @@ function getMimeType(file) {
  * Tránh request quá lớn khi ảnh gốc từ điện thoại (10-20MB/ảnh).
  * Trả về base64 string (không có prefix data:...).
  */
-function resizeToBase64(file, maxPx = 768) {
+function resizeToBase64(file, maxPx = 768, jpegQuality = 0.9) {
   return new Promise((resolve, reject) => {
     const img = new Image()
     const url = URL.createObjectURL(file)
     img.onload = () => {
-      URL.revokeObjectURL(url)
       const scale = Math.min(1, maxPx / Math.max(img.width, img.height))
+
+      // Keep original source when no downscale is needed to avoid unnecessary re-encoding blur.
+      if (scale === 1) {
+        URL.revokeObjectURL(url)
+        fileToBase64(file).then(resolve).catch(reject)
+        return
+      }
+
       const w = Math.round(img.width * scale)
       const h = Math.round(img.height * scale)
       const canvas = document.createElement('canvas')
       canvas.width = w
       canvas.height = h
       canvas.getContext('2d').drawImage(img, 0, 0, w, h)
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85)
+      const dataUrl = canvas.toDataURL('image/jpeg', jpegQuality)
+      URL.revokeObjectURL(url)
       resolve(dataUrl.split(',')[1])
     }
-    img.onerror = reject
+    img.onerror = (err) => {
+      URL.revokeObjectURL(url)
+      reject(err)
+    }
     img.src = url
   })
+}
+
+function getGenerationResizeMaxPx(rawQuality = '2K') {
+  const sizeMatch = rawQuality.match(/([124]K)/i)?.[1]?.toUpperCase() || '2K'
+  if (sizeMatch === '4K') return 2048
+  if (sizeMatch === '1K') return 1280
+  return 1664
 }
 
 // ─── Core call ────────────────────────────────────────────────────────────────
@@ -221,16 +239,18 @@ export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
   // This order is critical — AI prioritizes early images for identity
   const imageParts = []
 
+  const generationMaxPx = getGenerationResizeMaxPx(rawQuality)
+
   // Add reference face images FIRST (img1, img2...) for identity lock
-  // Resize to 1024px max to keep payload manageable (avoids "failed to fetch" with large phone photos)
+  // Keep higher resolution/quality to preserve micro-texture in downstream generation.
   const refFiles = opts.referenceFiles || []
   for (const refFile of refFiles) {
-    const refBase64 = await resizeToBase64(refFile, 1024).catch(() => fileToBase64(refFile))
+    const refBase64 = await resizeToBase64(refFile, generationMaxPx, 0.94).catch(() => fileToBase64(refFile))
     imageParts.push({ inline_data: { mime_type: 'image/jpeg', data: refBase64 } })
   }
 
-  // Add product image AFTER references — also resize to avoid huge payloads
-  const base64Img = await resizeToBase64(imageFile, 1024).catch(() => fileToBase64(imageFile))
+  // Add product image AFTER references — keep texture-rich source signal.
+  const base64Img = await resizeToBase64(imageFile, generationMaxPx, 0.94).catch(() => fileToBase64(imageFile))
   imageParts.push({ inline_data: { mime_type: 'image/jpeg', data: base64Img } })
 
   // Gemini Image Gen: IMAGEs before TEXT
@@ -246,13 +266,17 @@ export async function generateGarmentImage(imageFile, itemPrompt, opts = {}) {
       temperature: 0.4,
       maxOutputTokens: 8192,
       responseModalities: ['TEXT', 'IMAGE'],
-      // ★ CRITICAL: imageConfig controls actual output resolution
-      // Without this, API defaults to 1K (1024px)
       imageConfig: {
         imageSize: apiImageSize,
         aspectRatio: apiAspectRatio,
       },
     },
+    safetySettings: opts.safetySettings || [
+      { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
+      { category: 'HARM_CATEGORY_HARASSMENT', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+      { category: 'HARM_CATEGORY_HATE_SPEECH', threshold: 'BLOCK_MEDIUM_AND_ABOVE' },
+    ],
   }
 
   const url = `${BASE_URL}/${MODEL_IMAGE}:generateContent?key=${apiKey}`
